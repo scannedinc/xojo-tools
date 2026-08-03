@@ -1,0 +1,380 @@
+---
+name: xojo-migrate
+description: >-
+  Convert Xojo source code from API 1 to API 2. Use whenever the user asks to
+  convert, migrate, update, or modernize a Xojo project or Xojo code to API 2
+  (or "API 2.0"), fix Xojo deprecation warnings from Analyze Project, or
+  replace deprecated Xojo APIs such as MsgBox, Dim, RecordSet, SQLSelect,
+  Date, InStr, Mid, Len, Ubound, ListBox members, GetFolderItem, or
+  error-code checks. Also use for questions about Xojo API 1 vs API 2
+  differences, 0-based index changes, RowSet/DateTime/Try-Catch migration, or
+  whether a Xojo API is deprecated, even if the user never says "API 2".
+  Covers more than a thousand deprecated and removed symbols with hundreds of vetted conversion rules.
+---
+
+# Xojo API 1 → API 2 migration
+
+Rule-driven, confidence-tiered conversion of Xojo source code. This skill bundles the complete deprecation matrix (more than a thousand symbols, generated from Xojo's own deprecation docs) and hundreds of reviewed conversion rules with find/replace regexes, caveats, and before/after examples, each one machine-checked against the rule that carries it.
+
+The mindset that matters: **the dangerous bugs here are runtime bugs, not compile errors.** Several API 1 functions changed index base (1-based → 0-based), one changed its not-found sentinel (`InStr`'s 0 → `IndexOf`'s -1), and `Date`'s epoch moved 66 years. A rename that compiles can still be wrong. That is why rules carry confidence tiers and why the workflow below fixes *semantics before names*.
+
+## What this is, and what it needs
+
+**Requirements.** Desktop Xojo projects saved in **text format**, built with **Xojo 2021r3 or later** (when the `Desktop*` classes arrived), in a **git repository**, with **python3** on PATH for the bundled scripts. The **Xojo IDE is required**—this skill never compiles anything, so every checkpoint is a compile the user performs. iOS, Web and Android surfaces are out of scope.
+
+**Provenance, and what that means for trusting it.** The deprecation matrix is *derived* from Xojo's own published documentation—the deprecated-symbol indexes and the per-release deprecation tables—so its coverage is a property of those sources rather than of anyone's memory. The conversion rules, caveats and traps are hand-written on top of it and reviewed against real migrations; they are the opinionated part. Where a mapping could not be verified against a documentation page, the row says so in its `note`. Treat a row's note as part of the answer, not decoration.
+
+Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo" is their trademark. No Xojo documentation is redistributed here; the **References** section links to it. This skill is MIT-licensed (`LICENSE.txt`, beside this file) and comes with no warranty—it will happily hand you a wrong rename if you skip the receiver checks it keeps insisting on.
+
+## Hard rules
+
+1. **`high` describes the mapping, not the blast radius.** A `high` rule means *the replacement is the verified correct API 2 form*: the old name really does become that new name, with no index, sentinel, or epoch change hiding in it. It does **not** mean "safe to Replace All". No rule in this skill is authorized for a blind project-wide replace, because no regex here can tell code from a string literal, a call from a declaration, or one receiver type from another. Read the matched line before you change it. What the tier buys you is *how hard you have to look*: `high` needs a glance, `medium`/`low` need the receiver resolved, `manual` needs a rewrite.
+2. **Member renames are type-blind, and this rule outranks rule 1.** `.Append` means `.Add` on an array but `.AddObject` on a Group2D; `.RemoveRow` is deprecated on ListBox but valid API 2 on RowSet; `.ColumnType` is deprecated on ListBox and *live* on RowSet. Before renaming any `.Member`—at **any** confidence—find the receiver's declared type and confirm the replacement applies. More than half of the `high` rules are anchored on a literal dot and rename a member; they are high because the mapping is right for the stated receiver, and they still need that receiver checked.
+3. **A receiver must be an identifier—never a literal, never a parenthesised expression.** Xojo has no member access on either. Both of these are **syntax errors**, not stylistic choices:
+
+   ```
+   "0123456789".IndexOf(char)      ' literal receiver
+   ("00" + Hex(red)).Right(2)      ' parenthesised-expression receiver
+   ```
+
+   A receiver is an identifier, or a chain of member accesses and calls off one—`s.Trim.Uppercase`, `f.Child("x").Name`, `dict.ExportXML(p).ToString` are all fine. This decides whether a whole class of conversions is *expressible at all*, so it outranks any rule's convenience.
+
+   **What counts is why the parentheses are there, not that they are there.** Parentheses that *group an expression* block member access. Parentheses that belong to a call, a cast, or an index do not, and the result of any of those three is a perfectly good receiver:
+
+   ```
+   EncodeBase64(mb, 45).Split(delim)    ' OK -- global function result
+   Dictionary(v.ObjectValue).KeyCount   ' OK -- cast result
+   values(index).ReplaceLineEndings("") ' OK -- indexed access
+   ("00" + Hex(red)).Right(2)           ' SYNTAX ERROR -- grouped expression
+   ```
+
+   Xojo's own documentation writes `GetType(d).GetProperties` throughout, so the call-result form is not a grey area. This matters because it is the shape you land on whenever a global→method rule skips a call for its *argument* rather than its receiver, and you then convert it by hand.
+
+   Every global→method rule here captures an identifier receiver and silently skips everything else. For a skipped call there are exactly **two** outcomes: introduce a local variable, or leave the deprecated global in place. Hand-writing the method form is not a third option—it does not compile. `conversion-traps.md` §4 says which to choose and when.
+4. **Fix `InStr`/`IdxField` result comparisons and index arithmetic BEFORE renaming the functions.** Renaming first hides the remaining wrong arithmetic. Details in `$SKILL/references/conversion-traps.md`.
+
+   "Before" means *within the same edit*, not in an earlier commit. Splitting them leaves a tree where `InStr(...) >= 0` is API 1 code read with an API 2 sentinel—always true, compiles, wrong—which **Commit discipline** below forbids. Convert each site atomically, comparison and rename together, and commit the sites as one batch.
+5. **Byte-variants before base names**: `LenB/MidB/InStrB/ReplaceB/SplitB` before `Len/Mid/InStr/Replace/Split`, or the base-name pass mangles the byte variants.
+6. **Claude cannot compile or run Xojo.** There is no Xojo CLI. Every phase ends with the user compiling / running Analyze Project in the Xojo IDE and reporting back. Never claim a conversion "works"; say it awaits an IDE check.
+7. **Match rule casing exactly** in replacements (Xojo identifiers are case-insensitive, but canonical casing keeps the code readable and consistent with the docs).
+8. **Git is not optional, and one commit is not enough.** Do not begin editing outside a git repository. Commit at every checkpoint, one commit per category, so each batch can be reviewed and reverted on its own. A single commit at the end is a wall of renames nobody can review; a rule that over-matched is then indistinguishable from one that worked. See **Commit discipline** below.
+
+## Preconditions (phase 0)
+
+Before editing anything, confirm with the user:
+
+- **Git repository, clean tree, migration branch.** This is a hard requirement, not a suggestion: several rules can over-match, and the recovery plan is `git revert`, not memory.
+
+  ```
+  git -C <project> rev-parse --is-inside-work-tree   # must print exactly: true
+  git -C <project> status --porcelain                # must print nothing
+  ```
+
+  "Work tree" here means *the checked-out files you edit*, as opposed to the `.git` database, and has nothing to do with the `git worktree` command or with branches. The question being asked is "is there a checkout here I can edit and commit?"
+
+  Check the *output* of the first command, not just its exit status: outside a repository it exits non-zero, but inside a **bare** repository (a `.git` database with no checked-out files, the kind a server hosts) it exits 0 and prints `false`. `true` is the only acceptable answer.
+
+  - **Not a repo?** Offer `git init` plus an initial commit of the current state. Do not proceed until that baseline exists; without it there is nothing to diff the migration against.
+  - **Dirty tree?** Stop and ask the user to commit or stash. Their in-progress work must not end up inside a conversion commit.
+  - **Then branch:** note the current branch name first (`git branch --show-current`); that is the base you will diff against later. Then `git switch -c api2-migration`. The whole migration is reviewable as one branch and abandonable with one command.
+  - **Binary/XML project?** The text-format save (below) is itself the first commit, before any conversion.
+- **Text-format project.** Source must be `.xojo_code` / `.xojo_window` etc. If the project is binary (`.xojo_binary_project`) or XML, ask the user to File ▸ Save As... in "Xojo Project" (text) format first. `$SKILL/scripts/scan.py` detects this and prints the instruction.
+- **Xojo version.** Desktop* control classes need Xojo 2021r3+. Ask which release they build with.
+- **Deprecation warnings on.** Project ▸ Analysis Warnings → enable "Item1 is deprecated" (off by default), so Analyze Project shows the worklist.
+
+## Commit discipline
+
+**One commit per category.** Arrays, then ListBox, then Database, then Date, and so on, each its own commit, so the reviewer reads "what happened to the arrays" rather than 4,000 renamed lines. Within a category, `high` and `medium`/`low` work can share a commit; across categories, never.
+
+**Commit only after the user confirms the checkpoint.** Claude cannot compile Xojo (hard rule 6). The order is always: make the edits → ask the user to compile / Analyze Project → they report back → commit. Never commit changes whose compile status nobody has checked.
+
+**When the user declines the checkpoints.** Some users will opt out of compiling per category and ask you to run the whole migration through. That is their call to make, and it does not change the commit discipline—it changes what the `Compiles:` trailer says. Record the fact in **every** affected commit, in these words, rather than omitting the trailer:
+
+```
+Compiles: NOT VERIFIED -- user opted to skip the per-category IDE checkpoints
+```
+
+Silence reads as "checked and fine" to anyone reading `git log` later, which is precisely the claim you are not in a position to make. Say it once to the user up front as well: without the checkpoints, a rule that over-matched will surface at the end against the whole branch instead of against one category, and `git revert` of a single commit stops being a usable recovery.
+
+**The two categories expected to break the build** are Date and error handling: the compile errors *are* the worklist. Do not commit a half-migrated Date category as if it were finished. Either carry the mechanical pass and its manual follow-up into one commit, or commit the mechanical step with the breakage stated plainly in the message body and land the fix in the very next commit.
+
+**Message format.** Match the project's existing convention; read `git log` first. If there is none, use:
+
+```
+Xojo API 2: <category>, <what changed>
+
+<n> occurrences across <n> files. Rules applied: c2r0, c2r5, ...
+Skipped: <what and why>
+Still manual: <what remains>
+
+Compiles: confirmed by <user> / expected errors, fixed in the next commit
+```
+
+Listing the rule ids matters: when a rename turns out wrong three commits later, the id is how you find every other place that rule touched.
+
+**Never push, and never commit outside the migration branch.** Pushing is the user's call. At the end, hand them the branch and the commit list.
+
+## Workflow
+
+Read `$SKILL/references/ide-vs-source.md` before phase 1, and `$SKILL/references/conversion-traps.md` before phases 3–6. Its §8 (string literals) and §9 (declarations) are what phase 4's per-match glance is checking for.
+
+### 1. IDE converter first
+
+Ask the user to run **Project ▸ Update Controls to API 2.0** in the IDE, then commit the result as the **first commit on the migration branch**. It is a large, entirely IDE-generated diff; keeping it separate is what makes every later commit readable as your work rather than the converter's. If they can't or won't, note it; type renames move to phase 7.
+
+### 2. Inventory
+
+Set `SKILL` to the installed skill directory first (see **Data access** below); the scripts live there, not in the user's project.
+
+```
+python3 $SKILL/scripts/scan.py /path/to/project            # human-readable
+python3 $SKILL/scripts/scan.py /path/to/project --format json
+```
+
+**Present the in-code count, not the raw hit count.** `scan.py` reports `N in code (M raw)`: the first number excludes layout metadata, `#tag Note` blocks, comments and string literals, while the second counts every textual match. Only the first is a worklist. The gap is routinely 3–4x—a window's `Left = 110` and `Text = "OK"` layout properties alone can produce hundreds of matches for `Left` and `Text`—and leading with the raw number sets an expectation for the whole job that the real work will not match. Quote the raw number only to explain why a symbol looks alarming and isn't.
+
+**Never convert a symbol that is not compiled.** A deprecation is a property of code the compiler reads. A `#tag Note`, a comment and a string literal are not that, so a deprecated name inside one is not a deprecation and converting it fixes nothing. This is easy to get wrong from the *other* direction: `scan.py` already excludes these regions, so the temptation arises when a plain text search, a grep, or your own reading turns one up and it looks like a symbol the scanner missed. It did not miss it.
+
+`#tag Note` blocks are the trap, because their content is often whole slabs of real, syntactically valid old code that someone parked there instead of deleting:
+
+```
+#tag Note, Name = Old drawing code
+  #elseif TargetWin32 ///////////////////////////
+  ...400 lines of archived code...
+#tag EndNote
+```
+
+Editing that changes a comment, adds noise to a diff that is supposed to be pure renames, and reports as a fix that fixes nothing. Leave it. If a note's archived code is worth migrating it is worth deleting instead, and that is the user's call, not part of this migration.
+
+Even the in-code number is an upper bound: member matches are type-blind, so a symbol whose receivers all turn out to be user classes or live API 2 controls can go to zero. Say "up to M sites to review", never "M conversions".
+
+Present symbols per bucket, with those counts. The seven buckets, and what each one means for the plan:
+
+| Bucket | Meaning |
+|---|---|
+| `Removed` | **Does not compile.** Gone from the framework. These are build errors that exist before conversion starts; lead with them. |
+| `Source — global` / `member` / `type` | The conversion work. Member matches are type-blind leads, not a to-do list. |
+| `IDE handles` | Control/class renames the IDE converter does (phase 1), plus their event renames. |
+| `No replacement` | Still compiles, but Xojo documents no API 2 replacement; needs redesign, not renaming. |
+| `Out of scope` | iOS / Web / Android / PDF surface. |
+
+Lead with `Removed`, then `No replacement`: those two are the ones that change what the project can even do, and neither is fixed by any rule.
+
+**Anything left unconverted gets a marker at the site.** This is a hard rule of the workflow, not a nicety, and it applies to *every* deferral—not just the `No replacement` bucket. Deprecated calls still compile, so nothing will ever remind anyone they were deliberate. Leave the API 1 call in place and mark it with Xojo's own directive, which surfaces in the IDE's Issues pane on every build:
+
+```
+#Pragma Warning "API 2: JSONItem.DecimalFormat has no documented replacement -- unresolved"
+#Pragma Warning "API 2: InStr with a literal source -- needs a local variable"
+#Pragma Warning "API 2: DrawPolygon -- DrawPath takes a path object, not this coordinate array"
+```
+
+A line in a commit message is not a durable record: three months later the question is "this is still API 1, why?", and the commit body is not where anyone looks. A `#Pragma Warning` answers it at the call site, every build. Use `#Pragma Error` instead only if the user wants the build to stop until it is resolved.
+
+**One marker per method is enough when a method repeats the same deferral.** A validation loop calling `InStr("0123456789", c)` dozens of times across dozens of methods does not need one identical marker per call; it needs the reader to find out once, wherever they enter the method. Put a single marker at the top of the method and say how many sites it covers:
+
+```
+#Pragma Warning "API 2: 3x InStr with a literal source -- each needs a local variable"
+```
+
+The rule being enforced is *the deferral is discoverable from the code*, not *the marker count equals the site count*. What is never enough is recording it only in the final report: the report is not in the IDE and not in the file. Where `conversion-traps.md` §4 says to "list them in the final report", that is in addition to the marker, never instead of it.
+
+The three deferral categories that recur, all of which need this: compound receivers left as deprecated globals (hard rule 3), calls whose replacement takes a different *kind* of argument (`DrawPolygon`/`FillPolygon` → `DrawPath`/`FillPath`), and anything awaiting a design decision from the user.
+
+**Not everything old is deprecated.** Some globals that look like obvious API 1 holdovers are still current, and the matrix's silence about them is the answer, not a gap: `Asc`, `Chr`, `Val`, `Str`, `Format`, `Abs`, `Min`, `Max`, `Round`, `CStr`. Do not convert them, and do not go hunting for a replacement when a user asks. Note the trap in the pair, though—the **byte variants `AscB` and `ChrB` *are* deprecated** (→ `String.AscByte` / `String.ChrByte`) even though their base names are fine. If `lookup.py symbol <Name>` returns nothing, the symbol is not deprecated; check before answering.
+
+### 3. Plan the pass order
+
+From the inventory, build the worklist honoring the ordering pitfalls:
+
+1. Byte-variants before base names (hard rule 5).
+2. Narrow patterns before sweeps: `As RecordSet → As RowSet` before any bare `RecordSet` rename.
+3. `InStr`/`IdxField` comparison and index fixes before the renames (hard rule 4).
+4. Method-form rules before global-form where both exist.
+5. Category order roughly: strings → arrays → ListBox → Database → Date → error handling → globals → files → graphics → misc.
+
+#### One pass creates what the next pass matches
+
+A rule can *produce* a name that a later category's regex then matches, so that category's hits are partly your own output rather than the inventory's. The documented order causes one instance of this (arrays → ListBox `.LastIndex`) and handles two others. **Read `$SKILL/references/pass-hazards.md` §3 before running the ListBox or array categories**—it names all three and gives the end-of-category check that catches a new one.
+
+**This ordering is also the commit plan.** Each category in step 5 becomes one commit, in that order. Show the user the list up front ("roughly 9 commits, in this order, and here is what each will contain") so they know what they are agreeing to review. Categories with no hits are dropped from the plan; say which, so a missing commit does not read as a missed step.
+
+### 4. Fast pass (`high` rules): one glance per match
+
+For each `high` rule with hits, fetch it (`$SKILL/scripts/lookup.py rule <id>`) and walk its matches. Per match, three questions, all answerable from the one line you are looking at:
+
+1. **Is it code?** Skip matches inside string literals and comments. No rule here can see the difference; you can.
+2. **Does the rule's `caveat` name a hazard?** The caveats call out the two that recur: a *live API 2 collision* (the same member name is valid on another class) and a *declaration hazard* (the rule rewrites the identifier, so it would rewrite the user's own `Sub Speak(...)` too). A declaration hazard makes **each match ambiguous, not the rule inapplicable**—never skip the whole rule because the project defines the name, or you drop its true positives along with its false ones.
+3. **Does the rule's `manual` note apply?** Compound-argument calls the regex deliberately skips must be hand-converted or explicitly deferred.
+
+If all three are clear, apply it. This is a fast pass, not a blind one; most matches clear in a second.
+
+**A global-form rule and its method-form sibling are two separate steps.** Most string and array functions survive in both forms, and each form is its own rule: `Len(s)` is c0r0 and `s.Len` is c0r1; `Mid(s, n)` is c0r8–c0r10 and `s.Mid(n)` is c0r11. The global rules are anchored `(?<![\w.])`, whose whole job is to *exclude* the dot form, so applying them cannot touch it. Fifteen member names are in this state, including `.Len`, `.Mid`, `.InStr`, `.UBound`, `.LTrim` and the byte variants.
+
+Work the rules a symbol at a time, not a form at a time: `scan.py` lists every rule for a symbol on one line (`len ... rules: c0r0(high), c0r1(high)`), so clear that line before moving on. Skipping the sibling is invisible—the global rule reports zero remaining and the dot form is still there.
+
+> **Phases 4 and 5 run per category, not project-wide.** Take one category from
+> the step-5 order, do its `high` pass, then its `medium`/`low` pass, then
+> checkpoint and commit, then move to the next. Running all the `high` rules
+> across every category first would spread each category's changes over two
+> commits and defeat the point of batching them.
+
+**Then sweep for what the rules structurally cannot see.** Three call shapes are invisible to every pattern here—receiverless member calls, paren-less statement calls, and calls split over a line continuation—so **a rule reporting zero remaining matches is not evidence the symbol is converted**. `$SKILL/references/pass-hazards.md` §1 has the detail.
+
+So after each category, sweep the *bare names* that category converted and reconcile the count against the matches you actually handled:
+
+```
+python3 $SKILL/scripts/sweep.py <project-dir> --only Invalidate,MsgBox,ReplaceAll --context
+```
+
+The leftovers are the receiverless calls, the continued calls, and anything a lookahead declined. This is a per-category step, not an end-of-run one: done at the end, you can no longer tell which pass should have caught them.
+
+**Category checkpoint, then commit:** ask the user to compile / Analyze Project, wait for their answer, then commit that category alone. The Date and error-handling categories are *expected* to produce compile errors; the compiler is locating the manual work, so handle those two per **Commit discipline** rather than committing a broken tree as if it were done.
+
+### 5. Receiver pass (`medium` / `low`)
+
+Still inside the same category. These need something phase 4 does not: the *declared type of the receiver*, which is not on the line you are editing. For each hit, look up `Var`/`Dim ... As`, the parameter list, or the control's class; check the rule's `caveat`; then apply or skip. Log skips for the final report; the skip list goes in the commit message body, where it stays attached to the diff it explains.
+
+A member is only in this tier because a plausible receiver takes a different replacement or needs none at all: `.RemoveRow` on a RowSet, `.ColumnType` on a RowSet, `.MoveNext` on an Iterator, `.Remove` on a Dictionary. Finding the declaration is the work; the rename is trivial once you have it.
+
+**Expect most matches in this tier to be wrong, and check the ratio rather than the count.** On one real project `c3r31` matched hundreds of lines and a handful were correct to apply; `c10r15` matched dozens and none were. A rule matching ninety lines and converting twenty is the system working. See `$SKILL/references/pass-hazards.md` §2 for the measured table, and for why matches cluster in single files.
+
+**Reading a declaration: one line can declare several types.** Xojo allows multiple clauses per `Dim`/`Var`, each with its own `As`:
+
+```
+Dim p As Picture, g As Graphics
+Var i, j As Integer, name As String
+```
+
+Take the clause, not the line. Matching the first `As <Type>` on the line types `g` as `Picture` and then silently mis-converts or skips every `Graphics` call on it. Note also the second form: `i` and `j` share the single `As Integer` that follows them, so a clause's type can belong to a comma-separated *group* of names. Where the receiver is a control rather than a local, the declaration is not in the code at all—it is the `Begin <Class> <Name>` block in the window's layout metadata.
+
+### 6. Manual pass
+
+The structural migrations. **One commit each.** These are the changes most likely to be wrong in a way no compiler catches, so they are the ones a reviewer most needs to see in isolation. Each has a section in `$SKILL/references/conversion-traps.md`:
+
+- `InStr` sentinel comparisons (`>0 → >=0`, `=0 → =-1`) if any remain.
+- Index-decrement audit: simplify `(...) - 1`, hunt cross-statement double-decrements.
+- `Date → DateTime`: immutability, constructors, `TotalSeconds` → `SecondsFrom1970` epoch shift (stored values must be re-based!), `ParseDate` → `DateTime.FromString`.
+- Error codes → `Try/Catch` exceptions; socket/stream `Error` event signatures.
+
+The epoch shift deserves its own commit whatever its size: it silently rewrites the meaning of stored data, and a reviewer needs to see exactly which reads and writes moved.
+
+### 7. Type renames
+
+Two different jobs land here; do not conflate them.
+
+**7a. The `IDE handles` bucket: nothing to do here, by design.** Those control/class renames and every event rename that rides along with them are the IDE converter's job (phase 1), and running it is a **prerequisite of this skill**, not a preference. Do not reimplement it by hand:
+
+- A control's type appears in *both* code and layout metadata, so a hand rename has to change two representations in step or the project will not open correctly.
+- Event names change with the type and differ per control—a button's `Action` became `Pressed`, a checkbox's `ValueChanged`, a menu item's `MenuItemSelected`. `DesktopButton` has no `Action` event, so renaming a type and leaving its handler is a compile error.
+- You already need the Xojo IDE: hard rule 6 means every checkpoint is compiled there. Anyone who can satisfy that can run **Project ▸ Update Controls to API 2.0**. And the `Desktop*` classes only exist in 2021r3+, so a project that cannot run the converter cannot reach the target API either.
+
+If the converter genuinely has not been run, **stop and resolve that** rather than converting types by hand.
+
+**The one thing to do here runs the other way: leave `.Action` alone.** A *menu handler*—`Function DoStuff() As Boolean Handles DoStuff.Action` in `App`, a window, or a container—**keeps `.Action`**, and the converter deliberately leaves all of them untouched. Only an `Action` event implemented on a `DesktopMenuItem` subclass becomes `MenuItemSelected`. Renaming the handlers unbinds every menu command in the application, and it compiles. Do rename any event definitions you added to a subclass *yourself*—the converter does not know about those. See `$SKILL/references/ide-vs-source.md` for how to read what the converter did and did not touch.
+
+**7b. The `Source — type` bucket:** always, converter or not. These are the type names the IDE converter never touches because they are not placed controls: `Date → DateTime`, `HTTPSocket → URLConnection`, `SegmentedControl → SegmentedButton`, `Serial → SerialConnection`, `OpenDialog → OpenFileDialog`, the database types, and so on. Most have rules; the ones that don't are straight renames from the matrix (`lookup.py symbol <Name>`). `SegmentedControl` and `Serial` are the two that cannot be converted by changing `Super` alone; they need per-class attention.
+
+Commit 7a and 7b separately. A type rename touches both code and layout metadata, so its diff looks nothing like the member renames that came before and should not be mixed in with them.
+
+### 8. Validation and report
+
+Ask the user to run **Analyze Project** and a full runtime pass (the traps are runtime bugs).
+
+**Both scripts run again here, and neither is optional.** They fail in opposite directions, which is why one cannot stand in for the other.
+
+```
+python3 $SKILL/scripts/scan.py  <project-dir>
+python3 $SKILL/scripts/sweep.py <project-dir> --context
+```
+
+**Re-run `scan.py` and account for every remaining in-code hit**, comparing against the phase-2 inventory. Expect the type-blind member patterns to re-flag *correct* API 2 code (`.AddRow` on a ListBox, `.RemoveRow` on a RowSet, `.LastIndex` on an array); the goal is that global and type hits reach zero and every member hit is explained, not a literally empty scan. Do not skip this because you believe the categories are done. On the one migration that was checked afterwards by compiling, a re-scan of the handed-over tree lists **all five** real leftovers—`.Len`, `.Mid`, `TextColor`, `.Border` and `.Count`—each with its replacement and its rule ids already attached. Every one had been passed over during the category work, and the run was declared finished without this step.
+
+**Then run the bare-name sweep**, because `scan.py` alone cannot close the migration: it asks the rules what is left, and **the rules cannot see two whole forms**. A receiverless member call (`Invalidate` for `Self.Invalidate`) matches no dot-anchored pattern, and a paren-less statement call matches no `(?=\s*\()` pattern. A rule that structurally cannot match a form still reports zero remaining, and zero reads as done.
+
+The sweep is cruder and stricter on purpose: for every symbol it searches the bare name, ignoring dots and parentheses, and filters out identifiers the project itself declares. Its two sections:
+
+- **Receiverless member calls** — the blind spot. Account for **every hit in writing**: converted, deliberately left deprecated (with its `#Pragma Warning`), or an unrelated identifier. The receiver is the enclosing class, so take its type from the file's `Inherits` line or its `Begin <Class>` header.
+- **SUPPRESSED** — names the project declares itself, whose framework occurrences are therefore hidden too. This is the filter's one weakness and it is printed rather than hidden. Review these by hand; a project-defined name makes each match *ambiguous*, not the symbol absent (see `conversion-traps.md` §9).
+
+Writing the accounting down is what makes the deferral list honest—it is the same list the `#Pragma Warning` markers and the final report have to agree with.
+
+**Final report.** Lead with `git log --oneline <base>..api2-migration`, using the branch name recorded in phase 0: the commit series *is* the report, one line per category, in the order the work happened.
+
+Then report the leftovers as **three separate states**, never merged into "still manual"—they need different things from the reader, and merging them is how a deliberate decision gets re-litigated as an oversight:
+
+| State | Meaning | Marker |
+|---|---|---|
+| **Converted** | Done and compiling. | — |
+| **Deliberately left deprecated** | A decision, not a miss: compiles, warns, works. Compound receivers left as globals, calls awaiting a design decision. Give the reason. | `#Pragma Warning` at each site |
+| **Unresolved** | No known replacement, or the replacement needs a redesign. May or may not compile. | `#Pragma Warning` / `#Pragma Error` |
+
+Then the checklist:
+
+- [ ] Work is on a migration branch, one commit per category
+- [ ] IDE converter run; project compiles on renamed controls
+- [ ] All high-confidence rules applied, recompiled per category
+- [ ] All medium/low matches individually reviewed
+- [ ] Index traps audited; no double-decrement; `(...) - 1` simplified
+- [ ] `InStr` comparisons converted
+- [ ] Date → DateTime constructions, mutations, epoch, formatting, parsing
+- [ ] Error handling in Try/Catch; Error event signatures updated
+- [ ] `Nil`-returning calls that now raise: guard deleted, `Try`/`Catch` added
+- [ ] `scan.py` re-run; every remaining in-code hit accounted for in writing
+- [ ] Every symbol's method-form rule applied, not just its global-form rule
+- [ ] `sweep.py` run; every receiverless hit accounted for in writing
+- [ ] `sweep.py`'s SUPPRESSED names reviewed by hand
+- [ ] Every deliberate deferral carries a `#Pragma Warning` at the site
+- [ ] Analyze Project clean of deprecations; full app run-through done
+- [ ] No commit left in a known-broken state
+
+Hand the branch to the user; do not merge or push. If a category turns out wrong later, `git revert` that one commit, which is the whole reason the work was batched this way.
+
+## Applying rules outside the Xojo IDE
+
+Every `find`/`replace` here is written for the **Xojo IDE's Find panel** with "Use RegEx" checked: `$1`-style backreferences, case-insensitivity as an external flag, single-line matching. If you apply a rule with anything else—a script, `sed`, an editor—you must translate the dialect, and you must skip the locate-only rules whose `applies` is false, or you will delete the text they match. Both are in `$SKILL/references/applying-rules-by-script.md`.
+
+## Data access
+
+The scripts are stdlib-only python3 and locate their own bundled data, but they are *in the skill directory*, and your working directory is the user's Xojo project. Relative paths like `scripts/scan.py` will not resolve. Set a variable once and use it for every invocation and every reference file:
+
+```
+SKILL=/path/to/the/xojo-migrate/skill     # wherever this SKILL.md lives
+```
+
+```
+python3 $SKILL/scripts/scan.py <project-dir> [--format json]  # inventory a project (phase 2)
+python3 $SKILL/scripts/sweep.py <project-dir> [--context]     # final bare-name sweep (phase 8)
+python3 $SKILL/scripts/lookup.py symbol <name>   # coverage entries + full rules for a symbol
+python3 $SKILL/scripts/lookup.py rule <id>       # one rule, apply-ready (regex, caveats, examples)
+python3 $SKILL/scripts/lookup.py category [catN] # the 11 categories / one category's rules
+python3 $SKILL/scripts/lookup.py tier <t> [catN] # rules by confidence: high|medium|low|manual
+```
+
+`scan.py` and `sweep.py` answer different questions and both are required. `scan.py` opens the migration: what is here, per bucket, as a plan. `sweep.py` closes it: what did every rule structurally fail to see. Its main section is **receiverless member calls**—`Invalidate` where the code means `Self.Invalidate`—which no dot-anchored rule can match, and which therefore never appear as a remaining match anywhere else.
+
+**python3 is a requirement, not a convenience.** The scripts are stdlib-only, but `scan.py` and `sweep.py` have no hand equivalent—segmenting a Xojo file into code and metadata, and censusing a project's declared identifiers, are not things to do by eye. If python3 is genuinely unavailable, say so and stop rather than half-running the workflow.
+
+The two datasets are readable directly if you need to check one symbol without running anything: `coverage.json` is a JSON array of rows (`old`, `new`, `cat`, `status`, `since`, `note`, and where relevant `live_on` / `chains_to`), and `rules.json` holds full rule detail. **Do not read either whole**—they are ~390 KB and ~520 KB. Grep for the symbol, or use `lookup.py`, which is what it is for.
+
+## References
+
+Bundled with the skill:
+
+- `$SKILL/references/conversion-traps.md` — read before touching string/array/ Date/error code. Index shifts, sentinels, double-decrement, receiver rule.
+- `$SKILL/references/applying-rules-by-script.md` — the `$1` backreference dialect and the `applies` gate. Only needed if you drive the rules from a script rather than the IDE's Find panel.
+- `$SKILL/references/pass-hazards.md` — read once before the first category pass. Why a rule's zero is not completion, why its large match count is not work, and how one pass creates what the next pass matches.
+- `$SKILL/references/ide-vs-source.md` — what the IDE converter does and does not touch, how to read its silence, deprecated-vs-removed.
+- `$SKILL/references/coverage.json` / `$SKILL/references/rules.json` — the datasets behind the scripts.
+
+Fetched from Xojo when you need them. **The bundled matrix is the authority on what is deprecated**; these are for understanding an API you are converting *to*, or for anything the matrix does not cover:
+
+- <https://documentation.xojo.com/topics/api_design/moving_to_api_2.0.html> — Xojo's own "Moving To API 2.0" overview. Background for API 2 idioms (`Var`, iterators, enumerations). Read it once at the start if the codebase is unfamiliar; it is not a per-symbol reference.
+- <https://documentation.xojo.com/llms.txt> — an index of links to every documentation page, in a form built for agents. Use it to find the canonical page for a class, then fetch that page. This is the fastest way to answer "what does `DesktopSlider` actually expose in API 2?"
+
+There is also a `llms-full.txt` at that host, which is the entire corpus inlined. **Do not fetch it during a migration**—it will consume the context the migration needs. It is useful only if downloaded and grepped locally.
+
+Prefer a specific page over a search. `lookup.py symbol <Name>` first, the canonical doc page second, a web search last.
+
+## Writing converted code
+
+Follow Xojo API 2 idiom in anything you write: `Var` not `Dim`, exceptions not error codes, 0-based `...At` methods, `For Each` iterators where natural. Do not modernize beyond the rules uninvited (e.g. don't restructure working logic, rename user identifiers, or reformat untouched lines); conversions should produce reviewable diffs.
