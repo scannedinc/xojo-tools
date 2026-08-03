@@ -1,0 +1,38 @@
+#!/bin/sh
+# Example git pre-commit hook for a Xojo project in text format.
+#
+# It checks the staged .xojo_* files with xojo_lint.py and blocks the commit
+# on errors, warnings, or files the formatter would change. Notices never
+# block a commit.
+#
+# Install into one project:
+#   cp pre-commit.sample /path/to/project/.git/hooks/pre-commit
+#   chmod +x /path/to/project/.git/hooks/pre-commit
+#
+# The default below finds xojo_lint.py inside the installed Claude Code
+# plugin. The version directory in that path changes on upgrade, so a glob
+# resolves it. For any other install, set XOJO_LINT to the real location of
+# xojo_lint.py.
+
+XOJO_LINT=$(set -- "$HOME"/.claude/plugins/cache/xojo-tools/xojo/*/skills/xojo-lint/scripts/xojo_lint.py; echo "$1")
+[ -f "$XOJO_LINT" ] || {
+    echo "pre-commit: xojo_lint.py not found; set XOJO_LINT in this hook." >&2
+    exit 1
+}
+
+# Paths flow NUL-separated (-z, xargs -0) end to end, so names with spaces,
+# quotes, or non-ASCII characters survive regardless of core.quotepath.
+count=$(git diff --cached --name-only --diff-filter=ACMR -z \
+    | grep -zc '\.xojo_' 2>/dev/null | tr -d '[:space:]')
+[ "${count:-0}" -eq 0 ] && exit 0
+
+# The hook checks the files as they are on disk. A file staged and then
+# edited again is checked in its newest form.
+git diff --cached --name-only --diff-filter=ACMR -z | grep -z '\.xojo_' \
+    | xargs -0 python3 "$XOJO_LINT" check --all --warnings-as-errors || exit 1
+
+git diff --cached --name-only --diff-filter=ACMR -z | grep -z '\.xojo_' \
+    | xargs -0 python3 "$XOJO_LINT" format --check || {
+    echo "pre-commit: run \`python3 $XOJO_LINT format\` on the files above, then commit again." >&2
+    exit 1
+}
