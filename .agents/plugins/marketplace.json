@@ -1,0 +1,20 @@
+{
+  "name": "xojo-tools",
+  "interface": {
+    "displayName": "Xojo Tools"
+  },
+  "plugins": [
+    {
+      "name": "xojo",
+      "source": {
+        "source": "local",
+        "path": "./plugins/xojo"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

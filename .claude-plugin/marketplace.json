@@ -1,0 +1,27 @@
+{
+  "name": "xojo-tools",
+  "owner": {
+    "name": "Travis Hicks",
+  },
+  "description": "AI agent plugin for working with Xojo projects.",
+  "plugins": [
+    {
+      "name": "xojo",
+      "source": "./plugins/xojo",
+      "description": "Plugin of Agent Skills for working with Xojo projects.",
+      "author": {
+        "name": "Travis Hicks",
+        "url": "https://github.com/travisjhicks"
+      },
+      "homepage": "https://github.com/travisjhicks/xojo-tools",
+      "repository": "https://github.com/travisjhicks/xojo-tools",
+      "license": "MIT",
+      "keywords": [
+        "xojo",
+        "development",
+        "tools"
+      ],
+      "category": "Developer Tools"
+    }
+  ]
+}
