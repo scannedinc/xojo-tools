@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Environment
+.env
+
+# Xojo
+*.xojo_uistate
+
+# Local-only files
+*.local
+*.local.*
+
+# macOS
+.DS_Store
+
+# Xojo documentation and the reference output we build from it
+plugins/xojo/skills/xojo/assets/documentation.xojo.com/
+plugins/xojo/skills/xojo/references/documentation/
