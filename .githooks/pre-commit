@@ -1,0 +1,68 @@
+#!/bin/sh
+# Pre-commit checks for this repository.
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+#
+# Checks, in order:
+#   1. No email address in any file being committed. Addresses on the
+#      documentation-reserved domains (example.com/.org/.net, *.example,
+#      *.invalid, *.test) are allowed.
+#   2. The identical copies of helptext.py stay identical.
+#   3. Every staged .json file parses as JSON.
+
+set -u
+
+fail=0
+
+# --- 1. Email addresses -----------------------------------------------------
+# Scan the full staged content of every added or modified file, not just the
+# added lines, so an address can never ride along in an untouched line.
+files=$(git diff --cached --name-only --diff-filter=ACMR)
+for f in $files; do
+    found=$(git show ":$f" 2>/dev/null \
+        | LC_ALL=C grep -aoE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' \
+        | grep -viE '@(([A-Za-z0-9-]+\.)*example\.(com|org|net)|[A-Za-z0-9.-]+\.(example|invalid|test))$' \
+        | sort -u)
+    if [ -n "$found" ]; then
+        echo "pre-commit: email address in $f:" >&2
+        echo "$found" | sed 's/^/    /' >&2
+        fail=1
+    fi
+done
+if [ "$fail" -ne 0 ]; then
+    echo "Remove the address, or use one on example.com." >&2
+fi
+
+# --- 2. helptext.py copies --------------------------------------------------
+canon="plugins/xojo/skills/xojo/scripts/helptext.py"
+copies="plugins/xojo/skills/xojo-lint/scripts/helptext.py
+plugins/xojo/skills/xojo-ide/scripts/xojoctl/helptext.py"
+
+canon_sha=$(git ls-files -s "$canon" | awk '{print $2}')
+if [ -n "$canon_sha" ]; then
+    for copy in $copies; do
+        copy_sha=$(git ls-files -s "$copy" | awk '{print $2}')
+        if [ -n "$copy_sha" ] && [ "$copy_sha" != "$canon_sha" ]; then
+            echo "pre-commit: $copy differs from $canon" >&2
+            echo "These are maintained as identical copies; apply the same edit to every copy." >&2
+            fail=1
+        fi
+    done
+fi
+
+# --- 3. JSON validity -------------------------------------------------------
+if command -v python3 >/dev/null 2>&1; then
+    for f in $files; do
+        case "$f" in
+            *.json)
+                if ! git show ":$f" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
+                    echo "pre-commit: $f is not valid JSON" >&2
+                    fail=1
+                fi
+                ;;
+        esac
+    done
+fi
+
+exit "$fail"

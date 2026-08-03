@@ -1,7 +1,7 @@
 {
   "name": "xojo-tools",
   "owner": {
-    "name": "Travis Hicks",
+    "name": "Travis Hicks"
   },
   "description": "AI agent plugin for working with Xojo projects.",
   "plugins": [

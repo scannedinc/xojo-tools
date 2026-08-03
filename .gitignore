@@ -19,3 +19,6 @@ __pycache__/
 # Xojo documentation and the reference output we build from it
 plugins/xojo/skills/xojo/assets/documentation.xojo.com/
 plugins/xojo/skills/xojo/references/documentation/
+
+# Playwright MCP session artifacts
+.playwright-mcp/
