@@ -22,7 +22,7 @@ import shutil
 import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import quote, urlsplit
 
 import archive
@@ -36,7 +36,6 @@ from httpclient import RequestError, Session
 from progress import Progress, megabytes
 from convert import (
     DESCRIPTION_SECTIONS,
-    deprecation,
     md_path,
     unquote,
     Counter,
@@ -155,7 +154,7 @@ DEFAULT_EXCLUDES = (
     "404",           # the site's own not-found page
     "_Unpublished/",  # drafts, linked from nowhere
     "espanol/",      # Spanish translations of pages that exist in English
-    "fine_print/",   # licence and trademark boilerplate, not reference material
+    "fine_print/",   # license and trademark boilerplate, not reference material
     "fullsearch",    # a raw HTML search widget, no prose
     "whitesands",    # a scratch page of docutils sample markup
 )
@@ -185,6 +184,24 @@ def local_path(root: Path, url: str) -> Path:
     page twice.
     """
     return root / unquote(urlsplit(url).path).lstrip("/")
+
+
+def safe_docnames(docnames: list[str]) -> list[str]:
+    """Drop inventory entries that would escape the mirror root.
+
+    A docname is joined onto a filesystem path and written to; the archive
+    import rejects the same shape ("unsafe path in archive"), and the
+    live-site path has to as well, or a hostile objects.inv writes outside
+    the mirror.
+    """
+    safe = []
+    for name in docnames:
+        if (name.startswith("/") or "\\" in name
+                or ".." in PurePosixPath(name).parts):
+            print(f"  ignoring unsafe path in inventory: {name!r}", file=sys.stderr)
+            continue
+        safe.append(name)
+    return safe
 
 
 class Manifest:
@@ -599,8 +616,13 @@ def run_sync(args: argparse.Namespace) -> int:
             print("\nobjects.inv missing: cannot enumerate pages.", file=sys.stderr)
             return 1
 
-        _, inventory_names = parse_inventory_labels(inventory)
-        docnames = sorted({unquote(d) for d in inventory_names})
+        try:
+            _, inventory_names = parse_inventory_labels(inventory)
+        except Exception as exc:
+            print(f"\n{inventory} is unreadable ({exc}). Delete it and re-run "
+                  "sync.", file=sys.stderr)
+            return 1
+        docnames = safe_docnames(sorted({unquote(d) for d in inventory_names}))
         report_inventory_diff(root / "_sources", docnames)
 
         print(f"\nPages from objects.inv ({len(docnames)})")
@@ -819,8 +841,12 @@ def run_build(args: argparse.Namespace) -> int:
     # objects.inv is the authority on which pages exist, not the filesystem.
     # `sync` never deletes, so a page dropped upstream can linger in the mirror;
     # enumerating from the inventory keeps it out of the output.
-    labels, docnames = parse_inventory_labels(inventory)
-    docnames = sorted({unquote(d) for d in docnames})
+    try:
+        labels, docnames = parse_inventory_labels(inventory)
+    except Exception as exc:
+        print(f"{inventory} is unreadable ({exc}). Re-run sync.", file=sys.stderr)
+        return 1
+    docnames = safe_docnames(sorted({unquote(d) for d in docnames}))
     print(f"Parsing {len(docnames)} pages")
 
     excludes = () if args.include_all else DEFAULT_EXCLUDES
@@ -899,8 +925,13 @@ def run_build(args: argparse.Namespace) -> int:
                 written += 1
 
         title = renderer.inline(page.title, docname, plain=True)
+        # The prose-harvested version/replacement describe THIS page only when
+        # the page itself is deprecated; a guide that merely quotes someone
+        # else's deprecation notice must not gain a deprecated_in of its own.
         version, replacement, note = apply_override(
-            title.removesuffix(" (deprecated)").strip(), page.deprecated_in, page.replacement
+            title.removesuffix(" (deprecated)").strip(),
+            page.deprecated_in if page.deprecated else "",
+            page.replacement if page.deprecated else "",
         )
         class_rows.append(
             (
@@ -929,6 +960,20 @@ def run_build(args: argparse.Namespace) -> int:
         bar.update(index, f"{index}/{len(pages)}")
     bar.clear()
 
+    # A symbol the documentation no longer describes at all still has to be
+    # findable -- that is the whole reason the override file exists -- so any
+    # row that matched nothing is added rather than dropped. This runs BEFORE
+    # the files are written; it once ran after, which reported the rows as
+    # added while never writing them.
+    added = 0
+    for name in sorted(set(overrides) - used):
+        version, replacement, note = overrides[name]
+        if "." in name:
+            member_rows.append((name, "", "", "deprecated", version, replacement, note, ""))
+        else:
+            class_rows.append((name, "", "deprecated", version, replacement, note, "0", "", ""))
+        added += 1
+
     tsv(
         dest / "classes.tsv",
         ("name", "kind", "flags", "deprecated_in", "replacement", "note", "members", "path", "summary"),
@@ -955,17 +1000,6 @@ def run_build(args: argparse.Namespace) -> int:
             f"plain text ({dict(unresolved)})."
         )
 
-    # A symbol the documentation no longer describes at all still has to be
-    # findable -- that is the whole reason the override file exists -- so any
-    # row that matched nothing is added rather than dropped.
-    added = 0
-    for name in sorted(set(overrides) - used):
-        version, replacement, note = overrides[name]
-        if "." in name:
-            member_rows.append((name, "", "", "deprecated", version, replacement, note, ""))
-        else:
-            class_rows.append((name, "", "deprecated", version, replacement, note, "0", "", ""))
-        added += 1
     if overrides:
         print(
             f"\n{len(used)}/{len(overrides)} deprecation overrides annotated an "

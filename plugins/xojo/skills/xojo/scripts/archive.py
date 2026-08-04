@@ -266,7 +266,12 @@ def extract(tgz: Path, staged: Path, base_url: str) -> dict[str, tuple[str, str]
             if not name or not member.isfile() or not _wanted(name):
                 continue
             parts = PurePosixPath(name).parts
-            if name.startswith("/") or ".." in parts:
+            # Backslashes are rejected outright: PurePosixPath does not split
+            # on them, so `_sources/..\..\evil` would pass the ".." check here
+            # and then escape `staged` on a Windows host, where the joined
+            # path DOES treat them as separators. No legitimate Sphinx output
+            # contains one.
+            if name.startswith("/") or "\\" in name or ".." in parts:
                 raise ArchiveError(f"unsafe path in archive: {member.name}")
 
             target = staged / name
@@ -279,6 +284,11 @@ def extract(tgz: Path, staged: Path, base_url: str) -> dict[str, tuple[str, str]
                 shutil.copyfileobj(source, handle, 1 << 16)
             os.replace(tmp, target)
             os.utime(target, (member.mtime, member.mtime))
+            # Verify the timestamp took, at the moment it can fail: the seeded
+            # manifest promises these mtimes, and a filesystem that silently
+            # drops them would make every conditional request answer 200.
+            if abs(target.stat().st_mtime - member.mtime) > 2:
+                raise ArchiveError(f"timestamp did not survive extraction: {name}")
 
             url = f"{base_url}/{quote(name)}"
             seeded[url] = (email.utils.formatdate(member.mtime, usegmt=True), "")
@@ -318,12 +328,10 @@ def validate(staged: Path, parse_inventory) -> None:
             f"{difference} pages differ between objects.inv and _sources/"
         )
 
-    # Timestamps are the whole point of importing; if they did not survive,
-    # every conditional request would answer 200.
-    recent = time.time() - 3600
-    sample = sorted(sources.rglob("*.rst.txt"))[:20]
-    if any(p.stat().st_mtime > recent for p in sample):
-        raise ArchiveError("extracted timestamps look like now, not the archive's")
+    # Timestamp survival is checked in extract(), against each member's own
+    # mtime. A wall-clock check here rejected any archive published within
+    # the last hour -- fresh member mtimes are indistinguishable from "the
+    # timestamps did not survive" without the archive in hand.
 
 
 def merge(staged: Path, root: Path) -> int:

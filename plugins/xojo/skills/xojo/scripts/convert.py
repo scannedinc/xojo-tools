@@ -323,6 +323,9 @@ def parse_members(lines: list[str], kind: str) -> list[Member]:
         name = name_match.group(1).strip()
         signature = name_match.group(2).lstrip("\\").strip()
 
+        body = dedent(block[signature_at + 1 :])
+        joined = "\n".join(body)
+        deprecated_in, replacement = deprecation(joined)
         members.append(
             Member(
                 anchor=anchor,
@@ -330,10 +333,10 @@ def parse_members(lines: list[str], kind: str) -> list[Member]:
                 name=name,
                 signature=signature,
                 kind=kind,
-                body=(body := dedent(block[signature_at + 1 :])),
-                deprecated=bool(DEPRECATION.search(joined := "\n".join(body))),
-                deprecated_in=deprecation(joined)[0],
-                replacement=deprecation(joined)[1],
+                body=body,
+                deprecated=bool(DEPRECATION.search(joined)),
+                deprecated_in=deprecated_in,
+                replacement=replacement,
             )
         )
 
@@ -345,7 +348,7 @@ def parse_members(lines: list[str], kind: str) -> list[Member]:
 # --------------------------------------------------------------------------
 
 
-def parse_csv_table(arg: str, body: list[str]) -> tuple[list[str], list[list[str]]]:
+def parse_csv_table(body: list[str]) -> tuple[list[str], list[list[str]]]:
     """Return (header, rows) for a csv-table directive body."""
     options: dict[str, str] = {}
     i = 0
@@ -404,7 +407,7 @@ def summary_flags(page: Page) -> dict[str, tuple[str, str]]:
                 continue
             indent = len(match.group(1))
             body, i = collect_indented(lines, i + 1, indent)
-            header, rows = parse_csv_table(match.group(3), body)
+            header, rows = parse_csv_table(body)
             columns = [h.strip().lower() for h in header]
             for row in rows:
                 if not row:
@@ -620,9 +623,19 @@ class Renderer:
             # the four spaces that trigger it.
             if indent >= 3 and not LIST_ITEM.match(line):
                 body, i = collect_indented(lines, i, indent - 1)
-                literal = bool(out) and out[-1].rstrip().endswith("::")
+                # The paragraph owning the "::" is the last NON-BLANK entry:
+                # standard reStructuredText puts a blank line before the
+                # indented block, so out[-1] is "" by the time it is reached.
+                last = next((k for k in range(len(out) - 1, -1, -1)
+                             if out[k].strip()), None)
+                literal = last is not None and out[last].rstrip().endswith("::")
                 if literal:
-                    out[-1] = out[-1].rstrip()[:-2].rstrip()
+                    remainder = out[last].rstrip()[:-2].rstrip()
+                    if remainder:
+                        out[last] = remainder
+                    else:
+                        # A paragraph that was only "::" disappears, as in RST.
+                        del out[last]
                     out += ["", "```", *body, "```", ""]
                 else:
                     out += ["", *self.block(body, current, base_level), ""]
@@ -712,7 +725,7 @@ class Renderer:
         if name == "rubric":
             return ["", f"**{self.inline(arg, current)}**", ""]
 
-        # An unrecognised directive still has content worth keeping. Its
+        # An unrecognized directive still has content worth keeping. Its
         # argument is not decoration: for a one-line directive it is the entire
         # text, and dropping it loses the content outright.
         self.stats[f"directive:{name}"] += 1
@@ -720,7 +733,7 @@ class Renderer:
         return lead + self.block(body, current, base_level)
 
     def table(self, arg: str, body: list[str], current: str) -> list[str]:
-        header, rows = parse_csv_table(arg, body)
+        header, rows = parse_csv_table(body)
         if not rows and not header:
             return []
 

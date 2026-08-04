@@ -20,7 +20,7 @@ description: >-
 
 This skill is a local copy of <https://documentation.xojo.com>, converted to Markdown, with tab-separated indexes. It also contains the rules to write Xojo code and to edit Xojo project files.
 
-**Every path below is relative to this skill's folder — the folder that holds this SKILL.md — not to the project you work in.** Run the commands from that folder, or prefix each path with its location.
+**Every path below is relative to this skill's folder—the folder that holds this SKILL.md—not to the project you work in.** Run the commands from that folder, or prefix each path with its location.
 
 **Look facts up. Do not recall them.** Most Xojo code in training data predates API 2, so a recalled answer is often the removed API 1 form. `MsgBox`, `Dim`, `RecordSet`, `ListBox`, `Ubound`, and hundreds more are deprecated. The indexes below give the replacement for each one.
 

@@ -30,7 +30,7 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 REFERENCES = SKILL_DIR / "references" / "documentation"
 XOJO_SUFFIXES = {
     ".xojo_code", ".xojo_window", ".xojo_menu", ".xojo_toolbar",
-    ".xojo_report", ".xojo_script", ".rbbas", ".rbfrm",
+    ".xojo_report", ".xojo_script", ".rbbas", ".rbfrm", ".rbmnu",
 }
 
 # Blocks that hold prose or literals rather than executable code.
@@ -55,7 +55,8 @@ def release_key(text: str) -> tuple[int, int]:
 
 def project_release(start: Path) -> tuple[str, tuple[int, int]] | None:
     """The Xojo release that last saved the enclosing project, if findable."""
-    for folder in [start if start.is_dir() else start.parent, *start.parents]:
+    base = start if start.is_dir() else start.parent
+    for folder in [base, *base.parents]:
         for project in folder.glob("*.xojo_project"):
             match = IDE_VERSION.search(project.read_text(errors="replace"))
             if match:
@@ -83,14 +84,26 @@ def load_index() -> dict[str, tuple[str, str, str, str]]:
     deprecated_leaves: dict[str, tuple[str, str, str, str]] = {}
     current_leaves: set[str] = set()
 
-    for name, flag_col, ver, rep, note in (
-        ("members.tsv", 3, 4, 5, 6),
-        ("classes.tsv", 2, 3, 4, 5),
-    ):
+    for name in ("members.tsv", "classes.tsv"):
         path = REFERENCES / name
         if not path.exists():
             continue
-        for line in path.read_text(encoding="utf-8").splitlines()[1:]:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if not lines:
+            continue
+        # The header row names the columns; reading positions from it keeps
+        # this aligned with whatever docs.py writes, and makes a reordering
+        # a loud error instead of a silently empty index.
+        header = lines[0].split("\t")
+        try:
+            flag_col = header.index("flags")
+            ver = header.index("deprecated_in")
+            rep = header.index("replacement")
+            note = header.index("note")
+        except ValueError:
+            sys.exit(f"{path} header {header!r} is missing an expected column; "
+                     f"re-run docs.py build")
+        for line in lines[1:]:
             c = line.split("\t")
             if len(c) <= note:
                 continue
@@ -139,8 +152,11 @@ def find_uses(text: str, index: dict) -> list[tuple[int, str, tuple]]:
     types, members = index["types"], index["members"]
     hits: list[tuple[int, str, tuple]] = []
     for number, line in code_lines(text):
-        # Member access: anything after a dot.
-        for m in re.finditer(r"([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)", line):
+        # Member access: anything after a dot. The member is captured in a
+        # lookahead so the scan resumes right after the dot -- a chained
+        # `Me.lstItems.ListCount` must also yield (lstItems, ListCount),
+        # which a plain two-group match consumed past.
+        for m in re.finditer(r"([A-Za-z_]\w*)\s*\.\s*(?=([A-Za-z_]\w*))", line):
             receiver, name = m.group(1), m.group(2)
             entry = members.get(f"{receiver}.{name}".lower()) or members.get(name.lower())
             if entry:
@@ -198,7 +214,9 @@ def main(argv: list[str]) -> int:
     if not files:
         return 0
     index = load_index()
-    if not index:
+    if not (index["types"] or index["members"]):
+        # load_index always returns the two-key dict, so test the CONTENTS:
+        # an absent or empty index must say so, not scan cleanly forever.
         print(f"no indexes at {REFERENCES}; run: docs.py build", file=sys.stderr)
         return 0
 
