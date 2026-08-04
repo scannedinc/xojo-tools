@@ -48,7 +48,7 @@ Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo"
    ("00" + Hex(red)).Right(2)           ' SYNTAX ERROR -- grouped expression
    ```
 
-   Xojo's own documentation writes `GetType(d).GetProperties` throughout, so the call-result form is not a grey area. This matters because it is the shape you land on whenever a global→method rule skips a call for its *argument* rather than its receiver, and you then convert it by hand.
+   Xojo's own documentation writes `GetType(d).GetProperties` throughout, so the call-result form is not a gray area. This matters because it is the shape you land on whenever a global→method rule skips a call for its *argument* rather than its receiver, and you then convert it by hand.
 
    Every global→method rule here captures an identifier receiver and silently skips everything else. For a skipped call there are exactly **two** outcomes: introduce a local variable, or leave the deprecated global in place. Hand-writing the method form is not a third option—it does not compile. `conversion-traps.md` §4 says which to choose and when.
 4. **Fix `InStr`/`IdxField` result comparisons and index arithmetic BEFORE renaming the functions.** Renaming first hides the remaining wrong arithmetic. Details in `$SKILL/references/conversion-traps.md`.
@@ -212,11 +212,7 @@ If all three are clear, apply it. This is a fast pass, not a blind one; most mat
 
 Work the rules a symbol at a time, not a form at a time: `scan.py` lists every rule for a symbol on one line (`len ... rules: c0r0(high), c0r1(high)`), so clear that line before moving on. Skipping the sibling is invisible—the global rule reports zero remaining and the dot form is still there.
 
-> **Phases 4 and 5 run per category, not project-wide.** Take one category from
-> the step-5 order, do its `high` pass, then its `medium`/`low` pass, then
-> checkpoint and commit, then move to the next. Running all the `high` rules
-> across every category first would spread each category's changes over two
-> commits and defeat the point of batching them.
+> **Phases 4 and 5 run per category, not project-wide.** Take one category from the step-5 order, do its `high` pass, then its `medium`/`low` pass, then checkpoint and commit, then move to the next. Running all the `high` rules across every category first would spread each category's changes over two commits and defeat the point of batching them.
 
 **Then sweep for what the rules structurally cannot see.** Three call shapes are invisible to every pattern here—receiverless member calls, paren-less statement calls, and calls split over a line continuation—so **a rule reporting zero remaining matches is not evidence the symbol is converted**. `$SKILL/references/pass-hazards.md` §1 has the detail.
 

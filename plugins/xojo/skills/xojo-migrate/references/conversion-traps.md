@@ -98,10 +98,7 @@ Two related hazards:
 
 **Global-to-method conversions.** Most global string functions become methods on `String` (`Trim(s)` -> `s.Trim`). The bundled regexes only capture a plain variable or dotted property path as the receiver. That is deliberate, and the reason is a *language* constraint, not a regex limitation:
 
-> **Xojo has no member access on a string literal or on a parenthesised
-> expression.** `"0123456789".IndexOf(c)` and `("00" + Hex(r)).Right(2)` are
-> **syntax errors**. A receiver must be an identifier, or a chain of member
-> accesses and calls off one (`s.Trim.Uppercase`, `f.Child("x").Name`).
+> **Xojo has no member access on a string literal or on a parenthesized expression.** `"0123456789".IndexOf(c)` and `("00" + Hex(r)).Right(2)` are **syntax errors**. A receiver must be an identifier, or a chain of member accesses and calls off one (`s.Trim.Uppercase`, `f.Child("x").Name`).
 
 So when a rule skips a call because its receiver argument is a literal or a compound expression, there are exactly **two** outcomes. Writing the method form by hand is not one of them—it does not compile:
 
@@ -201,9 +198,7 @@ Notes:
 
 Section 6 covers the *explicit* form, where the code checks `db.Error` and you can see the check. The more common form has no check to find:
 
-> **An API 1 call that signalled failure by its return value, and an API 2 call
-> that signals failure by raising, are not a rename.** Renaming compiles, and
-> then does two wrong things at once.
+> **An API 1 call that signaled failure by its return value, and an API 2 call that signals failure by raising, are not a rename.** Renaming compiles, and then does two wrong things at once.
 
 ```
 ' API 1 -- returns Nil on failure

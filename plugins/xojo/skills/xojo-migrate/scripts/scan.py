@@ -88,6 +88,10 @@ def mask_line(line):
     comment does not open one. One left-to-right pass handles both. Xojo writes
     an embedded quote as `""`, which falls out of toggling on each `"`.
     """
+    # Rem is Xojo's third comment form, and it can only open a line (Xojo has
+    # no statement separator, and Rem is reserved, so no call starts this way).
+    if re.match(r"\s*rem\b", line, flags=re.I):
+        return " " * len(line)
     out = list(line)
     in_string = False
     i = 0
@@ -131,12 +135,24 @@ def code_only(text):
             continue
         m_open = TAG_OPEN.match(line)
         if m_open:
-            tag_stack.append(m_open.group(1))
+            # Standalone records never get an End tag; pushing one would
+            # wedge the stack (`#Tag Instance` inside `#tag Constant` is the
+            # standard dynamic-constant serialization) and suppress every
+            # line after it as non-code.
+            if m_open.group(1).lower() not in ("instance", "compatibilityflags"):
+                tag_stack.append(m_open.group(1))
             out.append(" " * len(line) + nl)
             continue
 
         suppressed = any(t in NONCODE_TAGS or t.rstrip("s") in NONCODE_TAGS
                          for t in tag_stack)
+        if suppressed:
+            # Checked before Begin/End: prose in a Note that happens to start
+            # with `Begin <word>` (or an archived layout slab) must not bump
+            # layout_depth, which never resets and would blank the rest of
+            # the file.
+            out.append(" " * len(line) + nl)
+            continue
 
         if BEGIN_BLOCK.match(line):
             layout_depth += 1
@@ -147,7 +163,7 @@ def code_only(text):
             out.append(" " * len(line) + nl)
             continue
 
-        if suppressed or layout_depth:
+        if layout_depth:
             out.append(" " * len(line) + nl)
         else:
             out.append(mask_line(line) + nl)
@@ -209,9 +225,14 @@ def rule_index():
     return idx
 
 
-# A rule's `find` is dot-anchored when it looks behind for a `.` or escapes one.
-# Both spellings are in use: `(?<=\.)Len\b` and `\.ListCount\b`.
-DOT_ANCHORED = re.compile(r"\(\?<=\\\.\)([A-Za-z]\w*)|\\\.([A-Za-z]\w*)")
+# A rule's `find` is dot-anchored when it STARTS by escaping a `.` or looking
+# behind for one, optionally after a `(?i)` flag. All three spellings are in
+# use: `\.ListCount\b`, `(?<=\.)Len\b`, and `(?i)\.IsCancel\b`. Anchoring at
+# the start is what keeps a namespace-prefix rule like `Xojo\.Core\.` from
+# donating its interior `\.Core` as a bogus member name (which flagged user
+# code like `Prefs.Core` as deprecated). sweep.py uses this same pattern; keep
+# the two in sync so no rule-only member escapes the final sweep.
+RULE_MEMBER = re.compile(r"^(?:\(\?i\))?(?:\\\.|\(\?<=\\\.\))([A-Za-z_]\w*)")
 
 
 def rule_member_names(rules_data):
@@ -235,8 +256,9 @@ def rule_member_names(rules_data):
     found = {}
     for c in rules_data["categories"]:
         for r in c["rules"]:
-            for m in DOT_ANCHORED.finditer(r.get("find") or ""):
-                member = m.group(1) or m.group(2)
+            m = RULE_MEMBER.match(r.get("find") or "")
+            if m:
+                member = m.group(1)
                 found.setdefault(member.lower(), (member, r))
     return found
 
@@ -334,7 +356,10 @@ def orphaned(src, manifests, root):
         except OSError:
             continue
         for name in re.findall(r"[^\s;\"]+\.(?:xojo_\w+|rb\w+)", text):
-            referenced.add(pathlib.PurePath(name).name.lower())
+            # Manifests saved on Windows use backslash separators, which
+            # PurePath does not split on POSIX; normalize first or every such
+            # file reads as orphaned (and sweep.py then excludes it).
+            referenced.add(pathlib.PurePath(name.replace("\\", "/")).name.lower())
     return [p for p in src if p.name.lower() not in referenced]
 
 
@@ -412,7 +437,10 @@ def main():
                 if rid not in rids:
                     rids.append(rid)
         buckets = {r["cat"] for r in rows}
-        bucket = next(b for b in BUCKET_ORDER if b in buckets) if buckets else "?"
+        # The default keeps a new/respelled category in coverage.json a "?"
+        # instead of a StopIteration crash, matching the candidates sort below.
+        bucket = (next((b for b in BUCKET_ORDER if b in buckets), "?")
+                  if buckets else "?")
         # One member name can land in several buckets because it is deprecated
         # on several classes. Filing the symbol under the most severe of them
         # and saying nothing else is actively misleading: `.Bold` reports as

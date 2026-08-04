@@ -6,7 +6,7 @@ Three ways to get it wrong, all of which damage the user's source rather than fa
 
 ## Run the rules over code, not over the file
 
-A `.xojo_code` or `.xojo_window` file is mostly not code. Layout metadata in `Begin <Class>` … `End` blocks, `#tag Note` prose, `#tag ViewBehavior` property tables, comments and string literals all sit in the same file as the methods, and a bare regex cannot tell them apart. On one real project the rule for the `TextColor` system colour matched dozens of lines, and **all but a handful were `TextColor = &c00000000` control properties inside `Begin` blocks**. The ratio of metadata to code ran better than ten to one.
+A `.xojo_code` or `.xojo_window` file is mostly not code. Layout metadata in `Begin <Class>` … `End` blocks, `#tag Note` prose, `#tag ViewBehavior` property tables, comments and string literals all sit in the same file as the methods, and a bare regex cannot tell them apart. On one real project the rule for the `TextColor` system color matched dozens of lines, and **all but a handful were `TextColor = &c00000000` control properties inside `Begin` blocks**. The ratio of metadata to code ran better than ten to one.
 
 `scan.py` reports both numbers for exactly this reason (`4 in code (66 raw)`), but that segmentation lives in the scanner and a rule cannot inherit it. A driver must do the same thing before matching. Reuse `code_only()` from `scripts/scan.py`—it blanks non-code regions while preserving length and line count, so match offsets still map back to the original line:
 

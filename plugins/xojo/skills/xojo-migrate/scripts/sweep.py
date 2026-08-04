@@ -136,7 +136,11 @@ def declared_names(files):
     return names
 
 
-RULE_MEMBER = re.compile(r"^\\\.([A-Za-z_]\w*)")
+# Kept identical to scan.py's RULE_MEMBER: a find may start `\.Name`,
+# `(?<=\.)Name`, or `(?i)\.Name`, and a spelling this misses is a rule-only
+# member the final sweep never checks -- the exact miss this file exists to
+# prevent.
+RULE_MEMBER = re.compile(r"^(?:\(\?i\))?(?:\\\.|\(\?<=\\\.\))([A-Za-z_]\w*)")
 
 
 def rule_member_names():
@@ -227,17 +231,10 @@ def main():
     # four `CurveShape.Border` sites unconverted. A name used in files that do
     # not declare it is the cheap signal that the two are not the same set.
     used_in = defaultdict(set)
+    s_rx = None
     if suppressed:
         s_alt = "|".join(re.escape(n) for n in sorted(suppressed, key=len, reverse=True))
         s_rx = re.compile(r"(?<=\.)(" + s_alt + r")\b", re.I)
-        for path in live:
-            try:
-                seg = code_only(path.read_text(encoding="utf-8", errors="replace"))
-            except OSError:
-                continue
-            rel_p = str(path.relative_to(root))
-            for mo in s_rx.finditer(seg):
-                used_in[mo.group(1).lower()].add(rel_p)
 
     results = defaultdict(lambda: {"bare": [], "dotted": []})
     if not active:
@@ -252,7 +249,12 @@ def main():
         dotted_rx = re.compile(r"(?<=\.)(" + alt + r")\b", re.I)
     canonical = {n.lower(): n for n in active}
 
+    # ONE read and ONE code_only() masking per file, feeding both the
+    # suppressed-name usage map and the sweep itself; these used to be two
+    # loops that each re-read and re-masked every live file.
     for path in live:
+        if s_rx is None and bare_rx is None:
+            break
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -260,11 +262,14 @@ def main():
         # Reuse scan.py's segmentation: layout metadata and #tag Note prose
         # would otherwise flood a sweep whose whole point is that you read
         # every line of its output.
+        code = code_only(text)
+        rel = str(path.relative_to(root))
+        if s_rx is not None:
+            for mo in s_rx.finditer(code):
+                used_in[mo.group(1).lower()].add(rel)
         if bare_rx is None:
             continue
-        code = code_only(text)
         orig = text.splitlines()
-        rel = str(path.relative_to(root))
         for i, line in enumerate(code.splitlines()):
             if not line.strip():
                 continue
@@ -289,7 +294,11 @@ def main():
     # Without this split the report is drowned by Len/Mid/Ubound, which are
     # supposed to look like that.
     def is_global(name):
-        return any("." not in r["old"].split("(")[0] for r in active[name])
+        # The empty prefix of a synthesized "(rule only).Name" old-field must
+        # not read as a global form -- those names have only dot-anchored
+        # rules and belong in the blind section below.
+        return any(p and "." not in p
+                   for p in (r["old"].split("(")[0] for r in active[name]))
 
     bare_hits = {n: v["bare"] for n, v in results.items() if v["bare"]}
     blind = {n: v for n, v in bare_hits.items() if not is_global(n)}
@@ -338,7 +347,7 @@ def main():
             # `Refresh(immediately As Boolean = False)` became `Refresh(False)`.
             # The two Booleans are different parameters -- API 1's was
             # EraseBackground -- so it compiles and silently changes redraw
-            # behaviour. Nothing here can tell whether the parameters
+            # behavior. Nothing here can tell whether the parameters
             # correspond, which is exactly why the signature must not be
             # offered without the warning.
             passes_arg = sum(1 for _f, _l, t in group[name]
@@ -411,8 +420,10 @@ def main():
             # to the project root. Compare basenames or the difference is never
             # taken and a name's own declaring file reads as evidence against it.
             decl = set(suppressed[name])
+            # PurePath splits on the native separator; used_in paths come
+            # from str(relative_to(root)), which is backslashed on Windows.
             return sorted(p for p in used_in.get(name.lower(), set())
-                          if p.rsplit("/", 1)[-1] not in decl)
+                          if pathlib.PurePath(p).name not in decl)
 
         others_of = {n: elsewhere(n) for n in suppressed}
         # Flagged first, then fewest files: a name used in one file it does not
