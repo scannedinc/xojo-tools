@@ -1,8 +1,6 @@
 # Editing project files while the IDE is open
 
-An agent's normal edit path is the disk: change the text-format project files, then make the IDE reload them. This page gives the rules for that path, the failure modes when a rule is skipped, and the IDE Script alternatives.
-
-Some items below are marked **unverified**. They are reported by another IDE Communicator client, the MIT-licensed [xojo-mcp](https://github.com/brechanbech/xojo-mcp) project, but have not been confirmed against a live IDE by this skill's own tests. Verify before you rely on one.
+An agent has two edit paths: the disk (change the text-format project files, then make the IDE reload them) and IDE Script (change code and properties inside the running IDE). This page gives the rules for both, the failure modes, and which path each kind of change requires. Everything here was verified against Xojo 2026r2.1 on macOS. The script commands are Xojo's own, documented in the `xojo` skill's mirror under `references/documentation/topics/build_automation/ide_scripting/`; read `project_commands.md` there for the full vocabulary.
 
 ## The two silent failure modes
 
@@ -15,7 +13,7 @@ The rule that prevents both: **after disk edits, reload before anything else tou
 
 ## The reload recipe
 
-There is no reload command, and `OpenFile` on an already-open project does nothing (verified; see [IDE behavior](ide-behavior.md)). Close, then reopen:
+There is no reload command, and `OpenFile` on an already-open project does nothing (see [IDE behavior](ide-behavior.md)). Close, then reopen:
 
 ```sh
 xojoctl close --discard --yes
@@ -24,7 +22,7 @@ xojoctl open /path/to/Project.xojo_project
 
 `--discard` throws away the IDE's unsaved in-memory changes, which after disk edits is exactly what you want: the in-memory copy is stale. But if the user may have real unsaved work open in the IDE, stop and ask before you discard it.
 
-A single IDE Script can do the same atomically, reading the path from the IDE itself (unverified):
+A single IDE Script does the same atomically, reading the path from the IDE itself:
 
 ```
 Dim path As String = ProjectShellPath
@@ -32,28 +30,31 @@ CloseProject(False)
 OpenFile(path)
 ```
 
-## Window and layout internals
+`ProjectShellPath` returns the path shell-escaped (`My\ Desktop\ App.xojo_project`); pass it to `OpenFile` unchanged. `CloseProject(False)` discards unsaved changes without a prompt.
 
-- Event handlers, controls, and layout inside a `.xojo_window` are not reachable through IDE scripting at all (unverified). The disk-edit-and-reload path is the only way to change them.
-- Never invent or renumber the `&h` item IDs in project files. Other files reference them, and a fabricated ID can crash the IDE (unverified). The `xojo` skill's `references/xojo-file-formats/` documents the formats; the `xojo-lint` skill validates the result.
+## Editing through IDE Script instead
 
-## Editing through the IDE instead (unverified)
+For code and property changes, `xojoctl script` can edit the in-memory project directly, with no reload cycle:
 
-The IDE Script language exposes an in-IDE editing vocabulary that `xojoctl script` can use. None of it is wrapped as a xojoctl command yet, and none of it is verified here:
-
-- `SubLocations("dot.path")` returns the tab-delimited children of a navigator item; an empty string lists the top level. Events are not listed.
-- `SelectProjectItem("Module.Method")` then the `Text` property reads or replaces the selected item's source.
-- A multi-line value cannot be written as one Xojo string literal. Build it line by line: `v = v + "escaped line" + EndOfLine`.
-- `DoCommand` accepts item-creation names (`NewClass`, `NewModule`, `NewMethod`, and more) and debugger stepping names (`StepOver`, `StepInto`, `StepOut`, `Resume`, `Pause`).
+- **Navigate with `Location`.** `Location = "App.Greet"` selects a method; `Location = "Window1.TestButton.Pressed"` selects a control's event handler. `TypeOfCurrentLocation` reports what is selected. `SelectProjectItem` works only for project items (classes, windows, modules); it returns False for members, so use `Location` for anything inside an item.
+- **Read and write source with `Text`.** After setting `Location`, `Text` gets or sets the body of the selected method or event handler (the body only, not the declaration). A write lands in the in-memory project and is saved with the next save.
+- **Build multi-line source line by line.** A Xojo string literal cannot span lines: `v = v + "one line" + EndOfLine`, then `Text = v`. Double the quotation marks to embed one: `"Print ""hi"""`.
+- **Set framework properties with `PropertyValue`.** `PropertyValue("Window1.Title") = "New Title"` works on framework-defined properties of project items.
+- **Create items with `DoCommand`.** `DoCommand("NewClass")` adds Class1 to the project; `ChangeDeclaration` renames and retypes the current method or property. `DoCommand` also drives debugger stepping (`StepOver`, `StepInto`, `StepOut`, `Resume`, `Pause`).
+- **List items with `SubLocations`.** `SubLocations("")` returns the top-level project items tab-delimited. It descends only into modules and folders: it returns nothing for a class or a window.
 
 The safety rules of [Security](security.md) apply doubly here: a generated script that writes source code into the project is a generated program.
 
+## What only disk edits can do
+
+Window structure is not script-editable: no command places or removes a control, `SubLocations` does not list a window's controls, and `Text` returns nothing for a window itself. To add or rearrange controls, edit the `.xojo_window` file on disk following the `xojo` skill's `references/xojo-file-formats/`, then reload. Never invent or renumber the `&h` item IDs in project files; other files reference them. The `xojo-lint` skill validates the result before the IDE sees it.
+
 ## Verifying a save
 
-`DoCommand("SaveFile")` reports nothing. To confirm a save happened, compare the modification time of the project file before and after, and allow the IDE a moment to write (unverified as a recipe; the missing signal itself is documented in the protocol notes).
+`DoCommand("SaveFile")` reports nothing. To confirm a save happened, compare the modification time of the edited project file before and after, and allow the IDE a moment to write.
 
 ## Seeing what a running or built app did
 
-- In debug runs, `System.DebugLog` output lands in the macOS unified log. Read it back with `log show --last 2m --predicate 'process == "MyApp.debug"'` (unverified).
-- A built app that crashes is invisible unless the code installs an `UnhandledException` handler that writes to a log file. The handler does not fire in debug runs; the debugger intercepts the exception first (unverified).
+- `System.DebugLog` lands in the macOS unified log, in both debug runs and built apps. A debug run's process is the app name plus `.debug`. Read it back with `/usr/bin/log show --last 2m --predicate 'process == "My Desktop App.debug"'` — spell out `/usr/bin/log`, because zsh has a `log` builtin that shadows it and silently returns nothing. The IDE's own Messages panel shows the same output.
+- `App.UnhandledException` fires in debug runs and in built apps. A built app that crashes is invisible unless that handler writes somewhere durable, so install one that logs to a file when the user needs crash evidence from a built app.
 - Prefer `System.DebugLog` over `MessageBox` for tracing: a message box blocks the UI and fires once per iteration.

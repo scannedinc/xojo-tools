@@ -51,7 +51,7 @@ Run `status` first: it confirms the IDE is reachable before you spend a long com
 
 ## References
 
-- [Editing and reload](references/editing-and-reload.md) — editing project files on disk while the IDE is open: the reload recipe and the two silent failure modes.
+- [Editing and reload](references/editing-and-reload.md) — editing project files while the IDE is open: the reload recipe, the two silent failure modes, and the IDE Script commands that edit code in place.
 - [JSON output](references/json-output.md) — the full schema and the exit codes.
 - [IDE behavior](references/ide-behavior.md) — how the IDE really answers, and the surprises xojoctl handles.
 - [Build targets](references/build-targets.md) — the target table and its sort order.
