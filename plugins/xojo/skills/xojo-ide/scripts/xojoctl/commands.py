@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import os
 import secrets
-import platform
 import sys
 import time
 import unicodedata
@@ -129,7 +128,7 @@ def cmd_analyze(args: argparse.Namespace, res: Result) -> None:
     with connected(args, res, wall) as client:
         health_check(client, res)
         require_project(client, res, "analyze")
-        script = (script_analyze_item(args.item) if getattr(args, "item", None)
+        script = (script_analyze_item(item) if item
                   else script_analyze_project())
         ex = client.exchange(script, ceiling=getattr(args, "analyze_timeout", WORK_CEILING))
         # A dirty analyze legitimately arrives as TWO same-tag messages (the
@@ -164,8 +163,8 @@ def cmd_analyze(args: argparse.Namespace, res: Result) -> None:
     res.timing = {"started_at": _iso_utc(wall),
                   "elapsed_ms": int((time.monotonic() - started) * 1000),
                   "reply_ms": int(ex.elapsed * 1000)}
-    res.result = {"scope": "item" if getattr(args, "item", None) else "project",
-                  "item": getattr(args, "item", None), "complete": ex.complete}
+    res.result = {"scope": "item" if item else "project",
+                  "item": item, "complete": ex.complete}
 
     cl = ex.result
     parts = [cl] + [classify(m) for m in extras]
@@ -184,8 +183,6 @@ def cmd_analyze(args: argparse.Namespace, res: Result) -> None:
             note="analysis reported zero errors and zero warnings")
     cl = worst_of(parts) or cl
     apply_classification(res, cl, getattr(args, "warnings_as_errors", False))
-    if res.outcome == "success":
-        res.summary = "no errors, no warnings"
 
     sev = getattr(args, "severity", "all")
     if sev == "errors":
@@ -508,6 +505,14 @@ def cmd_projects(args: argparse.Namespace, res: Result) -> None:
             # title list instead miscounts as soon as one title contains a
             # tab, which a file name may. Validate BEFORE selecting.
             count = project_window_count(client)
+            if count == 0:
+                # Same state bare `projects` reports as no_project_open;
+                # a range error here would garble into "(indexes 0--1)"
+                # and misfile the failure as exit 64.
+                raise NoProjectOpen(
+                    "no project is open in the Xojo IDE, so there is "
+                    "nothing to select.\nOpen one first:  %s open "
+                    "<path>.xojo_project" % INVOCATION)
             if count is not None and int(args.select) >= count:
                 raise XojoError(
                     "--select %s is out of range: %d workspace%s open "
@@ -615,9 +620,16 @@ def cmd_capture(args: argparse.Namespace, res: Result) -> None:
             time.sleep(min(0.5, max(0.0, end - time.monotonic())))
     res.timing = {"started_at": _iso_utc(wall),
                   "elapsed_ms": int((time.monotonic() - started) * 1000)}
+    # The health check (and any --script) contributes tagged messages of our
+    # own making; count the IDE-initiated traffic separately so an idle IDE
+    # does not read as having produced events.
+    msgs = res.raw["messages"]
+    unsolicited = sum(1 for m in msgs if m["channel"] == "out-of-band")
     res.result = {"seconds": args.seconds,
-                  "message_count": len(res.raw["messages"])}
-    res.summary = "captured %d message(s)" % len(res.raw["messages"])
+                  "message_count": len(msgs),
+                  "unsolicited_count": unsolicited}
+    res.summary = ("captured %d message(s), %d unsolicited"
+                   % (len(msgs), unsolicited))
 
 
 def cmd_targets(args: argparse.Namespace, res: Result) -> None:
@@ -625,7 +637,11 @@ def cmd_targets(args: argparse.Namespace, res: Result) -> None:
     if args.query:
         q = args.query.strip().lower()
         try:
-            rows = [resolve_target(q)]
+            resolved = resolve_target(q)
+            # Resolve within the --host filter, not around it: an exact
+            # match for another platform's target filters to nothing
+            # rather than silently overriding the flag.
+            rows = [resolved] if resolved in rows else []
         except ValueError:
             rows = [t for t in rows
                     if q in t.name or q in t.platform.lower()]

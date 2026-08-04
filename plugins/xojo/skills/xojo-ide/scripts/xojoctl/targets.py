@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import platform
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from .constants import *  # noqa: F401,F403
 from .escaping import *  # noqa: F401,F403
@@ -35,7 +35,6 @@ PLATFORM_RANK = {
     "macOS": 0, "Windows": 1, "Linux": 2,
     "iOS": 3, "Android": 4, "Web": 5, "Xojo Cloud": 5,
 }
-PLATFORM_ORDER = ("macOS", "Windows", "Linux", "iOS", "Android", "Web")
 
 # Architecture precedence WITHIN a platform, applied in this order:
 #   1. Intel before ARM, and single-arch before Universal/multi  (this map)
@@ -118,7 +117,6 @@ def host_targets() -> List[Target]:
 
 
 __all__ = [
-    "PLATFORM_ORDER",
     "PLATFORM_RANK",
     "TARGETS",
     "Target",

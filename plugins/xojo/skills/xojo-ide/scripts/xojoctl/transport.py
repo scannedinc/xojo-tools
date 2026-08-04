@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import platform
 import re
 import socket
 import stat
@@ -69,8 +68,14 @@ class _SocketTransport(Transport):
                 self._sock.settimeout(remaining)
                 try:
                     view = view[self._sock.send(view):]
-                except socket.timeout:
-                    pass    # loop; the deadline check above decides
+                except socket.timeout as exc:
+                    # A slice expiry carries no errno. Kernel ETIMEDOUT does
+                    # (socket.timeout IS TimeoutError on 3.10+) and means the
+                    # connection is dead -- the same distinction the read
+                    # side makes in Client._read_loop.
+                    if getattr(exc, "errno", None) is not None:
+                        raise
+                    # else loop; the deadline check above decides
                 attempted = True
         finally:
             self._sock.settimeout(None)
@@ -194,7 +199,10 @@ def connect_unix(name: Optional[str] = None, timeout: float = CONNECT_TIMEOUT,
         try:
             check_socket(path, trust_foreign_owner)
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(timeout)
+            # settimeout(0) means NON-BLOCKING -- connect() would raise
+            # EINPROGRESS even against a live IDE. --connect-timeout 0 gets
+            # the same one-short-try floor the deadline-bounded send uses.
+            sock.settimeout(timeout if timeout > 0 else 0.01)
             try:
                 sock.connect(path)
             except OSError:
@@ -241,7 +249,8 @@ def connect_tcp(port: int, timeout: float = CONNECT_TIMEOUT) -> Transport:
         except OSError as exc:
             last = exc
             continue
-        sock.settimeout(timeout)
+        # 0 would mean non-blocking, not "expire immediately"; see connect_unix.
+        sock.settimeout(timeout if timeout > 0 else 0.01)
         try:
             sock.connect((host, port))
         # OverflowError: connect() raises it (not OSError) for a port

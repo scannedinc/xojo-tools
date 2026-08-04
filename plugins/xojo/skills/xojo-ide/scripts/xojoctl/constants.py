@@ -2,29 +2,9 @@
 
 from __future__ import annotations
 
-import argparse
-import collections
-import contextlib
-import difflib
-import enum
-import json
 import os
-import platform
-import re
-import secrets
-import shutil
-import socket
-import stat
-import struct
-import subprocess
 import sys
-import tempfile
-import textwrap
-import threading
-import time
-import unicodedata
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Optional
 
 TOOL_NAME = "xojoctl"
 TOOL_VERSION = "0.1.0"

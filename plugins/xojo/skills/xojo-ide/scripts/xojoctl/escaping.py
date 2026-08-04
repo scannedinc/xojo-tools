@@ -44,6 +44,9 @@ def strip_bom(text: str) -> str:
     return text[1:] if text.startswith(BOM) else text
 
 
+_SURROGATE = re.compile(r"[\ud800-\udfff]")
+
+
 def encode_request(tag: str, script: str) -> bytes:
     """Build the JSON envelope with a real encoder. NEVER concatenation.
 
@@ -52,7 +55,19 @@ def encode_request(tag: str, script: str) -> bytes:
     those same six characters -- an odd substring of a filename, not a quote.
     ensure_ascii (the default) also guarantees no raw NUL reaches the wire
     ahead of the framing NUL.
+
+    Unpaired surrogates are rejected up front: json.dumps would happily emit
+    a bare \\udcXX escape, which is not valid JSON interchange -- a strict
+    IDE-side parser drops the envelope and the command times out blaming a
+    cold IDE. They reach here via surrogateescape-decoded argv (a filename
+    that is not valid UTF-8), and an early loud error names the real cause.
     """
+    m = _SURROGATE.search(script)
+    if m:
+        raise ValueError(
+            "script contains an unpaired surrogate (U+%04X at offset %d) and "
+            "cannot be sent as JSON text; a path argument is probably not "
+            "valid UTF-8" % (ord(m.group()), m.start()))
     return json.dumps({"script": script, "tag": tag}).encode("ascii") + NUL
 
 

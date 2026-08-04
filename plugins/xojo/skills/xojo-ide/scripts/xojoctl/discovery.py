@@ -62,7 +62,7 @@ def listening_ports(pids: "set") -> List[int]:
 
     A listening row is identified STRUCTURALLY -- its foreign address is the
     wildcard -- rather than by the literal string "LISTENING", which netstat
-    localises (de-DE prints ABHOEREN).
+    localizes (de-DE prints ABHOEREN).
     """
     ports = set()
     for line in _run(["netstat", "-ano", "-p", "TCP"]).splitlines():

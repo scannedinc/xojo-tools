@@ -34,6 +34,19 @@ def decode_message(raw: bytes) -> Message:
     except (ValueError, UnicodeDecodeError):
         env = None
     tag = env.get("tag") if isinstance(env, dict) else None
+    if env is None:
+        # A reply that is not valid UTF-8 JSON may still carry OUR tag (tags
+        # are ASCII hex this client minted). Salvage it with a lenient pass
+        # so the waiting exchange can claim the reply and classify it as
+        # "not valid UTF-8 JSON" -- instead of never correlating it and
+        # sitting out the whole ceiling to blame a cold IDE. The envelope
+        # stays None; only the tag is trusted from the lenient decode.
+        try:
+            lenient: Any = json.loads(raw.decode("utf-8", errors="replace"))
+        except ValueError:
+            lenient = None
+        if isinstance(lenient, dict) and isinstance(lenient.get("tag"), str):
+            tag = lenient["tag"]
     return Message(seq=-1, tag=tag if isinstance(tag, str) else None,
                    envelope=env, raw=raw)
 
@@ -102,11 +115,16 @@ class Journal:
         skipped: List[Message] = []
         with self._cond:
             overrun = 0
-            if cursor < self._first_seq:
-                overrun = self._first_seq - cursor
-                cursor = self._first_seq
             deadline = time.monotonic() + timeout
             while True:
+                if cursor < self._first_seq:
+                    # Checked every pass, not just on entry: eviction can
+                    # also happen while this waiter is parked in wait(), and
+                    # a reply evicted then must still be COUNTED, or a
+                    # flood turns a received reply into a clean-looking
+                    # timeout with lost == 0.
+                    overrun += self._first_seq - cursor
+                    cursor = self._first_seq
                 for m in self._items:
                     if m.seq < cursor:
                         continue

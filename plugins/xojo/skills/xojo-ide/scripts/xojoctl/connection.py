@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
-import platform
 import sys
 from typing import List, Optional
 
@@ -113,12 +112,16 @@ def open_client(args: argparse.Namespace, res: Result) -> Client:
                 "patiently..." % c))
         transport = connect_tcp(port, timeout=args.connect_timeout)
         res.connection["port"] = port
+    client = Client(transport, first_ceiling=args.timeout,
+                    reply_ceiling=args.warm_timeout, on_hint=hint)
+    # Recorded only after Client() returns: its constructor performs the
+    # handshake write, and recording first meant a handshake that died on
+    # the wire was still reported as "connected": true, "handshake": "ok".
     res.connection.update({
         "connected": True, "transport": transport.kind,
         "endpoint": transport.address, "handshake": "ok",
     })
-    return Client(transport, first_ceiling=args.timeout,
-                  reply_ceiling=args.warm_timeout, on_hint=hint)
+    return client
 
 
 def record_raw(res: Result, client: Client, started: float) -> None:

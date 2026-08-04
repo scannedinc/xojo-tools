@@ -100,7 +100,8 @@ ROOT_FLAGS = (
     ("--json", "Emit one JSON document on stdout"),
     ("-W", "Treat warnings as errors (analyze, build, run, script)"),
     ("-q, --quiet", "Suppress progress and advisory notes"),
-    ("--timeout SEC", "Safety ceiling for the first reply (default 900)"),
+    ("--timeout SEC", "Safety ceiling for the first reply (default %d)"
+     % FIRST_REPLY_CEILING),
     ("-h, --help", "Show help for a command"),
     ("--version", "Show xojoctl's own version"),
 )
@@ -254,14 +255,18 @@ def build_parser() -> argparse.ArgumentParser:
                       help="Windows: loopback TCP port; skips discovery "
                            "(defaults to XOJOCTL_PORT if set)")
     conn.add_argument("--connect-timeout", type=_seconds_arg, default=CONNECT_TIMEOUT,
-                      metavar="SEC", help="socket connect timeout (default 10)")
+                      metavar="SEC",
+                      help="socket connect timeout (default %d)" % CONNECT_TIMEOUT)
     conn.add_argument("--timeout", type=_seconds_arg, default=FIRST_REPLY_CEILING,
                       metavar="SEC",
                       help="safety ceiling for the first reply, and the whole "
-                           "budget for Windows port discovery (default 900); "
-                           "a cold IDE unpacks plugins before answering")
+                           "budget for Windows port discovery (default %d); "
+                           "a cold IDE unpacks plugins before answering"
+                           % FIRST_REPLY_CEILING)
     conn.add_argument("--warm-timeout", type=_seconds_arg, default=REPLY_CEILING,
-                      metavar="SEC", help="ceiling once the IDE has replied (default 300)")
+                      metavar="SEC",
+                      help="ceiling once the IDE has replied (default %d)"
+                           % REPLY_CEILING)
 
     out = HelpfulParser(add_help=False)
     out.add_argument("--json", action="store_true",
@@ -280,8 +285,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = HelpfulParser(
         prog=INVOCATION,
         description="Drive a running Xojo IDE: analyze, build, and read back "
-                    "errors and warnings.",
-        epilog="The Xojo IDE must already be running -- it creates the socket.")
+                    "errors and warnings.")
     p.add_argument("--version", action="version",
                    version="%s %s" % (TOOL_NAME, TOOL_VERSION))
     sub = p.add_subparsers(dest="command", required=True,
@@ -299,8 +303,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="display filter only; the exit code always uses the full set")
     s.add_argument("--analyze-timeout", type=_seconds_arg, default=WORK_CEILING,
                    metavar="SEC",
-                   help="ceiling for the analysis itself (default 1800); a large "
-                        "project takes far longer than a small one")
+                   help="ceiling for the analysis itself (default %d); a large "
+                        "project takes far longer than a small one"
+                        % WORK_CEILING)
     s.set_defaults(func=cmd_analyze)
 
     s = sub.add_parser("build", parents=[conn, out, pol],
@@ -313,10 +318,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="stop after the first failing target")
     s.add_argument("--build-timeout", type=_seconds_arg, default=BUILD_CEILING,
                    metavar="SEC",
-                   help="ceiling for one build (default 1800). Deliberately "
+                   help="ceiling for one build (default %d). Deliberately "
                         "generous: measurements come from empty projects, and a "
                         "real one takes far longer. Too low a value abandons a "
-                        "running build and leaves the IDE busy")
+                        "running build and leaves the IDE busy" % BUILD_CEILING)
     s.set_defaults(func=cmd_build)
 
     s = sub.add_parser(

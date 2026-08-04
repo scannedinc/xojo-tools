@@ -51,10 +51,6 @@ def locate_diagnostics(env: Any) -> Tuple[Optional[str], Any, Optional[str]]:
     return None, None, None
 
 
-def carries_diagnostics(msg: Message) -> bool:
-    return locate_diagnostics(msg.envelope)[0] is not None
-
-
 def split_script_diagnostics(items: Sequence[Any]) -> Tuple[List[Any], List[Any]]:
     """Partition a scriptError array into (errors, warnings).
 
@@ -67,7 +63,7 @@ def split_script_diagnostics(items: Sequence[Any]) -> Tuple[List[Any], List[Any]
           "message": "Converting from Int64 to Double causes a possible loss
                       of precision, ..."}]}
 
-    as the ONLY content of a reply. Anything without a recognisably-warning
+    as the ONLY content of a reply. Anything without a recognizably-warning
     type is treated as an error, so an unknown shape still fails loudly.
     """
     errs: List[Any] = []
@@ -203,7 +199,6 @@ __all__ = [
     "DIAG_KEYS",
     "Verdict",
     "_has_fatal_open_error",
-    "carries_diagnostics",
     "classify",
     "locate_diagnostics",
     "split_script_diagnostics",

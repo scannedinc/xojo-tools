@@ -31,7 +31,7 @@ class Framer:
                 if len(self._buf) + (n - pos) > self._cap:
                     raise ProtocolError(
                         "unterminated message exceeded the %d byte cap; "
-                        "the connection is desynchronised" % self._cap)
+                        "the connection is desynchronized" % self._cap)
                 self._buf += data[pos:]
                 return out
             if len(self._buf) + (i - pos) > self._cap:

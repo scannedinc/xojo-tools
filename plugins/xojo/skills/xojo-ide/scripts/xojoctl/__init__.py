@@ -1,6 +1,7 @@
 """xojoctl -- drive a running Xojo IDE over its IDE Communicator socket.
 
-See docs/ for usage; the protocol record lives in protocol_notes.py.
+See the skill's README.md for usage; the protocol record lives in
+protocol_notes.py.
 """
 
 from __future__ import annotations

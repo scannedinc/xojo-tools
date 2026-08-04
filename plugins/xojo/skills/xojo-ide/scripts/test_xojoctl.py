@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import socket
 import sys
 import tempfile
@@ -333,13 +334,15 @@ class MockIDE:
 
     def __init__(self) -> None:
         self.handshakes = 0
+        self._dir = None
         if X.IS_WINDOWS:
             self._srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._srv.bind(("127.0.0.1", 0))
             self.port = self._srv.getsockname()[1]
             self.path = None
         else:
-            self.path = os.path.join(tempfile.mkdtemp(), "XojoIDEMock")
+            self._dir = tempfile.mkdtemp()
+            self.path = os.path.join(self._dir, "XojoIDEMock")
             self._srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self._srv.bind(self.path)
             self.port = None
@@ -511,6 +514,8 @@ class MockIDE:
             pass
         if self.path and os.path.exists(self.path):
             os.unlink(self.path)
+        if self._dir:
+            shutil.rmtree(self._dir, ignore_errors=True)
 
 
 def test_client() -> None:
@@ -1403,7 +1408,7 @@ def test_send_deadline() -> None:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.connect(path)
         tr = X._SocketTransport(s, path, "unix")
-        cleanup = path
+        cleanup = d
     try:
         big = b"x" * (32 * 1024 * 1024)
         t0 = time.monotonic()
@@ -1415,8 +1420,8 @@ def test_send_deadline() -> None:
     finally:
         tr.close()
         srv.close()
-        if cleanup and os.path.exists(cleanup):
-            os.unlink(cleanup)
+        if cleanup:
+            shutil.rmtree(cleanup, ignore_errors=True)
 
 
 def test_peer_uid() -> None:

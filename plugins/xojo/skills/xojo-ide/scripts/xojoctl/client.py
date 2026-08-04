@@ -63,7 +63,15 @@ class Client:
                                         name="xojoctl-reader", daemon=True)
         self._reader.start()
         # The IDE sends NO acknowledgement to the handshake. Never read here.
-        self._t.send(HANDSHAKE)
+        try:
+            self._t.send(HANDSHAKE)
+        except BaseException:
+            # A constructor that raises leaves no object for the caller to
+            # close: shut the transport (which also unblocks the reader)
+            # and collect the thread before propagating.
+            self._t.close()
+            self._reader.join(timeout=5.0)
+            raise
 
     @property
     def address(self) -> str:
