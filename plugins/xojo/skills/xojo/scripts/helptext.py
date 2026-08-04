@@ -115,6 +115,14 @@ class HelpConfig:
     Every command must appear in `command_blurbs` (and in exactly one group
     when `command_groups` is set), so a new command cannot silently vanish
     from help.
+
+    `root_flags` set to None derives the root FLAGS section from the parser;
+    an empty sequence suppresses the section. `usage` holds root usage-line
+    suffixes rendered after `prog` (a lone string counts as one line, not as
+    characters). `prompt` is the shell prompt drawn before `prog` in usage
+    and example lines. A subcommand-less CLI leaves `command_blurbs` empty
+    -- that drops the COMMANDS section and the per-command trailer -- and
+    should override `usage`, whose default advertises subcommands.
     """
 
     prog: str
@@ -127,6 +135,12 @@ class HelpConfig:
     color_env: str | None = None
     usage: Sequence[str] = ("<command> [flags]",)
     prompt: str = "%"
+
+    def __post_init__(self) -> None:
+        # A lone string satisfies Sequence[str] and would otherwise render
+        # one usage line per character.
+        if isinstance(self.usage, str):
+            object.__setattr__(self, "usage", (self.usage,))
 
 
 def nonneg_float(value: str) -> float:
@@ -181,29 +195,64 @@ def _two_col(th: Theme, rows: Sequence[tuple[str, str]], width: int) -> str:
     return "".join(out)
 
 
+def _rows_section(th: Theme, title: str, rows: Sequence[tuple[str, str]]) -> str:
+    # Width is per-section: flags are longer than command names, and sharing
+    # one width makes the longer column collide with its descriptions.
+    return (
+        _section(th, title)
+        + _two_col(th, rows, max(len(name) for name, _ in rows) + 4)
+        + "\n"
+    )
+
+
+def _cap(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
+def _metavar_str(action: argparse.Action) -> str:
+    """The display name for one argument; argparse allows a tuple for nargs > 1."""
+    metavar = action.metavar
+    if isinstance(metavar, tuple):
+        return " ".join(metavar)
+    return metavar or action.dest.upper()
+
+
 def _positionals(parser: argparse.ArgumentParser) -> list[argparse.Action]:
     return [
         a
         for a in parser._actions
-        if not a.option_strings and a.dest not in ("help", "command")
+        if not a.option_strings
+        and not isinstance(a, argparse._SubParsersAction)
+        and a.help != argparse.SUPPRESS
+    ]
+
+
+def _arg_rows(parser: argparse.ArgumentParser) -> list[tuple[str, str]]:
+    return [
+        (_metavar_str(action), _cap((action.help or "").strip()))
+        for action in _positionals(parser)
     ]
 
 
 def _flag_rows(parser: argparse.ArgumentParser) -> list[tuple[str, str]]:
     rows = []
     for action in parser._actions:
-        if not action.option_strings:
+        if not action.option_strings or action.help == argparse.SUPPRESS:
             continue
         flag = ", ".join(action.option_strings)
         if action.choices:
             flag += " {%s}" % ",".join(str(c) for c in action.choices)
-        elif action.metavar:
-            flag += " " + action.metavar
-        elif action.nargs != 0:
-            flag += " " + action.dest.upper()
-        desc = (action.help or "").strip()
-        rows.append((flag, desc[:1].upper() + desc[1:] if desc else ""))
+        elif action.metavar or action.nargs != 0:
+            flag += " " + _metavar_str(action)
+        rows.append((flag, _cap((action.help or "").strip())))
     return rows
+
+
+def _usage_lines(th: Theme, config: HelpConfig) -> str:
+    return "".join(
+        "    %s %s %s\n" % (th.dim(config.prompt), config.prog, th.dim(usage))
+        for usage in config.usage
+    )
 
 
 def render_root_help(
@@ -213,15 +262,13 @@ def render_root_help(
     th = help_theme(config.color_env)
 
     buf = [_blurb(th, parser.description or "")]
-    buf.append(_section(th, "USAGE"))
-    for usage in config.usage:
-        buf.append(
-            "    %s %s %s\n"
-            % (th.dim(config.prompt), config.prog, th.dim(usage))
-        )
-    buf.append("\n")
+    if config.usage:
+        buf.append(_section(th, "USAGE"))
+        buf.append(_usage_lines(th, config))
+        buf.append("\n")
 
-    if config.command_blurbs and config.command_groups:
+    if config.command_groups:
+        # One width across all groups, so the columns line up page-wide.
         width = max(len(n) for n in config.command_blurbs) + 4
         for title, group in config.command_groups:
             buf.append(_section(th, title))
@@ -230,25 +277,11 @@ def render_root_help(
             )
             buf.append("\n")
     elif config.command_blurbs:
-        width = max(len(n) for n in config.command_blurbs) + 4
-        buf.append(_section(th, "COMMANDS"))
-        buf.append(_two_col(th, list(config.command_blurbs.items()), width))
-        buf.append("\n")
+        buf.append(_rows_section(th, "COMMANDS", list(config.command_blurbs.items())))
 
-    args = [
-        (action.metavar or action.dest.upper(), (action.help or "").strip())
-        for action in _positionals(parser)
-    ]
+    args = _arg_rows(parser)
     if args:
-        buf.append(_section(th, "ARGUMENTS"))
-        buf.append(
-            _two_col(
-                th,
-                [(n, d[:1].upper() + d[1:] if d else "") for n, d in args],
-                max(len(n) for n, _ in args) + 4,
-            )
-        )
-        buf.append("\n")
+        buf.append(_rows_section(th, "ARGUMENTS", args))
 
     flags = (
         list(config.root_flags)
@@ -256,12 +289,7 @@ def render_root_help(
         else _flag_rows(parser)
     )
     if flags:
-        buf.append(_section(th, "FLAGS"))
-        # Width is per-section: flags are longer than command names, and
-        # sharing one width makes the longer column collide with its
-        # descriptions.
-        buf.append(_two_col(th, flags, max(len(f) for f, _ in flags) + 4))
-        buf.append("\n")
+        buf.append(_rows_section(th, "FLAGS", flags))
 
     if config.root_examples:
         buf.append(_section(th, "EXAMPLES"))
@@ -296,7 +324,7 @@ def render_command_help(
     # A readable usage line, rather than argparse's full flag dump.
     shown = []
     for action in _positionals(parser):
-        metavar = action.metavar or action.dest.upper()
+        metavar = _metavar_str(action)
         shown.append("[%s]" % metavar if action.nargs in ("?", "*") else metavar)
     buf.append(_section(th, "USAGE"))
     buf.append(
@@ -310,26 +338,13 @@ def render_command_help(
         )
     )
 
-    args = [
-        (action.metavar or action.dest.upper(), (action.help or "").strip())
-        for action in _positionals(parser)
-    ]
+    args = _arg_rows(parser)
     if args:
-        buf.append(_section(th, "ARGUMENTS"))
-        buf.append(
-            _two_col(
-                th,
-                [(n, d[:1].upper() + d[1:] if d else "") for n, d in args],
-                max(len(n) for n, _ in args) + 4,
-            )
-        )
-        buf.append("\n")
+        buf.append(_rows_section(th, "ARGUMENTS", args))
 
     flags = _flag_rows(parser)
     if flags:
-        buf.append(_section(th, "FLAGS"))
-        buf.append(_two_col(th, flags, max(len(f) for f, _ in flags) + 4))
-        buf.append("\n")
+        buf.append(_rows_section(th, "FLAGS", flags))
 
     command_examples = config.command_examples or {}
     if name in command_examples:
@@ -344,31 +359,38 @@ def render_command_help(
 
 
 # argparse quotes the bad value with %r, which switches to double quotes
-# when the value itself contains an apostrophe.
-_INVALID_CHOICE = re.compile(
-    r"argument (?:<command>|command): invalid choice: (['\"])(.+?)\1"
-)
+# when the value itself contains an apostrophe. The leading group captures
+# which argument failed, so a flag's choice error is never mistaken for an
+# unknown command.
+_INVALID_CHOICE = re.compile(r"argument (\S+): invalid choice: (['\"])(.+?)\2")
 _REQUIRED = re.compile(r"the following arguments are required: (.+)")
 _UNRECOGNIZED = re.compile(r"unrecognized arguments: (.+)")
+
+# How the subcommand argument is conventionally named; HelpfulParser.error()
+# extends these with the parser's actual subparsers dest and metavar.
+_COMMAND_LABELS = ("<command>", "command")
 
 
 def _humanize(
     message: str,
     command_blurbs: Mapping[str, str],
+    command_labels: Sequence[str] = _COMMAND_LABELS,
 ) -> tuple[str, str | None]:
     """Turn argparse's phrasing into something a person wants to read.
 
     argparse's own invalid-choice text lists every valid name inline; strip
-    that and offer a single close match instead.
+    that and offer a single close match instead. Only errors on an argument
+    named in `command_labels` are treated as command errors; a flag with
+    choices keeps argparse's own message.
     """
     match = _INVALID_CHOICE.search(message)
-    if match:
-        bad = match.group(2)
+    if match and match.group(1) in command_labels:
+        bad = match.group(3)
         close = difflib.get_close_matches(bad, sorted(command_blurbs), n=1, cutoff=0.5)
         return 'unknown command "%s"' % bad, close[0] if close else None
     match = _REQUIRED.search(message)
     if match:
-        if match.group(1).strip() in ("<command>", "command"):
+        if command_blurbs and match.group(1).strip() in command_labels:
             return "no command given", None
         return "missing required argument: %s" % match.group(1), None
     match = _UNRECOGNIZED.search(message)
@@ -413,11 +435,19 @@ class HelpfulParser(argparse.ArgumentParser):
                 self.command_name,
                 th.dim("[flags]"),
             )
-        return "".join(
-            "    %s %s %s\n"
-            % (th.dim(config.prompt), config.prog, th.dim(usage))
-            for usage in config.usage
-        )
+        return _usage_lines(th, config)
+
+    def _command_labels(self) -> list[str]:
+        """The conventional names plus this parser's own subcommand argument."""
+        labels = list(_COMMAND_LABELS)
+        for action in self._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                labels.extend(
+                    label
+                    for label in (action.dest, action.metavar)
+                    if label and label != argparse.SUPPRESS
+                )
+        return labels
 
     def usage_error_extra(self, text: str, suggestion: str | None, hint: str) -> None:
         """Hook for subclasses; called just before a usage error exits."""
@@ -426,12 +456,16 @@ class HelpfulParser(argparse.ArgumentParser):
         config = self.get_help_config()
         th = help_theme(config.color_env)
         err = sys.stderr
-        text, suggestion = _humanize(message, config.command_blurbs)
+        text, suggestion = _humanize(
+            message, config.command_blurbs, self._command_labels()
+        )
         print("\n  %s %s\n" % (th.error("error:"), text), file=err)
         if suggestion:
             print("  Did you mean %s?\n" % th.bold(suggestion), file=err)
-        print(_section(th, "USAGE"), file=err, end="")
-        print(self.format_usage(), file=err, end="")
+        usage = self.format_usage()
+        if usage:
+            print(_section(th, "USAGE"), file=err, end="")
+            print(usage, file=err, end="")
         hint = (
             "%s %s --help" % (config.prog, self.command_name)
             if self.command_name

@@ -762,6 +762,82 @@ def test_help() -> None:
         set_global("INVOCATION", old_inv)
 
 
+def test_helptext_generic() -> None:
+    """The shared renderer's configurable paths, which no CLI in this repo
+    exercises: subcommand-less help, custom usage lines and prompt, and the
+    parser-derived sections. This repo is the canonical source for
+    helptext.py, so a regression here ships to every downstream copy.
+    """
+    print("\nshared helptext: subcommand-less and configurable paths")
+    from xojoctl import helptext as H
+
+    cfg = H.HelpConfig(
+        prog="onetool",
+        command_blurbs={},
+        usage=("FILE [flags]", "--stdin [flags]"),
+        prompt="$",
+    )
+
+    class OneParser(H.HelpfulParser):
+        help_config = cfg
+
+    p = OneParser(prog="onetool", description="One command only.",
+                  add_help=False)
+    p.add_argument("-h", "--help", action="help", help="show this help")
+    p.add_argument("file", metavar="FILE", nargs="?", help="input file")
+    p.add_argument("--fast", action="store_true", help="hurry up")
+    p.add_argument("--internal", action="store_true", help=argparse.SUPPRESS)
+    p.add_argument("--between", nargs=2, metavar=("LOW", "HIGH"),
+                   help="range filter")
+
+    text = H.render_root_help(p, cfg)
+    check("every configured usage line renders", text.count("$ onetool"), 2)
+    check("the custom usage suffix renders", "FILE [flags]" in text, True)
+    check("positionals get an ARGUMENTS section", "ARGUMENTS" in text, True)
+    check("flags derive from the parser when root_flags is None",
+          "--fast" in text, True)
+    check("tuple metavars render joined, not crash",
+          "--between LOW HIGH" in text, True)
+    check("suppressed flags stay hidden", "--internal" in text, False)
+    check("no COMMANDS section without commands", "COMMANDS" in text, False)
+    check("no per-command trailer without commands",
+          "<command> --help" in text, False)
+    check("root_flags=() suppresses the FLAGS section",
+          "FLAGS" in X.helptext.render_root_help(
+              p, H.HelpConfig(prog="onetool", command_blurbs={},
+                              usage=("FILE",), root_flags=())), False)
+
+    # A lone string is a Sequence[str] too; it must count as one usage line,
+    # not be iterated character by character.
+    check("a lone usage string counts as one line",
+          H.HelpConfig(prog="onetool", command_blurbs={},
+                       usage="FILE [flags]").usage, ("FILE [flags]",))
+
+    # The subparsers action is excluded structurally, whatever its dest; a
+    # genuine positional that happens to be named "command" still documents.
+    bare = OneParser(prog="subtool", add_help=False)
+    bare.add_subparsers()
+    check("a subparsers action never lands in ARGUMENTS",
+          H._arg_rows(bare), [])
+    named = OneParser(prog="cmds", add_help=False)
+    named.add_argument("command", help="the command to send")
+    check("a positional named 'command' is documented",
+          H._arg_rows(named), [("COMMAND", "The command to send")])
+
+    # Error humanizing follows the parser's own subcommand naming.
+    check("invalid choice on a custom dest is still a command error",
+          H._humanize("argument <action>: invalid choice: 'fro' (choose)",
+                      {"frob": ""}, ("<action>", "action")),
+          ('unknown command "fro"', "frob"))
+    check("a flag's invalid choice keeps argparse's message",
+          H._humanize("argument --color: invalid choice: 'no' (choose)",
+                      {"go": ""}, ("<command>", "command"))[0],
+          "argument --color: invalid choice: 'no' (choose)")
+    check("a required positional is not 'no command given' without commands",
+          H._humanize("the following arguments are required: command", {})[0],
+          "missing required argument: command")
+
+
 def test_help_width() -> None:
     """Help must not widen with the terminal: every page stays within 100
     columns even on a very wide terminal, and within 80 for everything except
@@ -1492,6 +1568,7 @@ def main() -> int:
     test_bom_handling()
     test_channel_classification()
     test_help()
+    test_helptext_generic()
     test_target_table()
     test_error_paths()
     test_split_reply()
