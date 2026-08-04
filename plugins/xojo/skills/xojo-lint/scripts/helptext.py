@@ -93,17 +93,23 @@ class Theme:
         return "\033[3m%s\033[0m" % self.dim(text)
 
 
-def help_theme(color_env: str | None = None) -> Theme:
+def help_theme(color_env: str | None = None, stream: Any = None) -> Theme:
     """Help is rendered before flags are parsed, so decide from the environment.
 
     `color_env` names an optional per-tool variable that forces color on when
-    set to "always", e.g. through a pipe.
+    set to "always", e.g. through a pipe. `stream` is the stream the text will
+    be written to -- color keys off ITS TTY-ness, so error text bound for
+    stderr is not colored just because stdout is a terminal (which put raw
+    escape codes in `tool bogus 2>err.log`). Defaults to stdout, where help
+    goes.
     """
     if os.environ.get("NO_COLOR"):
         return Theme(False)
     if color_env and os.environ.get(color_env) == "always":
         return Theme(True)
-    return Theme(bool(getattr(sys.stdout, "isatty", lambda: False)()))
+    if stream is None:
+        stream = sys.stdout
+    return Theme(bool(getattr(stream, "isatty", lambda: False)()))
 
 
 @dataclass(frozen=True)
@@ -384,7 +390,7 @@ def _humanize(
     choices keeps argparse's own message.
     """
     match = _INVALID_CHOICE.search(message)
-    if match and match.group(1) in command_labels:
+    if match and command_blurbs and match.group(1) in command_labels:
         bad = match.group(3)
         close = difflib.get_close_matches(bad, sorted(command_blurbs), n=1, cutoff=0.5)
         return 'unknown command "%s"' % bad, close[0] if close else None
@@ -395,7 +401,9 @@ def _humanize(
         return "missing required argument: %s" % match.group(1), None
     match = _UNRECOGNIZED.search(message)
     if match:
-        return "unrecognized argument: %s" % match.group(1), None
+        extra = match.group(1)
+        plural = "s" if " " in extra.strip() else ""
+        return "unrecognized argument%s: %s" % (plural, extra), None
     return message, None
 
 
@@ -426,8 +434,9 @@ class HelpfulParser(argparse.ArgumentParser):
         return render_root_help(self, self.get_help_config())
 
     def format_usage(self) -> str:
+        # Only the error path renders usage, and errors go to stderr.
         config = self.get_help_config()
-        th = help_theme(config.color_env)
+        th = help_theme(config.color_env, sys.stderr)
         if self.command_name:
             return "    %s %s %s %s\n" % (
                 th.dim(config.prompt),
@@ -438,10 +447,18 @@ class HelpfulParser(argparse.ArgumentParser):
         return _usage_lines(th, config)
 
     def _command_labels(self) -> list[str]:
-        """The conventional names plus this parser's own subcommand argument."""
-        labels = list(_COMMAND_LABELS)
+        """Labels naming this parser's subcommand argument, if it owns one.
+
+        A parser with no subparsers gets NO labels: its errors are about
+        ordinary arguments -- even one whose dest happens to be "command" --
+        and rewriting those as "unknown command" would discard argparse's
+        own choose-from list and offer suggestions drawn from a command
+        table the argument has nothing to do with.
+        """
+        labels: list[str] = []
         for action in self._actions:
             if isinstance(action, argparse._SubParsersAction):
+                labels.extend(_COMMAND_LABELS)
                 labels.extend(
                     label
                     for label in (action.dest, action.metavar)
@@ -454,8 +471,8 @@ class HelpfulParser(argparse.ArgumentParser):
 
     def error(self, message: str) -> Any:
         config = self.get_help_config()
-        th = help_theme(config.color_env)
         err = sys.stderr
+        th = help_theme(config.color_env, err)
         text, suggestion = _humanize(
             message, config.command_blurbs, self._command_labels()
         )
