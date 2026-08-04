@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import difflib
-import io
 import json
 import os
 import re
@@ -346,7 +345,7 @@ def validate_common_text(path: Path, document: TextDocument) -> list[Diagnostic]
                 severity="warning",
             )
         )
-    for number, line in enumerate(document.text.splitlines(), 1):
+    for number, line in enumerate(split_logical_lines(document.text), 1):
         if MERGE_MARKER_RE.match(line):
             diagnostics.append(
                 diagnostic(
@@ -369,6 +368,30 @@ def validate_common_text(path: Path, document: TextDocument) -> list[Diagnostic]
     return diagnostics
 
 
+def closing_end_kinds(lines: Iterable[str]) -> set[str]:
+    """Every kind that appears as a `#tag End<kind>` line, casefolded.
+
+    One definition shared by the validators and the formatter, so their
+    models of which tags close can never drift apart.
+    """
+    return {
+        end_match.group("kind").casefold()
+        for line in lines
+        if (tag_match := TAG_RE.match(line.rstrip("\r")))
+        if (end_match := END_TAG_RE.match(tag_match.group("body")))
+    }
+
+
+def is_standalone_tag(kind: str, closing_kinds: set[str]) -> bool:
+    """An unknown kind with no matching End tag is an opaque standalone
+    record. This lets a newer IDE add metadata records without making an
+    older validator claim the rest of the file is malformed.
+    """
+    return kind in STANDALONE_TAGS or (
+        kind not in KNOWN_TAG_KINDS and kind.casefold() not in closing_kinds
+    )
+
+
 def parse_tag_tokens(
     path: Path,
     text: str,
@@ -378,14 +401,9 @@ def parse_tag_tokens(
     stack: list[tuple[str, int]] = []
     tokens: list[TagToken] = []
     diagnostics: list[Diagnostic] = []
-    closing_kinds = {
-        end_match.group("kind").casefold()
-        for line in text.splitlines()
-        if (tag_match := TAG_RE.match(line.rstrip("\r")))
-        if (end_match := END_TAG_RE.match(tag_match.group("body")))
-    }
+    closing_kinds = closing_end_kinds(split_logical_lines(text))
 
-    for number, line in enumerate(text.splitlines(), 1):
+    for number, line in enumerate(split_logical_lines(text), 1):
         match = TAG_RE.match(line.rstrip("\r"))
         if not match:
             continue
@@ -459,12 +477,7 @@ def parse_tag_tokens(
             )
             continue
         kind = kind_match.group("kind")
-        # An unknown kind with no matching End tag is treated as an opaque
-        # standalone record. This lets a newer IDE add metadata records without
-        # making an older validator claim the rest of the file is malformed.
-        standalone = kind in STANDALONE_TAGS or (
-            kind not in KNOWN_TAG_KINDS and kind.casefold() not in closing_kinds
-        )
+        standalone = is_standalone_tag(kind, closing_kinds)
         depth = len(stack)
         tokens.append(
             TagToken(
@@ -507,14 +520,9 @@ def validate_begin_blocks(path: Path, text: str) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     blocks: list[tuple[str, int]] = []
     tag_stack: list[str] = []
-    closing_kinds = {
-        end_match.group("kind").casefold()
-        for line in text.splitlines()
-        if (tag_match := TAG_RE.match(line.rstrip("\r")))
-        if (end_match := END_TAG_RE.match(tag_match.group("body")))
-    }
+    closing_kinds = closing_end_kinds(split_logical_lines(text))
 
-    for number, line in enumerate(text.splitlines(), 1):
+    for number, line in enumerate(split_logical_lines(text), 1):
         stripped = line.strip()
         tag_match = TAG_RE.match(line.rstrip("\r"))
         if tag_match:
@@ -527,11 +535,7 @@ def validate_begin_blocks(path: Path, text: str) -> list[Diagnostic]:
                 kind_match = TAG_KIND_RE.match(body)
                 if kind_match:
                     kind = kind_match.group("kind")
-                    standalone = kind in STANDALONE_TAGS or (
-                        kind not in KNOWN_TAG_KINDS
-                        and kind.casefold() not in closing_kinds
-                    )
-                    if not standalone:
+                    if not is_standalone_tag(kind, closing_kinds):
                         tag_stack.append(kind)
             continue
 
@@ -652,7 +656,7 @@ def validate_project(
     item_rows: list[tuple[str, re.Match[str], int]] = []
     item_ids: dict[int, tuple[str, int]] = {}
 
-    for number, line in enumerate(document.text.splitlines(), 1):
+    for number, line in enumerate(split_logical_lines(document.text), 1):
         if not line:
             diagnostics.append(
                 diagnostic(
@@ -907,7 +911,12 @@ class UIStateParser:
             diagnostic(self.path, code, message, severity="warning")
         )
 
-    def parse_stream(self, start: int, end: int) -> int:
+    # Grup records nest by recursion; a cap keeps a corrupt (or crafted) file
+    # a diagnostic rather than a RecursionError traceback. Real UI state has
+    # been observed a handful of levels deep, never near this.
+    MAX_GROUP_DEPTH = 100
+
+    def parse_stream(self, start: int, end: int, depth: int = 0) -> int:
         offset = start
         while offset < end:
             if end - offset < 8:
@@ -946,7 +955,14 @@ class UIStateParser:
                 if terminator + 12 > end:
                     self.error("XJU007", f"Grup record at byte {offset} exceeds its container")
                     return end
-                self.parse_stream(offset + 16, terminator)
+                if depth >= self.MAX_GROUP_DEPTH:
+                    self.error(
+                        "XJU010",
+                        f"Grup record at byte {offset} nests deeper than "
+                        f"{self.MAX_GROUP_DEPTH} levels",
+                    )
+                    return end
+                self.parse_stream(offset + 16, terminator, depth + 1)
                 end_tag = self.data[terminator : terminator + 8]
                 end_id = struct.unpack_from(">I", self.data, terminator + 8)[0]
                 if end_tag != b"EndGInt ":
@@ -1151,12 +1167,7 @@ def format_manifest(text: str) -> str:
 def format_tagged_text(text: str, *, source_indent: bool) -> str:
     formatted: list[str] = []
     stack: list[str] = []
-    closing_kinds = {
-        end_match.group("kind").casefold()
-        for line in split_logical_lines(text)
-        if (tag_match := TAG_RE.match(line.rstrip("\r")))
-        if (end_match := END_TAG_RE.match(tag_match.group("body")))
-    }
+    closing_kinds = closing_end_kinds(split_logical_lines(text))
     for line in split_lines_keepends(text):
         body, ending = split_line_ending(line)
         match = TAG_RE.match(body)
@@ -1182,11 +1193,7 @@ def format_tagged_text(text: str, *, source_indent: bool) -> str:
                     marker = "#Tag" if kind == "Instance" else "#tag"
                     depth = 0 if kind in OUTDENTED_METADATA_TAGS else len(stack)
                     body = "\t" * depth + marker + " " + tag_body.rstrip()
-                    standalone = kind in STANDALONE_TAGS or (
-                        kind not in KNOWN_TAG_KINDS
-                        and kind.casefold() not in closing_kinds
-                    )
-                    if not standalone:
+                    if not is_standalone_tag(kind, closing_kinds):
                         stack.append(kind)
             formatted.append(body + ending)
             continue
