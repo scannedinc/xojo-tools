@@ -1,22 +1,23 @@
 """Shared help rendering for the command-line scripts in these skills.
 
-argparse parses; this renders: uppercase section headers, a two-column
-command list, dim secondary text, and `%` prompts in examples. The accent
+argparse parses; this renders: uppercase section headers, two-column content,
+dim secondary text, and configurable prompts in examples. The accent
 color is Xojo's green:
   #96C84E  used on dark terminals
   #6DB335  used on light terminals
 
 IDENTICAL COPIES -- MAINTAIN TOGETHER. Skills install independently, so they
-cannot share one module on disk. This file is therefore duplicated, byte for
-byte, at:
+cannot share one module on disk. The canonical copies live in the xojo-tools
+repository at:
 
     plugins/xojo/skills/xojo/scripts/helptext.py
     plugins/xojo/skills/xojo-lint/scripts/helptext.py
     plugins/xojo/skills/xojo-ide/scripts/xojoctl/helptext.py
 
-Apply every edit to all copies. The repository's pre-commit hook fails the
-commit when the copies differ. Keep this module generic: anything specific to
-one CLI belongs in that CLI's own HelpConfig.
+Further copies exist in other repositories. Apply every edit to every copy;
+xojo-tools' pre-commit hook enforces identity within that repository. Keep
+this module generic: anything specific to one CLI belongs in that CLI's own
+HelpConfig.
 """
 
 from __future__ import annotations
@@ -124,6 +125,8 @@ class HelpConfig:
     command_examples: Mapping[str, Sequence[str]] | None = None
     learn_more: Sequence[str] = ()
     color_env: str | None = None
+    usage: Sequence[str] = ("<command> [flags]",)
+    prompt: str = "%"
 
 
 def nonneg_float(value: str) -> float:
@@ -208,50 +211,77 @@ def render_root_help(
     config: HelpConfig,
 ) -> str:
     th = help_theme(config.color_env)
-    width = max(len(n) for n in config.command_blurbs) + 4
 
     buf = [_blurb(th, parser.description or "")]
     buf.append(_section(th, "USAGE"))
-    buf.append(
-        "    %s %s %s\n\n"
-        % (th.dim("%"), config.prog, th.dim("<command> [flags]"))
-    )
+    for usage in config.usage:
+        buf.append(
+            "    %s %s %s\n"
+            % (th.dim(config.prompt), config.prog, th.dim(usage))
+        )
+    buf.append("\n")
 
-    if config.command_groups:
+    if config.command_blurbs and config.command_groups:
+        width = max(len(n) for n in config.command_blurbs) + 4
         for title, group in config.command_groups:
             buf.append(_section(th, title))
             buf.append(
                 _two_col(th, [(n, config.command_blurbs[n]) for n in group], width)
             )
             buf.append("\n")
-    else:
+    elif config.command_blurbs:
+        width = max(len(n) for n in config.command_blurbs) + 4
         buf.append(_section(th, "COMMANDS"))
         buf.append(_two_col(th, list(config.command_blurbs.items()), width))
         buf.append("\n")
 
-    flags = list(config.root_flags or [("-h, --help", "Show help for a command")])
-    buf.append(_section(th, "FLAGS"))
-    # Width is per-section: flags are longer than command names, and sharing
-    # one width makes the longer column collide with its descriptions.
-    buf.append(_two_col(th, flags, max(len(f) for f, _ in flags) + 4))
-    buf.append("\n")
+    args = [
+        (action.metavar or action.dest.upper(), (action.help or "").strip())
+        for action in _positionals(parser)
+    ]
+    if args:
+        buf.append(_section(th, "ARGUMENTS"))
+        buf.append(
+            _two_col(
+                th,
+                [(n, d[:1].upper() + d[1:] if d else "") for n, d in args],
+                max(len(n) for n, _ in args) + 4,
+            )
+        )
+        buf.append("\n")
+
+    flags = (
+        list(config.root_flags)
+        if config.root_flags is not None
+        else _flag_rows(parser)
+    )
+    if flags:
+        buf.append(_section(th, "FLAGS"))
+        # Width is per-section: flags are longer than command names, and
+        # sharing one width makes the longer column collide with its
+        # descriptions.
+        buf.append(_two_col(th, flags, max(len(f) for f, _ in flags) + 4))
+        buf.append("\n")
 
     if config.root_examples:
         buf.append(_section(th, "EXAMPLES"))
         for example in config.root_examples:
-            buf.append("    %s %s %s\n" % (th.dim("%"), config.prog, example))
+            buf.append(
+                "    %s %s %s\n" % (th.dim(config.prompt), config.prog, example)
+            )
         buf.append("\n")
 
     if config.learn_more:
         for line in config.learn_more:
             buf.append("  %s\n" % th.dim(line))
         buf.append("\n")
-    buf.append(
-        "  %s\n\n"
-        % th.italic_dim(
-            "Run '%s <command> --help' for details on a command." % config.prog
+    if config.command_blurbs:
+        buf.append(
+            "  %s\n\n"
+            % th.italic_dim(
+                "Run '%s <command> --help' for details on a command." % config.prog
+            )
         )
-    )
     return "".join(buf)
 
 
@@ -272,7 +302,7 @@ def render_command_help(
     buf.append(
         "    %s %s %s%s %s\n\n"
         % (
-            th.dim("%"),
+            th.dim(config.prompt),
             config.prog,
             name,
             (" " + " ".join(shown)) if shown else "",
@@ -305,7 +335,9 @@ def render_command_help(
     if name in command_examples:
         buf.append(_section(th, "EXAMPLES"))
         for example in command_examples[name]:
-            buf.append("    %s %s %s\n" % (th.dim("%"), config.prog, example))
+            buf.append(
+                "    %s %s %s\n" % (th.dim(config.prompt), config.prog, example)
+            )
         buf.append("\n")
 
     return "".join(buf)
@@ -376,15 +408,15 @@ class HelpfulParser(argparse.ArgumentParser):
         th = help_theme(config.color_env)
         if self.command_name:
             return "    %s %s %s %s\n" % (
-                th.dim("%"),
+                th.dim(config.prompt),
                 config.prog,
                 self.command_name,
                 th.dim("[flags]"),
             )
-        return "    %s %s %s\n" % (
-            th.dim("%"),
-            config.prog,
-            th.dim("<command> [flags]"),
+        return "".join(
+            "    %s %s %s\n"
+            % (th.dim(config.prompt), config.prog, th.dim(usage))
+            for usage in config.usage
         )
 
     def usage_error_extra(self, text: str, suggestion: str | None, hint: str) -> None:
