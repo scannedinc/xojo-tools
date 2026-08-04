@@ -18,8 +18,12 @@ fail=0
 # --- 1. Email addresses -----------------------------------------------------
 # Scan the full staged content of every added or modified file, not just the
 # added lines, so an address can never ride along in an untouched line.
+# Filenames are read line-wise (never word-split): a name with a space must
+# not fall apart into fragments that `git show` silently fails on. The
+# here-document keeps the loop in this shell so `fail=1` sticks.
 files=$(git diff --cached --name-only --diff-filter=ACMR)
-for f in $files; do
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
     found=$(git show ":$f" 2>/dev/null \
         | LC_ALL=C grep -aoE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' \
         | grep -viE '@(([A-Za-z0-9-]+\.)*example\.(com|org|net)|[A-Za-z0-9.-]+\.(example|invalid|test))$' \
@@ -29,7 +33,9 @@ for f in $files; do
         echo "$found" | sed 's/^/    /' >&2
         fail=1
     fi
-done
+done <<EOF
+$files
+EOF
 if [ "$fail" -ne 0 ]; then
     echo "Remove the address, or use one on example.com." >&2
 fi
@@ -53,7 +59,8 @@ fi
 
 # --- 3. JSON validity -------------------------------------------------------
 if command -v python3 >/dev/null 2>&1; then
-    for f in $files; do
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
         case "$f" in
             *.json)
                 if ! git show ":$f" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
@@ -62,7 +69,9 @@ if command -v python3 >/dev/null 2>&1; then
                 fi
                 ;;
         esac
-    done
+    done <<EOF
+$files
+EOF
 fi
 
 exit "$fail"
