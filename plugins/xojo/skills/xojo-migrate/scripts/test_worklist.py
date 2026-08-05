@@ -122,6 +122,12 @@ class JoinTests(unittest.TestCase):
     def test_unmatched_symbol_returns_nothing(self):
         self.assertEqual(self.rows_for("NotARealXojoSymbol", "Whatever"), [])
 
+    def test_a_generic_replacement_word_still_narrows(self):
+        # "String" is filler in prose but a decisive replacement name here:
+        # seven rows own the bare name Text, and only one becomes String.
+        rows = self.rows_for("Text", "String")
+        self.assertEqual([r["old"] for r in rows], ["Text"])
+
     def test_ambiguity_is_reported_not_guessed(self):
         # A replacement that matches neither candidate must keep both, so the
         # caller can say "ambiguous" instead of silently picking one.
@@ -163,6 +169,37 @@ class WorklistTests(unittest.TestCase):
         g = self.group("Listbox")
         self.assertEqual(g["action"], worklist.CONVERTER)
         self.assertEqual(g["rules"], [])
+
+    def test_rule_prose_does_not_attach_a_foreign_rule(self):
+        # Timer.Mode -> Timer.RunMode is a correct join. c1r20 governs
+        # StrComp and matched only because "mode" is one of its PARAMETER
+        # names; being manual-only it then drove the whole group to the
+        # top section, telling the reader to study string comparison before
+        # renaming a Timer property.
+        wl = worklist.build(dict(LIVE, diagnostics=[
+            diag("Mode is deprecated.  You should use RunMode instead")]))
+        rules = [r["id"] for g in wl["groups"] for r in g["rules"]]
+        self.assertNotIn("c1r20", rules)
+
+    def test_unknown_replacement_rows_are_ambiguous_not_agreed(self):
+        # Three classes own .InsertRow and the matrix records no
+        # replacement for any of them. Three identical "unknown" markers
+        # are not three rows agreeing.
+        wl = worklist.build(dict(LIVE, diagnostics=[
+            diag("InsertRow is deprecated.  You should use AddRowAt instead")]))
+        g = wl["groups"][0]
+        self.assertTrue(g["ambiguous"])
+        self.assertNotEqual(g["action"], worklist.MECHANICAL)
+
+    def test_unrecorded_replacement_is_never_mechanical(self):
+        # "Mechanical rename" is the one heading that says "edit without
+        # reading anything", so it must never cover a row whose
+        # replacement the matrix does not actually record.
+        for g in worklist.build(LIVE)["groups"]:
+            if g["action"] == worklist.MECHANICAL:
+                for row in g["rows"]:
+                    self.assertTrue(worklist.known_replacement(row),
+                                    f"{g['symbol']}: {row}")
 
     def test_equivalent_rows_are_not_called_ambiguous(self):
         # Date and Xojo.Core.Date both become DateTime; there is nothing for
@@ -253,6 +290,44 @@ class CliTests(unittest.TestCase):
         code, _, err = self.run_cli({"nonsense": True})
         self.assertNotEqual(code, 0)
         self.assertIn("analyze", err.lower())
+
+    def test_rejects_a_failed_analysis_instead_of_reading_it_as_clean(self):
+        # xojoctl emits a JSON document on every outcome, including a
+        # failed connection, and that document carries an empty
+        # diagnostics list. Reporting "no deprecation warnings" for an
+        # analysis that never ran is the worst answer available: it reads
+        # as a finished migration.
+        failed = {"schema_version": 1, "ok": False, "outcome": "connect_failed",
+                  "exit_code": 2, "summary": "could not reach the IDE",
+                  "counts": {"errors": 0, "warnings": 0},
+                  "diagnostics": [],
+                  "error": {"code": "connect_failed",
+                            "message": "no IDE socket"}}
+        code, out, err = self.run_cli(failed)
+        self.assertNotEqual(code, 0)
+        self.assertNotIn("no deprecation", out.lower())
+        combined = (out + err).lower()
+        self.assertIn("connect_failed", combined)
+        # It must send the reader somewhere, not just stop.
+        self.assertIn("scan.py", combined)
+
+    def test_truncated_row_list_says_how_many_were_hidden(self):
+        code, out, _ = self.run_cli(dict(LIVE, diagnostics=[
+            diag("DataField is deprecated")]))
+        self.assertEqual(code, 0)
+        self.assertIn("2 more", out)
+
+    def test_group_without_rules_prints_the_matrix_row_note(self):
+        # The row's note is the only guidance such a group has; SKILL.md
+        # calls a note "part of the answer, not decoration".
+        _, out, _ = self.run_cli(dict(LIVE, diagnostics=[
+            diag("AbsolutePath is deprecated")]))
+        rows = worklist.match_rows("AbsolutePath", None,
+                                   worklist.load_matrix())
+        note = next((r.get("note") for r in rows if r.get("note")), None)
+        if not note:
+            self.skipTest("no noted no-rule row available in this matrix")
+        self.assertIn(note.split(".")[0][:40], out)
 
     def test_reports_a_clean_analyze(self):
         code, out, _ = self.run_cli(dict(LIVE, diagnostics=[]))

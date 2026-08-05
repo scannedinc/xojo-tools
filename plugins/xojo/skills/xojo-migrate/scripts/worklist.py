@@ -42,6 +42,9 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 REFS = HERE.parent / "references"
+sys.path.insert(0, str(HERE))
+
+import scan  # noqa: E402  -- symbol_tokens is the vetted rule-name extractor
 
 # What a site needs from the reader, most demanding first. These strings are
 # the section headings too, so they say what to do, not what tier it is.
@@ -67,14 +70,22 @@ DEPRECATED = re.compile(
     r"(?:\s*You\s+should\s+use\s+(?P<new>.+?)\s+instead\s*\.?)?$",
     re.IGNORECASE | re.DOTALL)
 
-# Words that carry no receiver information, so they must not be what a
-# disambiguation match hinges on.
-GENERIC = frozenset(("constructor", "string", "value", "new", "the", "a", "as",
-                     "instead", "item", "method", "property"))
+# Filler that carries no identifying information. Deliberately excludes
+# words that ARE decisive replacement names: `Text -> String` is settled
+# entirely by "String", and dropping it emptied the token set, which turned
+# both narrowings off for one of the most common symbols in the matrix.
+GENERIC = frozenset(("the", "a", "an", "as", "instead", "new", "of", "to",
+                     "or", "and", "is", "use", "you", "should"))
+
+# What coverage.json writes when no replacement is recorded. It is an
+# absence of knowledge, not a value: several rows all carrying it are not
+# rows that agree.
+UNRECORDED = frozenset(("", "-", "—", "–", "?", "none", "n/a"))
 
 # Caps on the text report only; --format json always carries everything.
 RULES_SHOWN = 5
 SITES_SHOWN = 12
+ROWS_SHOWN = 3
 
 
 def parse_deprecation(message):
@@ -97,8 +108,15 @@ def load_matrix():
 
 
 def _tokens(text):
-    return {t.lower() for t in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text or "")
-            if t.lower() not in GENERIC}
+    found = {t.lower() for t in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text or "")}
+    # Filtering to nothing would silently disable the narrowing that uses
+    # this set, so keep the raw tokens rather than return an empty one.
+    return (found - GENERIC) or found
+
+
+def known_replacement(row):
+    """True when the matrix actually records a replacement for this row."""
+    return (row.get("new") or "").strip().lower() not in UNRECORDED
 
 
 def _head(text):
@@ -141,61 +159,81 @@ def match_rows(old, new, matrix):
 def rules_for(rows, matrix, new=None):
     """Rules that convert one of these rows' symbols toward `new`.
 
-    Two filters, and both are needed. The name match allows a leading dot,
-    because member rules always write the symbol dotted (`.ListCount`);
-    requiring a non-dot left neighbor attached no rule at all to any member
-    warning. But allowing it lets `Left` match the rule named
-    `.CellBorderBottom/Left/Right/Top`, so the IDE's replacement filters
-    second: a rule that converts this name toward something unrelated to
-    what the IDE named is about a different member that merely shares the
-    name. If that filter would empty the set it is dropped -- an
-    unfiltered set of rules is recoverable, a silently empty one is not.
+    Returns (rules, confirmed). Selection uses scan.symbol_tokens, which
+    already extracts the identifiers naming the symbol a rule *converts*:
+    it takes only the left of the rule name's arrow, and strips parameter
+    lists, quoted doc excerpts and `As <Type>` tails. Matching the raw text
+    instead handed a `Timer.Mode` warning the StrComp rule, because
+    "mode" is one of StrComp's parameter names -- and since that rule is
+    manual-only it then drove the whole group to the top of the report.
+
+    The IDE's replacement filters second, since one name can be converted
+    by rules belonging to different classes. When that filter would empty
+    the set, the rules are kept but `confirmed` is False: an unrelated rule
+    must never be believed enough to escalate a group.
     """
     names = {row["old"].split("(")[0].strip().split(".")[-1].lower()
              for row in rows}
     out = []
     for cat in matrix["rules"]["categories"]:
         for rule in cat["rules"]:
-            blob = " ".join((rule.get("name", ""), rule.get("old", "")))
-            if any(re.search(r"(?<!\w)" + re.escape(n) + r"\b", blob, re.I)
-                   for n in names):
-                out.append({"id": rule["id"], "conf": rule["conf"],
-                            "cat": cat["id"], "cat_name": cat["short"],
-                            "name": rule.get("name", ""),
-                            "applies": rule.get("applies", True),
-                            "manual": rule.get("manual", ""),
-                            "note": rule.get("note", ""),
-                            "new": rule.get("new", "")})
+            if not (names & scan.symbol_tokens(rule)):
+                continue
+            out.append({"id": rule["id"], "conf": rule["conf"],
+                        "cat": cat["id"], "cat_name": cat["short"],
+                        "name": rule.get("name", ""),
+                        "applies": rule.get("applies", True),
+                        "manual": rule.get("manual", ""),
+                        "note": rule.get("note", ""),
+                        "new": rule.get("new", "")})
+    confirmed = True
     wanted = _tokens(_head(new)) if new else set()
-    if wanted:
+    if wanted and out:
         kept = [r for r in out if _tokens(_head(r["new"])) & wanted]
         if kept:
             out = kept
+        else:
+            confirmed = False
     for rule in out:
         rule.pop("new", None)
-    return out
+    return out, confirmed
 
 
 def is_ambiguous(rows):
-    """True when the candidate rows disagree about the replacement.
+    """True when the candidate rows do not settle on one replacement.
 
     Several rows owning a name is not itself ambiguity: `Date` and
     `Xojo.Core.Date` both become `DateTime`, so the reader has nothing to
-    resolve. Only a genuine disagreement needs flagging.
+    resolve. But rows whose replacement is *unrecorded* do not agree with
+    each other either -- three classes owning `.InsertRow` with no
+    documented replacement is three open questions, not a settled join,
+    and reading it as agreement printed it as a mechanical rename.
     """
+    if len(rows) < 2:
+        return False
+    if any(not known_replacement(r) for r in rows):
+        return True
     return len({(r.get("new") or "").strip().lower() for r in rows}) > 1
 
 
-def action_for(rows, rules):
+def action_for(rows, rules, confirmed=True):
     """What this symbol asks of the reader."""
     if rows and all(r.get("cat") == IDE_BUCKET for r in rows):
         return CONVERTER
-    if any(r["conf"] == "manual-only" or not r["applies"] for r in rules):
+    if confirmed and any(r["conf"] == "manual-only" or not r["applies"]
+                         for r in rules):
         return HAND
     if is_ambiguous(rows):
         return REVIEW          # the join could not settle which row applies
+    if not confirmed:
+        return REVIEW          # rules found, none confirmed to match
     if not rules:
         return REVIEW          # a matrix row with no rule: convert from the row
+    if any(not known_replacement(r) for r in rows):
+        # "Mechanical rename" is the one heading that licenses editing
+        # without reading anything, so it must never cover a row whose
+        # replacement the matrix does not record.
+        return REVIEW
     if any(r["conf"] in ("medium", "low") or r["manual"] for r in rules):
         return REVIEW
     return MECHANICAL
@@ -225,12 +263,15 @@ def build(doc):
         if group is None:
             converter = bool(rows) and all(r.get("cat") == IDE_BUCKET
                                            for r in rows)
-            rules = [] if converter else rules_for(rows, matrix, new)
+            rules, confirmed = (([], True) if converter
+                                else rules_for(rows, matrix, new))
             group = groups[key] = {
                 "symbol": old, "replacement": new,
-                "action": action_for(rows, rules),
+                "action": action_for(rows, rules, confirmed),
                 "ambiguous": is_ambiguous(rows),
-                "rows": [{"old": r["old"], "new": r["new"], "cat": r["cat"]}
+                "rules_confirmed": confirmed,
+                "rows": [{"old": r["old"], "new": r["new"], "cat": r["cat"],
+                          "note": r.get("note", "")}
                          for r in rows],
                 "rules": rules,
                 "categories": sorted({r["cat_name"] for r in rules}),
@@ -296,8 +337,26 @@ def report(wl):
                            f"replacement did not settle it. Candidates: "
                            f"{olds}. Confirm the receiver before converting.",
                            "      "))
-            for row in g["rows"][:3]:
+            for row in g["rows"][:ROWS_SHOWN]:
                 print(f"      matrix: {row['old']} -> {row['new']}  [{row['cat']}]")
+            if len(g["rows"]) > ROWS_SHOWN:
+                print(f"      ... {len(g['rows']) - ROWS_SHOWN} more candidate "
+                      f"row(s) -- lookup.py symbol {g['symbol']}")
+            if not g["rules"]:
+                # With no rule attached, the coverage row's own note is the
+                # only guidance this group has.
+                for row in g["rows"]:
+                    if row.get("note"):
+                        print(wrap(f"note: {row['note']}", "      "))
+                        break
+                else:
+                    print("      No rule covers this symbol; convert from the "
+                          "matrix replacement above.")
+            if not g["rules_confirmed"]:
+                print(wrap("The rules below name this symbol but none "
+                           "converts it toward what the IDE proposed, so "
+                           "they may govern a different class. Confirm "
+                           "before using them.", "      "))
             if g["rules"]:
                 print(wrap(f"rules ({len(g['rules'])}): {rids}", "      "))
             # A rule's NAME states the hazard in one line ("InStr/IndexOf
@@ -368,6 +427,20 @@ def main(argv=None, stdin=None):
     if not isinstance(doc, dict) or "diagnostics" not in doc:
         sys.exit("this is not an `xojoctl analyze --json` document: no "
                  "`diagnostics` key.")
+    # xojoctl emits a document for every outcome, including a failed
+    # connection, a timeout and no-project-open -- each with an empty
+    # diagnostics list. Summarizing one of those as "no deprecation
+    # warnings" would report an analysis that never ran as a finished
+    # migration, which is the worst answer this script could give.
+    if doc.get("ok") is False or doc.get("error"):
+        err = doc.get("error") or {}
+        detail = err.get("message") or doc.get("summary") or ""
+        sys.exit(f"the analysis did not run: outcome "
+                 f"{doc.get('outcome') or 'unknown'}"
+                 f"{': ' + detail if detail else ''}.\n"
+                 f"Nothing here says anything about deprecations. Fix the "
+                 f"IDE connection and re-run, or take the scanner path "
+                 f"(workflow phase 2b): python3 scan.py <project-dir>")
 
     wl = build(doc)
     if args.format == "json":
