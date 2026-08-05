@@ -34,6 +34,21 @@ codex plugin add xojo@xojo-tools
 
 Start a new Codex thread after installation so the plugin loads.
 
+To use one skill without the plugin, copy its folder into your skills directory. This works for every skill in the table above:
+
+```sh
+cp -R plugins/xojo/skills/xojo-migrate ~/.claude/skills/xojo-migrate
+```
+
+To give one project's team a skill, copy it into that project instead:
+
+```sh
+mkdir -p /path/to/project/.claude/skills
+cp -R plugins/xojo/skills/xojo-migrate /path/to/project/.claude/skills/xojo-migrate
+```
+
+A skill copied by hand carries no plugin name, so you run it as `/xojo-migrate` rather than `/xojo:xojo-migrate`.
+
 ## Requirements
 
 - Python 3.9 or later, available as `python3`. The bundled scripts use only the Python standard library, so there is nothing else to install.

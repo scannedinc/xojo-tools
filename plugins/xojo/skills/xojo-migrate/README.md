@@ -4,7 +4,9 @@ This skill converts Xojo desktop projects from API 1.0 to API 2.0. It runs in [C
 
 These pages call the older generation API 1.0. Xojo's own documentation calls it "pre-API 2.0" on the rare occasions it names it. Both terms mean the same thing.
 
-You start the skill yourself. The agent cannot start it for you, because a migration rewrites your whole project. In Claude Code, run `/xojo:xojo-migrate` when you install the plugin, or `/xojo-migrate` when you copy the skill folder by hand. In Codex, write `$xojo-migrate` in your message.
+You start the skill yourself. The agent cannot start it for you, because a migration rewrites your whole project. In Claude Code, run `/xojo:xojo-migrate`. In Codex, write `$xojo-migrate` in your message.
+
+To ask what replaced one deprecated symbol, such as `RecordSet.MoveNext`, use the `xojo` skill instead: it holds the documentation and the deprecation indexes, and the agent loads it on its own.
 
 The skill contains three parts:
 
@@ -71,23 +73,6 @@ The mark shows in the IDE on every build. A report shows it once.
 
 The skill covers desktop projects. It marks the iOS, Web, and Android surface as out of scope.
 
-## Install
-
-The plugin install in the repository root README covers this skill. To install just this skill by hand for every project, copy it:
-
-```sh
-cp -R plugins/xojo/skills/xojo-migrate ~/.claude/skills/xojo-migrate
-```
-
-To install it into one Xojo project, so that your team gets it from that repository:
-
-```sh
-mkdir -p /path/to/project/.claude/skills
-cp -R plugins/xojo/skills/xojo-migrate /path/to/project/.claude/skills/xojo-migrate
-```
-
-Then run `/xojo-migrate` to start a migration. Claude does not start it for you. To ask what replaced one deprecated symbol, such as `RecordSet.MoveNext`, use the `xojo` skill instead: it holds the documentation and the deprecation indexes, and Claude loads it on its own.
-
 ## What each file does
 
 | File | What it does |
@@ -120,7 +105,7 @@ Two fields need a word of their own. `live_on` names the receivers where a depre
 Run them like this:
 
 ```sh
-SKILL=~/.claude/skills/xojo-migrate
+SKILL=/path/to/the/xojo-migrate/skill
 
 python3 $SKILL/scripts/scan.py   /path/to/project
 python3 $SKILL/scripts/sweep.py  /path/to/project --context
@@ -128,6 +113,8 @@ python3 $SKILL/scripts/lookup.py symbol RecordSet
 python3 $SKILL/scripts/lookup.py rule c0r13
 python3 $SKILL/scripts/lookup.py tier high cat3
 ```
+
+Substitute the real location of the skill. With the plugin installed in Claude Code, that is `~/.claude/plugins/cache/xojo-tools/xojo/<version>/skills/xojo-migrate/`.
 
 `scan.py` and `sweep.py` both accept `--format json`.
 
