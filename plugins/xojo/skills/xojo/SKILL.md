@@ -7,13 +7,19 @@ description: >-
   to confirm it exists, get its exact signature, and check whether it is
   deprecated. Also use for questions about what a Xojo API does, what replaced
   a removed one, which controls exist for Desktop, Web, Mobile or Console, or
-  how a Xojo feature works. Also use when reading or editing Xojo project
-  files (.xojo_project, .xojo_code, .xojo_window), when starting a new
-  project, and for Xojo code style: naming case, Var vs Dim, pragmas. Xojo is
-  obscure enough that most examples online use the removed API 1 rather than
-  current API 2, so do not answer Xojo questions from memory: look them up
-  here. Covers more than two thousand pages and fifteen thousand members, with
-  a replacement recorded for thousands of deprecated ones.
+  how a Xojo feature works. This is also the skill for questions about API 1.0
+  versus API 2.0: how the two differ, whether a symbol is deprecated, which
+  release deprecated it, and what replaced it. The indexes record all of that
+  per member, and the documentation includes Xojo's own articles on moving to
+  API 2.0. Answer such questions here; the xojo-migrate skill converts a
+  project and the user runs it themselves. Also use when reading or editing
+  Xojo project files (.xojo_project, .xojo_code, .xojo_window), when starting a
+  new project, and for Xojo code style: naming case, Var vs Dim, pragmas. Xojo
+  is obscure enough that most examples online use the removed API 1.0 rather
+  than current API 2.0, so do not answer Xojo questions from memory: look them
+  up here. Covers more than two thousand pages and fifteen thousand members,
+  with a replacement recorded for thousands of deprecated ones.
+disable-model-invocation: false
 ---
 
 # Xojo documentation
@@ -22,7 +28,7 @@ This skill is a local copy of <https://documentation.xojo.com>, converted to Mar
 
 **Every path below is relative to this skill's folder—the folder that holds this SKILL.md—not to the project you work in.** Run the commands from that folder, or prefix each path with its location.
 
-**Look facts up. Do not recall them.** Most Xojo code in training data predates API 2, so a recalled answer is often the removed API 1 form. `MsgBox`, `Dim`, `RecordSet`, `ListBox`, `Ubound`, and hundreds more are deprecated. The indexes below give the replacement for each one.
+**Look facts up. Do not recall them.** Most Xojo code in training data predates API 2.0, so a recalled answer is often the removed API 1.0 form. `MsgBox`, `Dim`, `RecordSet`, `ListBox`, `Ubound`, and hundreds more are deprecated. The indexes below give the replacement for each one.
 
 ## First use and refresh
 
@@ -135,7 +141,7 @@ for r in rows:
 
 ## Deprecation
 
-`flags` contains `deprecated` for each item removed from API 2. When `flags` contains `deprecated`, `deprecated_in` gives the release, and `replacement` gives the current API:
+`flags` contains `deprecated` for each item removed from API 2.0. When `flags` contains `deprecated`, `deprecated_in` gives the release, and `replacement` gives the current API:
 
 ```
 ListBox.ListCount   →  DesktopListBox.RowCount           (2019r2)
@@ -156,9 +162,9 @@ Those deprecations are maintained by hand in `scripts/deprecation-overrides.tsv`
 
 ## Renaming is not enough: some indexes changed
 
-**This is the most dangerous part of the move from API 1 to API 2.** Several replacements changed their counting base or their not-found value at the same time as the rename. If you substitute the new name and keep the old arithmetic, the code compiles cleanly but produces silent off-by-one bugs.
+**This is the most dangerous part of the move from API 1.0 to API 2.0.** Several replacements changed their counting base or their not-found value at the same time as the rename. If you substitute the new name and keep the old arithmetic, the code compiles cleanly but produces silent off-by-one bugs.
 
-| API 1 | API 2 | What changed |
+| API 1.0 | API 2.0 | What changed |
 | --- | --- | --- |
 | `Mid(s, start, len)` | `s.Middle(start, len)` | The first character is **1** in `Mid` and **0** in `Middle`. Subtract 1 from `start`. |
 | `InStr(s, find)` | `s.IndexOf(find)` | `InStr` returns a **one-based** position and **0** when not found. `IndexOf` returns a **zero-based** position and **-1** when not found. Change the `> 0` test to `>= 0`. Adjust the returned value everywhere the code uses it as a position. |
@@ -177,7 +183,7 @@ awk -F'\t' '$6!=""' references/documentation/classes.tsv     # every note
 
 ## Projects and file formats
 
-Xojo has three project formats: Xojo Project, Xojo Binary Project, and Xojo XML Project. Only the Xojo Project format works well with source control and with an agent, because it is text. This skill supports only that format: the `.xojo_project` manifest plus companion files with extensions such as `.xojo_code`, `.xojo_window`, and `.xojo_menu`. This skill does not support the Xojo Binary Project format (`.xojo_binary_project`) or the Xojo XML Project format (`.xojo_xml_project`); ask the user to save a copy in Xojo Project format instead. When no IDE is available for that, the experimental `xojo-convert` skill can attempt a manual conversion.
+Xojo has three project formats: Xojo Project, Xojo Binary Project, and Xojo XML Project. Only the Xojo Project format works well with source control and with an agent, because it is text. This skill supports only that format: the `.xojo_project` manifest plus companion files with extensions such as `.xojo_code`, `.xojo_window`, and `.xojo_menu`. This skill does not support the Xojo Binary Project format (`.xojo_binary_project`) or the Xojo XML Project format (`.xojo_xml_project`); ask the user to save a copy in Xojo Project format instead. When no IDE is available for that, the experimental `xojo-convert` skill can attempt a manual conversion, but the user has to start it: tell them to run `/xojo-convert`.
 
 **Before you read or edit any `.xojo_*` file, read the format reference for that file.** `references/xojo-file-formats/index.md` names the right document for each extension and states the safety rules for generators and editors. Start with `shared-text-grammar.md` for the `#tag` and `Begin`/`End` syntax that most formats share. The official overview is `references/documentation/getting_started/using_the_ide/project_file_information.md`.
 
@@ -187,7 +193,7 @@ Xojo has five project types: Desktop, Console, Web, iOS, and Android. Assume a d
 
 These defaults hold unless the user instructs otherwise:
 
-- **Use API 2.0.** API 2.0 is the current standard, so do not call it by name. Say "API 2.0" explicitly only when you discuss legacy code. Read `references/documentation/topics/api_design/moving_to_api_2.0.md` for what changed. If you see API 1 code in a project, warn the user to migrate the code to API 2.0.
+- **Use API 2.0.** API 2.0 is the current standard, so do not call it by name. Say "API 2.0" explicitly only when you discuss legacy code. Read `references/documentation/topics/api_design/moving_to_api_2.0.md` for what changed. If you see API 1.0 code in a project, warn the user to migrate the code to API 2.0, and tell them to run `/xojo-migrate` when they want that done: the migration skill only starts when they ask for it.
 - **In Web projects, use only Web 2.0 features.**
 - **Use `Var`, not `Dim`.**
 - **Follow the naming guidelines.** Read and follow `references/documentation/topics/api_design/api_design_and_naming_guidelines.md`. Class names and class members are PascalCase (upper camel case). Parameter names are camelCase (lower camel case), as in `safeInfo As String`.
@@ -200,7 +206,7 @@ These defaults hold unless the user instructs otherwise:
   - the parenthesization of calls
   - the other style choices
 
-  The API 1 warning above still applies. Deliver the warning, but do not rewrite the code of the project uninvited.
+  The API 1.0 warning above still applies. Deliver the warning, but do not rewrite the code of the project uninvited.
 - Declare several variables of the same type on one line (`Var apples, bananas As Integer`), not on sequential lines.
 - When a variable exists only to hold a function result that no code reads afterward, the compiler warns about the variable. Either add `#Pragma Unused VariableName`, or remove the assignment and use the `Call` keyword instead.
 - With `ExecuteSQL` and `SelectSQL`, bind values through the `values()` ParamArray parameter, not through the PreparedStatement classes.

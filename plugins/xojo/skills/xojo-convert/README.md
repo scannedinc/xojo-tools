@@ -4,6 +4,8 @@ This skill converts a Xojo project between the three Xojo storage formats—Xojo
 
 **It is highly experimental, and its use is not advised.** The reliable way to convert a project is the Xojo IDE: open the project, choose **File ▸ Save As**, and pick the target format. Use this skill only when no IDE can touch the project, and treat the result as unverified until an IDE opens it cleanly.
 
+You start the skill yourself, with `/xojo-convert`. The agent cannot start it for you.
+
 ## What it does
 
 - Identifies which of the three formats a project uses.

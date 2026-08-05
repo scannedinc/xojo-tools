@@ -9,7 +9,7 @@ Usage:
 <target> is a project directory, a .xojo_project manifest, a .xojo_uistate
 file, or a .xojo_binary_project file.
 
-Why this exists: Analyze Project only reports deprecated API 1 calls when the
+Why this exists: Analyze Project only reports deprecated API 1.0 calls when the
 "Item1 is deprecated" warnings are enabled, and they are off by default. The
 setting is per-project -- there is no global preference to set once, no key in
 com.xojo.xojo.plist, and no IDE-scripting command that reaches it (DoCommand
@@ -47,7 +47,7 @@ import pathlib
 import struct
 import sys
 
-# The warning ids to enable: both deprecation warnings plus the API 2 Desktop
+# The warning ids to enable: both deprecation warnings plus the API 2.0 Desktop
 # control deprecations toggle, which gates exactly the control renames an API
 # 1 -> 2 migration is chasing.
 DEPRECATION_IDS = (-2, 2, 16)

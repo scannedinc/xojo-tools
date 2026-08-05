@@ -7,6 +7,6 @@ Redim	2019r2	Array.ResizeTo	Keyword rather than a documented member, so it does 
 Val	2019r2	String.ToDouble	Global function. Str, Format, Hex and CStr changed alongside it; check each separately.
 Screen	2020r2	Displays	Global function returning a screen by index; replaced by the Displays array on Application.
 ListBox.Headings	2021r3	DesktopListBox.HeaderAt	Bulk array property replaced by an indexed accessor; no longer settable as a whole array.
-ListBox.CellToolTip	2021r3	DesktopListBox.CellToolTipAt	Listed as transitional in the API 2 notes and no longer described in the current documentation.
-ListBox.CellCheckBoxValue	2021r3	DesktopListBox.CellCheckboxValueAt	Listed as transitional in the API 2 notes and no longer described in the current documentation.
+ListBox.CellToolTip	2021r3	DesktopListBox.CellToolTipAt	Listed as transitional in the API 2.0 notes and no longer described in the current documentation.
+ListBox.CellCheckBoxValue	2021r3	DesktopListBox.CellCheckboxValueAt	Listed as transitional in the API 2.0 notes and no longer described in the current documentation.
 ListBox.ColumnSortType	2021r3	DesktopListBox.ColumnSortTypeAt	Indexed accessor; the bulk form is gone.

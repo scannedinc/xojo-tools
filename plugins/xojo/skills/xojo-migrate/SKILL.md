@@ -1,24 +1,28 @@
 ---
 name: xojo-migrate
 description: >-
-  Convert Xojo source code from API 1 to API 2. Use whenever the user asks to
-  convert, migrate, update, or modernize a Xojo project or Xojo code to API 2
-  (or "API 2.0"), fix Xojo deprecation warnings from Analyze Project, or
-  replace deprecated Xojo APIs such as MsgBox, Dim, RecordSet, SQLSelect,
-  Date, InStr, Mid, Len, Ubound, ListBox members, GetFolderItem, or
-  error-code checks. Also use for questions about Xojo API 1 vs API 2
-  differences, 0-based index changes, RowSet/DateTime/Try-Catch migration, or
-  whether a Xojo API is deprecated, even if the user never says "API 2".
-  Covers more than a thousand deprecated and removed symbols with hundreds of vetted conversion rules.
+  Migrate a Xojo desktop project from API 1.0 to API 2.0: a rule-driven,
+  confidence-tiered conversion of the source code, committed one category at a
+  time, that fixes the index bases, sentinels and epoch shift a rename alone
+  leaves wrong. Replaces deprecated APIs such as MsgBox, Dim, RecordSet,
+  SQLSelect, Date, InStr, Mid, Len, Ubound, ListBox members, GetFolderItem and
+  error-code checks. Covers more than a thousand deprecated and removed symbols
+  with hundreds of vetted conversion rules. Invoke this skill only when the user
+  asks for it by name: it rewrites a whole project across many commits, so never
+  start it on inference. When a user wants a migration, tell them to run
+  /xojo-migrate and wait for them to do it. Questions about API 1.0 versus
+  API 2.0, whether a symbol is deprecated, and what replaced it belong to the
+  xojo skill instead, which holds the documentation and the deprecation indexes.
+disable-model-invocation: true
 ---
 
-# Xojo API 1 → API 2 migration
+# Xojo API 1.0 → API 2.0 migration
 
 Rule-driven, confidence-tiered conversion of Xojo source code. This skill bundles the complete deprecation matrix (more than a thousand symbols, generated from Xojo's own deprecation docs) and hundreds of reviewed conversion rules with find/replace regexes, caveats, and before/after examples, each one machine-checked against the rule that carries it.
 
 Detection is IDE-first: when the sibling **xojo-ide** skill can reach a running IDE, the worklist comes from Xojo's own Analyze Project, which resolves receivers and types the way no regex can. The bundled scanner remains as the fallback—no IDE reachable, project will not open, or the user asks for it—and as the closing cross-platform check either way (phase 2 explains the split). The conversion rules, caveats and traps apply identically whichever path located the work.
 
-The mindset that matters: **the dangerous bugs here are runtime bugs, not compile errors.** Several API 1 functions changed index base (1-based → 0-based), one changed its not-found sentinel (`InStr`'s 0 → `IndexOf`'s -1), and `Date`'s epoch moved 66 years. A rename that compiles can still be wrong. That is why rules carry confidence tiers and why the workflow below fixes *semantics before names*.
+The mindset that matters: **the dangerous bugs here are runtime bugs, not compile errors.** Several API 1.0 functions changed index base (1-based → 0-based), one changed its not-found sentinel (`InStr`'s 0 → `IndexOf`'s -1), and `Date`'s epoch moved 66 years. A rename that compiles can still be wrong. That is why rules carry confidence tiers and why the workflow below fixes *semantics before names*.
 
 ## What this is, and what it needs
 
@@ -30,8 +34,8 @@ Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo"
 
 ## Hard rules
 
-1. **`high` describes the mapping, not the blast radius.** A `high` rule means *the replacement is the verified correct API 2 form*: the old name really does become that new name, with no index, sentinel, or epoch change hiding in it. It does **not** mean "safe to Replace All". No rule in this skill is authorized for a blind project-wide replace, because no regex here can tell code from a string literal, a call from a declaration, or one receiver type from another. Read the matched line before you change it. What the tier buys you is *how hard you have to look*: `high` needs a glance, `medium`/`low` need the receiver resolved, `manual` needs a rewrite.
-2. **Member renames are type-blind, and this rule outranks rule 1.** `.Append` means `.Add` on an array but `.AddObject` on a Group2D; `.RemoveRow` is deprecated on ListBox but valid API 2 on RowSet; `.ColumnType` is deprecated on ListBox and *live* on RowSet. Before renaming any `.Member`—at **any** confidence—find the receiver's declared type and confirm the replacement applies. More than half of the `high` rules are anchored on a literal dot and rename a member; they are high because the mapping is right for the stated receiver, and they still need that receiver checked.
+1. **`high` describes the mapping, not the blast radius.** A `high` rule means *the replacement is the verified correct API 2.0 form*: the old name really does become that new name, with no index, sentinel, or epoch change hiding in it. It does **not** mean "safe to Replace All". No rule in this skill is authorized for a blind project-wide replace, because no regex here can tell code from a string literal, a call from a declaration, or one receiver type from another. Read the matched line before you change it. What the tier buys you is *how hard you have to look*: `high` needs a glance, `medium`/`low` need the receiver resolved, `manual` needs a rewrite.
+2. **Member renames are type-blind, and this rule outranks rule 1.** `.Append` means `.Add` on an array but `.AddObject` on a Group2D; `.RemoveRow` is deprecated on ListBox but valid API 2.0 on RowSet; `.ColumnType` is deprecated on ListBox and *live* on RowSet. Before renaming any `.Member`—at **any** confidence—find the receiver's declared type and confirm the replacement applies. More than half of the `high` rules are anchored on a literal dot and rename a member; they are high because the mapping is right for the stated receiver, and they still need that receiver checked.
 3. **A receiver must be an identifier—never a literal, never a parenthesised expression.** Xojo has no member access on either. Both of these are **syntax errors**, not stylistic choices:
 
    ```
@@ -55,7 +59,7 @@ Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo"
    Every global→method rule here captures an identifier receiver and silently skips everything else. For a skipped call there are exactly **two** outcomes: introduce a local variable, or leave the deprecated global in place. Hand-writing the method form is not a third option—it does not compile. `conversion-traps.md` §4 says which to choose and when.
 4. **Fix `InStr`/`IdxField` result comparisons and index arithmetic BEFORE renaming the functions.** Renaming first hides the remaining wrong arithmetic. Details in `$SKILL/references/conversion-traps.md`.
 
-   "Before" means *within the same edit*, not in an earlier commit. Splitting them leaves a tree where `InStr(...) >= 0` is API 1 code read with an API 2 sentinel—always true, compiles, wrong—which **Commit discipline** below forbids. Convert each site atomically, comparison and rename together, and commit the sites as one batch.
+   "Before" means *within the same edit*, not in an earlier commit. Splitting them leaves a tree where `InStr(...) >= 0` is API 1.0 code read with an API 2.0 sentinel—always true, compiles, wrong—which **Commit discipline** below forbids. Convert each site atomically, comparison and rename together, and commit the sites as one batch.
 5. **Byte-variants before base names**: `LenB/MidB/InStrB/ReplaceB/SplitB` before `Len/Mid/InStr/Replace/Split`, or the base-name pass mangles the byte variants.
 6. **Nothing compiles Xojo except the Xojo IDE.** There is no standalone compiler. When the xojo-ide skill can reach a running IDE, run the checkpoints yourself—`analyze` compiles the project's front end and reports errors and warnings with file, method and line. When it cannot, every phase ends with the user compiling / running Analyze Project and reporting back. Either way an analyze pass is not a runtime pass: never claim a conversion "works"; say it analyzed clean and awaits the runtime check, which is always the user's—the dangerous bugs here are runtime bugs.
 7. **Match rule casing exactly** in replacements (Xojo identifiers are case-insensitive, but canonical casing keeps the code readable and consistent with the docs).
@@ -103,7 +107,7 @@ Silence reads as "checked and fine" to anyone reading `git log` later, which is 
 **Message format.** Match the project's existing convention; read `git log` first. If there is none, use:
 
 ```
-Xojo API 2: <category>, <what changed>
+Xojo API 2.0: <category>, <what changed>
 
 <n> occurrences across <n> files. Rules applied: c2r0, c2r5, ...
 Skipped: <what and why>
@@ -172,7 +176,7 @@ python3 $SKILL/scripts/scan.py /path/to/project --format json
 
 Editing that changes a comment, adds noise to a diff that is supposed to be pure renames, and reports as a fix that fixes nothing. Leave it. If a note's archived code is worth migrating it is worth deleting instead, and that is the user's call, not part of this migration.
 
-Even the in-code number is an upper bound: member matches are type-blind, so a symbol whose receivers all turn out to be user classes or live API 2 controls can go to zero. Say "up to M sites to review", never "M conversions".
+Even the in-code number is an upper bound: member matches are type-blind, so a symbol whose receivers all turn out to be user classes or live API 2.0 controls can go to zero. Say "up to M sites to review", never "M conversions".
 
 Present symbols per bucket, with those counts. The seven buckets, and what each one means for the plan:
 
@@ -181,32 +185,32 @@ Present symbols per bucket, with those counts. The seven buckets, and what each 
 | `Removed` | **Does not compile.** Gone from the framework. These are build errors that exist before conversion starts; lead with them. |
 | `Source — global` / `member` / `type` | The conversion work. Member matches are type-blind leads, not a to-do list. |
 | `IDE handles` | Control/class renames the IDE converter does (phase 1), plus their event renames. |
-| `No replacement` | Still compiles, but Xojo documents no API 2 replacement; needs redesign, not renaming. |
+| `No replacement` | Still compiles, but Xojo documents no API 2.0 replacement; needs redesign, not renaming. |
 | `Out of scope` | iOS / Web / Android / PDF surface. |
 
 Lead with `Removed`, then `No replacement`: those two are the ones that change what the project can even do, and neither is fixed by any rule.
 
-**Anything left unconverted gets a marker at the site.** This is a hard rule of the workflow, not a nicety, and it applies to *every* deferral—not just the `No replacement` bucket. Deprecated calls still compile, so nothing will ever remind anyone they were deliberate. Leave the API 1 call in place and mark it with Xojo's own directive, which surfaces in the IDE's Issues pane on every build:
+**Anything left unconverted gets a marker at the site.** This is a hard rule of the workflow, not a nicety, and it applies to *every* deferral—not just the `No replacement` bucket. Deprecated calls still compile, so nothing will ever remind anyone they were deliberate. Leave the API 1.0 call in place and mark it with Xojo's own directive, which surfaces in the IDE's Issues pane on every build:
 
 ```
-#Pragma Warning "API 2: JSONItem.DecimalFormat has no documented replacement -- unresolved"
-#Pragma Warning "API 2: InStr with a literal source -- needs a local variable"
-#Pragma Warning "API 2: DrawPolygon -- DrawPath takes a path object, not this coordinate array"
+#Pragma Warning "API 2.0: JSONItem.DecimalFormat has no documented replacement -- unresolved"
+#Pragma Warning "API 2.0: InStr with a literal source -- needs a local variable"
+#Pragma Warning "API 2.0: DrawPolygon -- DrawPath takes a path object, not this coordinate array"
 ```
 
-A line in a commit message is not a durable record: three months later the question is "this is still API 1, why?", and the commit body is not where anyone looks. A `#Pragma Warning` answers it at the call site, every build. Use `#Pragma Error` instead only if the user wants the build to stop until it is resolved.
+A line in a commit message is not a durable record: three months later the question is "this is still API 1.0, why?", and the commit body is not where anyone looks. A `#Pragma Warning` answers it at the call site, every build. Use `#Pragma Error` instead only if the user wants the build to stop until it is resolved.
 
 **One marker per method is enough when a method repeats the same deferral.** A validation loop calling `InStr("0123456789", c)` dozens of times across dozens of methods does not need one identical marker per call; it needs the reader to find out once, wherever they enter the method. Put a single marker at the top of the method and say how many sites it covers:
 
 ```
-#Pragma Warning "API 2: 3x InStr with a literal source -- each needs a local variable"
+#Pragma Warning "API 2.0: 3x InStr with a literal source -- each needs a local variable"
 ```
 
 The rule being enforced is *the deferral is discoverable from the code*, not *the marker count equals the site count*. What is never enough is recording it only in the final report: the report is not in the IDE and not in the file. Where `conversion-traps.md` §4 says to "list them in the final report", that is in addition to the marker, never instead of it.
 
 The three deferral categories that recur, all of which need this: compound receivers left as deprecated globals (hard rule 3), calls whose replacement takes a different *kind* of argument (`DrawPolygon`/`FillPolygon` → `DrawPath`/`FillPath`), and anything awaiting a design decision from the user.
 
-**Not everything old is deprecated.** Some globals that look like obvious API 1 holdovers are still current, and the matrix's silence about them is the answer, not a gap: `Asc`, `Chr`, `Val`, `Str`, `Format`, `Abs`, `Min`, `Max`, `Round`, `CStr`. Do not convert them, and do not go hunting for a replacement when a user asks. Note the trap in the pair, though—the **byte variants `AscB` and `ChrB` *are* deprecated** (→ `String.AscByte` / `String.ChrByte`) even though their base names are fine. If `lookup.py symbol <Name>` returns nothing, the symbol is not deprecated; check before answering.
+**Not everything old is deprecated.** Some globals that look like obvious API 1.0 holdovers are still current, and the matrix's silence about them is the answer, not a gap: `Asc`, `Chr`, `Val`, `Str`, `Format`, `Abs`, `Min`, `Max`, `Round`, `CStr`. Do not convert them, and do not go hunting for a replacement when a user asks. Note the trap in the pair, though—the **byte variants `AscB` and `ChrB` *are* deprecated** (→ `String.AscByte` / `String.ChrByte`) even though their base names are fine. If `lookup.py symbol <Name>` returns nothing, the symbol is not deprecated; check before answering.
 
 ### 3. Plan the pass order
 
@@ -229,7 +233,7 @@ A rule can *produce* a name that a later category's regex then matches, so that 
 For each `high` rule with hits, fetch it (`$SKILL/scripts/lookup.py rule <id>`) and walk its matches. Per match, three questions, all answerable from the one line you are looking at:
 
 1. **Is it code?** Skip matches inside string literals and comments. No rule here can see the difference; you can.
-2. **Does the rule's `caveat` name a hazard?** The caveats call out the two that recur: a *live API 2 collision* (the same member name is valid on another class) and a *declaration hazard* (the rule rewrites the identifier, so it would rewrite the user's own `Sub Speak(...)` too). A declaration hazard makes **each match ambiguous, not the rule inapplicable**—never skip the whole rule because the project defines the name, or you drop its true positives along with its false ones.
+2. **Does the rule's `caveat` name a hazard?** The caveats call out the two that recur: a *live API 2.0 collision* (the same member name is valid on another class) and a *declaration hazard* (the rule rewrites the identifier, so it would rewrite the user's own `Sub Speak(...)` too). A declaration hazard makes **each match ambiguous, not the rule inapplicable**—never skip the whole rule because the project defines the name, or you drop its true positives along with its false ones.
 3. **Does the rule's `manual` note apply?** Compound-argument calls the regex deliberately skips must be hand-converted or explicitly deferred.
 
 If all three are clear, apply it. This is a fast pass, not a blind one; most matches clear in a second.
@@ -311,7 +315,7 @@ python3 $SKILL/scripts/scan.py  <project-dir>
 python3 $SKILL/scripts/sweep.py <project-dir> --context
 ```
 
-**Re-run `scan.py` and account for every remaining in-code hit**, comparing against the phase-2 inventory. Expect the type-blind member patterns to re-flag *correct* API 2 code (`.AddRow` on a ListBox, `.RemoveRow` on a RowSet, `.LastIndex` on an array); the goal is that global and type hits reach zero and every member hit is explained, not a literally empty scan. Do not skip this because you believe the categories are done. On the one migration that was checked afterwards by compiling, a re-scan of the handed-over tree lists **all five** real leftovers—`.Len`, `.Mid`, `TextColor`, `.Border` and `.Count`—each with its replacement and its rule ids already attached. Every one had been passed over during the category work, and the run was declared finished without this step.
+**Re-run `scan.py` and account for every remaining in-code hit**, comparing against the phase-2 inventory. Expect the type-blind member patterns to re-flag *correct* API 2.0 code (`.AddRow` on a ListBox, `.RemoveRow` on a RowSet, `.LastIndex` on an array); the goal is that global and type hits reach zero and every member hit is explained, not a literally empty scan. Do not skip this because you believe the categories are done. On the one migration that was checked afterwards by compiling, a re-scan of the handed-over tree listed **every** real leftover—a mix of string members, a system color and a container member—each with its replacement and its rule ids already attached. Every one had been passed over during the category work, and the run was declared finished without this step.
 
 **Then run the bare-name sweep**, because `scan.py` alone cannot close the migration: it asks the rules what is left, and **the rules cannot see two whole forms**. A receiverless member call (`Invalidate` for `Self.Invalidate`) matches no dot-anchored pattern, and a paren-less statement call matches no `(?=\s*\()` pattern. A rule that structurally cannot match a form still reports zero remaining, and zero reads as done.
 
@@ -396,8 +400,8 @@ Bundled with the skill:
 
 Fetched from Xojo when you need them. **The bundled matrix is the authority on what is deprecated**; these are for understanding an API you are converting *to*, or for anything the matrix does not cover:
 
-- <https://documentation.xojo.com/topics/api_design/moving_to_api_2.0.html> — Xojo's own "Moving To API 2.0" overview. Background for API 2 idioms (`Var`, iterators, enumerations). Read it once at the start if the codebase is unfamiliar; it is not a per-symbol reference.
-- <https://documentation.xojo.com/llms.txt> — an index of links to every documentation page, in a form built for agents. Use it to find the canonical page for a class, then fetch that page. This is the fastest way to answer "what does `DesktopSlider` actually expose in API 2?"
+- <https://documentation.xojo.com/topics/api_design/moving_to_api_2.0.html> — Xojo's own "Moving To API 2.0" overview. Background for API 2.0 idioms (`Var`, iterators, enumerations). Read it once at the start if the codebase is unfamiliar; it is not a per-symbol reference.
+- <https://documentation.xojo.com/llms.txt> — an index of links to every documentation page, in a form built for agents. Use it to find the canonical page for a class, then fetch that page. This is the fastest way to answer "what does `DesktopSlider` actually expose in API 2.0?"
 
 There is also a `llms-full.txt` at that host, which is the entire corpus inlined. **Do not fetch it during a migration**—it will consume the context the migration needs. It is useful only if downloaded and grepped locally.
 
@@ -405,4 +409,4 @@ Prefer a specific page over a search. `lookup.py symbol <Name>` first, the canon
 
 ## Writing converted code
 
-Follow Xojo API 2 idiom in anything you write: `Var` not `Dim`, exceptions not error codes, 0-based `...At` methods, `For Each` iterators where natural. Do not modernize beyond the rules uninvited (e.g. don't restructure working logic, rename user identifiers, or reformat untouched lines); conversions should produce reviewable diffs.
+Follow Xojo API 2.0 idiom in anything you write: `Var` not `Dim`, exceptions not error codes, 0-based `...At` methods, `For Each` iterators where natural. Do not modernize beyond the rules uninvited (e.g. don't restructure working logic, rename user identifiers, or reformat untouched lines); conversions should produce reviewable diffs.

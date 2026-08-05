@@ -42,15 +42,15 @@ Allow a receiver to end in `)`, and remember that a census answers *who declares
 |---|---|---|---|
 | `c3r31` `.LastIndex → .LastAddedRowIndex` | hundreds | a handful | array `LastIndex` — mostly created by the *preceding* array commit |
 | `c9r3` `.FillRect → .FillRectangle` | hundreds | a handful | a user class with its own `FillRect` |
-| `c9r6` `.ForeColor → .DrawingColor` | dozens | about a fifth | the same user class's own `ForeColor` |
-| `c10r15` `.Value(i) → .ValueAt(i)` | dozens | **none** | Dictionary, DesktopCheckBox, user class |
-| `c2r13` `.AddRow → .Add` | dozens | **none** | DesktopPopupMenu / DesktopListBox — live API 2 |
-| `c10r1` `.Count → .KeyCount` | dozens | one | user class, FolderItem, DesktopToolbar |
+| `c9r6` `.ForeColor → .DrawingColor` | dozens | about a fifth | a user class with its own `ForeColor` |
+| `c10r15` `.Value(i) → .ValueAt(i)` | dozens | **none** | Dictionary, DesktopCheckBox, user classes |
+| `c2r13` `.AddRow → .Add` | dozens | **none** | DesktopPopupMenu / DesktopListBox — live API 2.0 |
+| `c10r1` `.Count → .KeyCount` | dozens | one | user classes, FolderItem, DesktopToolbar |
 | `c2r3` `.Remove(i) → .RemoveAt(i)` | a dozen or so | **none** | Dictionary, DesktopMenuItem, DesktopToolbar |
 
-Read the ratios, not the numbers: a rule matching ninety lines and converting twenty is the system **working**. Report the ratio to the user rather than the match count, and never treat a large match count as a large amount of work—the two are barely related. Note the top row: a rule can be mostly false-positive *because of what an earlier category did*, which is the ordering hazard from step 3 showing up in the numbers.
+Read the ratios, not the numbers: a rule matching ninety lines and converting twenty is the system **working**, and three of these rules were correct on nothing at all. Report the ratio to the user rather than the match count, and never treat a large match count as a large amount of work—the two are barely related. Note the top row: a rule can be mostly false-positive *because of what an earlier category did*, which is the ordering hazard from step 3 showing up in the numbers.
 
-One user class defining `ForeColor`, `FillRect` and `DrawString` accounted for three of these rows on its own. When a rule's matches cluster in one file, resolve the receiver once for that file rather than per line.
+A single user class that shadows several `Graphics` members can account for more than one of these rows by itself. When a rule's matches cluster in one file, resolve the receiver once for that file rather than per line.
 
 ## 3. One pass creates what the next pass matches
 
@@ -58,8 +58,8 @@ One user class defining `ForeColor`, `FillRect` and `DrawString` accounted for t
 
 The recurring shape: rule A *produces* a name that rule B's regex then matches, even though B's receiver is a different class. Because A ran first, B is no longer looking at the code the inventory described—it is looking at your own output. Three known instances, all of which the category order in step 5 either handles or (for the second) actively causes:
 
-- **ListBox `.RemoveRow → .RemoveRowAt` (c3r6) before RecordSet `.DeleteRecord → .RemoveRow` (c4r23).** The second rule *creates* `RowSet.RemoveRow`, which is correct API 2; run it first and the ListBox rule rewrites it to a `RemoveRowAt` that RowSet does not have. The category order already does this; do not reorder those two.
-- **Arrays `Ubound(x) → x.LastIndex` (cat2) vs ListBox `.LastIndex → .LastAddedRowIndex` (c3r31).** This one the documented order gets *wrong*. cat2 runs first and can create hundreds of fresh array `.LastIndex` reads; c3r31 is a bare `\.LastIndex\b` sweep, so on the very next category it rewrites array reads that are already correct API 2. Array `.LastIndex` is live, so nothing catches it at compile time. **Either run c3r31 before the array pass, or resolve the receiver on every one of its matches**—and running it first only shrinks the population to `.LastIndex` reads that were in the file already, it does not make them all ListBoxes. Resolve receivers either way; c3r31 is `medium` for exactly this reason.
+- **ListBox `.RemoveRow → .RemoveRowAt` (c3r6) before RecordSet `.DeleteRecord → .RemoveRow` (c4r23).** The second rule *creates* `RowSet.RemoveRow`, which is correct API 2.0; run it first and the ListBox rule rewrites it to a `RemoveRowAt` that RowSet does not have. The category order already does this; do not reorder those two.
+- **Arrays `Ubound(x) → x.LastIndex` (cat2) vs ListBox `.LastIndex → .LastAddedRowIndex` (c3r31).** This one the documented order gets *wrong*. cat2 runs first and can create hundreds of fresh array `.LastIndex` reads; c3r31 is a bare `\.LastIndex\b` sweep, so on the very next category it rewrites array reads that are already correct API 2.0. Array `.LastIndex` is live, so nothing catches it at compile time. **Either run c3r31 before the array pass, or resolve the receiver on every one of its matches**—and running it first only shrinks the population to `.LastIndex` reads that were in the file already, it does not make them all ListBoxes. Resolve receivers either way; c3r31 is `medium` for exactly this reason.
 - **ListBox `.DeleteAllRows → .RemoveAllRows` (c3r7) vs array `.RemoveAllRows → .RemoveAll` (c2r16).** Same shape in the other direction: c3r7 creates `RemoveAllRows` on popup menus and list boxes, where it is correct, and a later array sweep matches it.
 
 The general check, at the end of every category: **for each rule you just applied, ask whether its *replacement* text is something a later category's `find` will match.** If it is, that later rule's matches are no longer a to-do list—they are partly your own work, and every one needs its receiver resolved.

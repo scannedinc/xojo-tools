@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final-pass bare-name sweep for a Xojo API 1 -> API 2 migration (stdlib only).
+"""Final-pass bare-name sweep for a Xojo API 1.0 -> API 2.0 migration (stdlib only).
 
 Usage:
   python3 sweep.py /path/to/xojo/project [--format text|json]
@@ -318,7 +318,7 @@ def main():
         return
 
     def live_receivers(name):
-        """Receivers where this name is valid API 2, from the matrix's live_on."""
+        """Receivers where this name is valid API 2.0, from the matrix's live_on."""
         return sorted({r for row in active[name] for r in (row.get("live_on") or [])})
 
     def dump(title, group, blurb):
@@ -326,7 +326,7 @@ def main():
         for line in blurb:
             print(line)
         print()
-        # Symbols that are live API 2 on some receiver sink to the bottom. On a
+        # Symbols that are live API 2.0 on some receiver sink to the bottom. On a
         # real project `Close` and `Graphics` alone were two-thirds of the
         # receiverless hits, and `Self.Close` on a DesktopWindow is correct code
         # -- leading
@@ -345,7 +345,7 @@ def main():
             # argument reads as an invitation to carry the argument across, and
             # on a real migration it was taken: `invalidate(false)` next to
             # `Refresh(immediately As Boolean = False)` became `Refresh(False)`.
-            # The two Booleans are different parameters -- API 1's was
+            # The two Booleans are different parameters -- API 1.0's was
             # EraseBackground -- so it compiles and silently changes redraw
             # behavior. Nothing here can tell whether the parameters
             # correspond, which is exactly why the signature must not be
@@ -359,7 +359,7 @@ def main():
                       f"across on the strength of this line. Check the rule "
                       f"(lookup.py symbol {name}) before converting.")
             if live:
-                print(f"      LIVE API 2 on: {', '.join(live)} -- if the enclosing class is "
+                print(f"      LIVE API 2.0 on: {', '.join(live)} -- if the enclosing class is "
                       f"one of these, the call is already correct")
             if recv:
                 print(f"      deprecated on: {recv}")
@@ -380,7 +380,7 @@ def main():
     print(f"Receiverless member calls: {n_blind} across {len(blind)} symbols  "
           f"<- the blind spot")
     if n_live:
-        print(f"  of which {n_live} are names that are LIVE API 2 on some receiver "
+        print(f"  of which {n_live} are names that are LIVE API 2.0 on some receiver "
               f"(listed last, marked LIKELY FINE)")
     print(f"Global-form occurrences:   {n_glob} across {len(globals_)} symbols  "
           f"(rules cover these)\n")

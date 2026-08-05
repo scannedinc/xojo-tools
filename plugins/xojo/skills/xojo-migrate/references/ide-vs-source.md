@@ -20,8 +20,8 @@ There is no hand-rename fallback here, deliberately. A control's type appears in
 - **The `Source — type` bucket (52 entries)**: type names that are not placed controls, so the converter never sees them: `Date → DateTime`, `HTTPSocket → URLConnection`, `OpenDialog → OpenFileDialog`, the database types. These are yours in every case, converter or not. `SegmentedControl → SegmentedButton` and `Serial → SerialConnection` live here too, and are the two that cannot be converted by changing the `Super` alone; they need per-class attention. (They are *not* in the `IDE handles` bucket; note that the separate `SegmentedButton → DesktopSegmentedButton` rename is.)
 - Anything in the `Removed` bucket (86 symbols, e.g. `FolderItem.AbsolutePath`, `FolderItem.MacType`, `RectControl.BalloonHelp`, the `MoviePlayer` QuickTime surface): gone from the framework. These do not compile, so they surface as build errors whether or not you plan for them.
 
-  Read the *row*, not the bucket, when a member name is shared. `MenuItem.Bold` is Removed, but `.Bold` is live API 2 on `Graphics` and `TextShape`—so a scan filing `.Bold` under Removed is reporting the worst of its receivers, not a verdict on your code. The matrix marks those receivers (`live_on`) and the scanner flags the symbol `MIXED`.
-- Anything in the `No replacement` bucket (40 symbols, e.g. `AddressBook`, `Placard`, `Line`): still compiles, but Xojo documents no API 2 replacement. The feature needs a redesign, not a rename.
+  Read the *row*, not the bucket, when a member name is shared. `MenuItem.Bold` is Removed, but `.Bold` is live API 2.0 on `Graphics` and `TextShape`—so a scan filing `.Bold` under Removed is reporting the worst of its receivers, not a verdict on your code. The matrix marks those receivers (`live_on`) and the scanner flags the symbol `MIXED`.
+- Anything in the `No replacement` bucket (40 symbols, e.g. `AddressBook`, `Placard`, `Line`): still compiles, but Xojo documents no API 2.0 replacement. The feature needs a redesign, not a rename.
 
 ## Reading the converter's output as evidence
 
@@ -29,7 +29,7 @@ On a project where the converter has already run, its output is a useful oracle�
 
 | Observation | What it means |
 |---|---|
-| The converter renamed the types and event names but **left an `Action` binding alone** | **Informative.** Events are its job. That binding is still valid API 2—do not "finish" it by renaming. |
+| The converter renamed the types and event names but **left an `Action` binding alone** | **Informative.** Events are its job. That binding is still valid API 2.0—do not "finish" it by renaming. |
 | `As Window` or `As REALbasic.Rect` still in the code | **Not informative.** Code-level type annotations are outside its jurisdiction; it was never going to touch them. Their survival says nothing about whether they are current. |
 
 Stated as a heuristic: **the converter's silence is evidence only where the converter has jurisdiction.** Both readings come up in a real migration and they are not in conflict—the first is a signal, the second is an absence of one. Getting this backwards in either direction costs you: treat its silence on types as approval and you leave real deprecations behind; treat its silence on events as an oversight and you break working code.
@@ -42,14 +42,14 @@ Stop and resolve that; do not convert types by hand. See "What the IDE handles" 
 
 ## Deprecated vs removed
 
-Deprecated API 1 calls still compile and run; Analyze Project flags them once "Item1 is deprecated" warnings are enabled (Project ▸ Analysis Warnings, off by default—see **Turning the deprecation warnings on** below for the programmatic path). This means conversion can proceed category by category with a working project at every checkpoint.
+Deprecated API 1.0 calls still compile and run; Analyze Project flags them once "Item1 is deprecated" warnings are enabled (Project ▸ Analysis Warnings, off by default—see **Turning the deprecation warnings on** below for the programmatic path). This means conversion can proceed category by category with a working project at every checkpoint.
 
 The two buckets that are *not* ordinary deprecations are easy to confuse, and only one of them blocks a build:
 
 | Bucket | Compiles? | What it means |
 |---|---|---|
 | `Removed` | **No** | Xojo lists the symbol as Removed; it is gone. Any project still using one fails to build before conversion even starts. |
-| `No replacement` | Yes | Deprecated, but Xojo documents no API 2 replacement. It keeps working; there is simply nothing to rename it to. |
+| `No replacement` | Yes | Deprecated, but Xojo documents no API 2.0 replacement. It keeps working; there is simply nothing to rename it to. |
 
 The status comes from the per-release tables in Xojo's own `deprecations.md`, not from whether a replacement happens to be documented; those are different questions, and treating them as one put `AddressBook` and `Line` (both still compiling) in the same bucket as symbols that had been deleted, while `FolderItem.AbsolutePath` and the rest of the genuinely-removed set were missing from the matrix altogether.
 

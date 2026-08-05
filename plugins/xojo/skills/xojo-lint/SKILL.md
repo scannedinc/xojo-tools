@@ -6,6 +6,7 @@ description: >-
   extensions). Use after creating or editing any Xojo project file, when the
   user asks to lint, check, validate, format, or clean up a Xojo project, and
   when the user wants a pre-commit check for a Xojo project.
+disable-model-invocation: false
 ---
 
 # Xojo Lint

@@ -93,14 +93,14 @@ Members place the same field on their opening tag:
 #tag Method, Flags = &h0, CompatibilityFlags = API2Only and ( (TargetDesktop and (Target32Bit or Target64Bit)) )
 ```
 
-Observed atoms are `API1Only`, `API2Only`, `Target32Bit`, `Target64Bit`, `TargetAndroid`, `TargetConsole`, `TargetDesktop`, `TargetHasGUI`, `TargetIOS`, and `TargetWeb`, combined with lowercase `and`, `or`, `false`, and parentheses. These expressions are the inclusion rules for project family, word size, and API generation. An all-disabled member is written `CompatibilityFlags = false`; a default member omits the field. The IDE emits API 1 and API 2 forms asymmetrically, for example:
+Observed atoms are `API1Only`, `API2Only`, `Target32Bit`, `Target64Bit`, `TargetAndroid`, `TargetConsole`, `TargetDesktop`, `TargetHasGUI`, `TargetIOS`, and `TargetWeb`, combined with lowercase `and`, `or`, `false`, and parentheses. These expressions are the inclusion rules for project family, word size, and API generation. An all-disabled member is written `CompatibilityFlags = false`; a default member omits the field. The IDE emits API 1.0 and API 2.0 forms asymmetrically, for example:
 
 ```text
 CompatibilityFlags = API1Only or ( (TargetConsole and (Target32Bit or Target64Bit)) or ... )
 CompatibilityFlags = API2Only and ( (TargetConsole and (Target32Bit or Target64Bit)) or ... )
 ```
 
-Preserve the IDE's operator choice, spacing, target list, and parenthesization. In particular, do not simplify the API 1 expression using ordinary boolean-algebra assumptions.
+Preserve the IDE's operator choice, spacing, target list, and parenthesization. In particular, do not simplify the API 1.0 expression using ordinary boolean-algebra assumptions.
 
 ## Descriptions, attributes and comments
 

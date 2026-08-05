@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Report deprecated Xojo APIs used in a source file.
 
-Reads the indexes this skill builds and flags API 1 symbols the code still
+Reads the indexes this skill builds and flags API 1.0 symbols the code still
 uses, with what replaced each one. Written to be usable as a Claude Code
 PostToolUse hook; see README.md.
 

@@ -1,6 +1,8 @@
 # Agent Skill: xojo-migrate
 
-This skill converts Xojo desktop projects from API 1 to API 2. It runs in [Claude Code](https://claude.com/claude-code).
+This skill converts Xojo desktop projects from API 1.0 to API 2.0. It runs in [Claude Code](https://claude.com/claude-code).
+
+You start the skill yourself, with `/xojo-migrate`. The agent cannot start it for you, because a migration rewrites your whole project.
 
 The skill contains three parts:
 
@@ -12,7 +14,7 @@ The skill is not a codemod. It does not convert a project on one command. The re
 
 ## Why a rename is not enough
 
-Most API 1 changes are renames. A few are not. Those few compile without an error and then behave differently.
+Most API 1.0 changes are renames. A few are not. Those few compile without an error and then behave differently.
 
 | Change | What breaks |
 | --- | --- |
@@ -52,7 +54,7 @@ Some calls stay deprecated on purpose. Xojo has no member access on a literal or
 The skill leaves those calls and marks each one:
 
 ```
-#Pragma Warning "API 2: InStr with a literal source -- needs a local variable"
+#Pragma Warning "API 2.0: InStr with a literal source -- needs a local variable"
 ```
 
 The mark shows in the IDE on every build. A report shows it once.
@@ -82,7 +84,7 @@ mkdir -p /path/to/project/.claude/skills
 cp -R plugins/xojo/skills/xojo-migrate /path/to/project/.claude/skills/xojo-migrate
 ```
 
-Then describe what you want. Claude loads the skill. For example: "migrate this project to API 2", or "what replaced `RecordSet.MoveNext`?"
+Then run `/xojo-migrate` to start a migration. Claude does not start it for you. To ask what replaced one deprecated symbol, such as `RecordSet.MoveNext`, use the `xojo` skill instead: it holds the documentation and the deprecation indexes, and Claude loads it on its own.
 
 ## What each file does
 
@@ -103,7 +105,7 @@ Then describe what you want. Claude loads the skill. For example: "migrate this 
 | `ide-vs-source.md` | Explains what the IDE converter changes and what it leaves. Also explains the difference between deprecated and removed. |
 | `applying-rules-by-script.md` | Explains the `$1` backreference dialect and the `applies` gate. Read it only if you run the rules from a script. |
 
-Two fields need a word of their own. `live_on` names the receivers where a deprecated member name is still correct in API 2, on dozens of rows. `chains_to` marks a replacement that Xojo then deprecated again, on a few rows.
+Two fields need a word of their own. `live_on` names the receivers where a deprecated member name is still correct in API 2.0, on dozens of rows. `chains_to` marks a replacement that Xojo then deprecated again, on a few rows.
 
 ### The `scripts` directory
 

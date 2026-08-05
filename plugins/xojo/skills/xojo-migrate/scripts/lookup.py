@@ -78,7 +78,7 @@ def cmd_symbol(name):
             print(f"  {row['old']} -> {row['new']}   [{row['cat']}] kind={row['kind']} "
                   f"status={status or '-'} since={since}{flag}{note}")
     if not hits:
-        print("  (none: symbol is not in the deprecation matrix; it may already be API 2)")
+        print("  (none: symbol is not in the deprecation matrix; it may already be API 2.0)")
 
     print(f"\n=== conversion rules matching '{name}' ===")
     matched = []

@@ -546,7 +546,7 @@
      "forms": "global",
      "old": "NthField(source, separator, fieldNumber) As String",
      "new": "source.NthField(separator, fieldNumber) As String",
-     "note": "NONE on the field number — VERIFIED in both docs ('The first field is numbered 1' in API 1 and API 2). Do NOT decrement fieldNumber. The only change is global→method restructure (source becomes the receiver; separator, fieldNumber keep order).",
+     "note": "NONE on the field number — VERIFIED in both docs ('The first field is numbered 1' in API 1.0 and API 2.0). Do NOT decrement fieldNumber. The only change is global→method restructure (source becomes the receiver; separator, fieldNumber keep order).",
      "find": "(?<![\\w.])NthField\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_.]*)\\s*,\\s*([^,()]+?)\\s*,\\s*([^,()]+?)\\s*\\)",
      "replace": "$1.NthField($2, $3)",
      "manual": "Arguments containing nested parens/commas are skipped — hand-convert NthField(SOURCE, SEP, N) → SOURCE.NthField(SEP, N) (NO arithmetic on N). VERY common: a separator like Chr(9) or comma-bearing literal will NOT match and must be done by hand. The already-existing method form s.NthField(sep, n) is left untouched and remains valid.",
@@ -574,7 +574,7 @@
      "forms": "both",
      "old": "NthFieldB(source, separator, fieldNumber) As String",
      "new": "No direct String method. The deprecation map directs NthFieldB → MemoryBlock; there is no drop-in renamed call. Re-implement with a MemoryBlock (or, if byte-exactness is not actually required, String.NthField).",
-     "note": "No simple rename exists. The 1-based field-number concept does not transfer to a single API-2 String call; restructure to MemoryBlock byte handling. Field number was 1-based in API 1.",
+     "note": "No simple rename exists. The 1-based field-number concept does not transfer to a single API-2 String call; restructure to MemoryBlock byte handling. Field number was 1-based in API 1.0.",
      "find": "",
      "replace": "",
      "manual": "1) Search the project for \\bNthFieldB\\b. 2) Per occurrence decide whether true byte-level (binary, case-sensitive) field parsing is required. 3) If yes, re-implement with a MemoryBlock to locate the separator bytes and slice — no one-line equivalent. 4) If the data is really text and byte-exactness was incidental, you MAY substitute source.NthField(separator, fieldNumber) (keeping the 1-based field number) but verify encoding/case behavior. Do NOT attempt a regex rename.",
@@ -598,7 +598,7 @@
      "find": "(?<![\\w.])CountFields\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_.]*)\\s*,\\s*([^,()]+?)\\s*\\)",
      "replace": "$1.CountFields($2)",
      "manual": "Nested-paren arguments (e.g. separator = Chr(9)) are skipped — hand-convert CountFields(SOURCE, SEP) → SOURCE.CountFields(SEP). CountFieldsB is a different (MemoryBlock) conversion, excluded by the trailing B / \\b.",
-     "caveat": "No index change → low semantic risk. The two-comma-arg shape limits to the global call form. User-defined CountFields rewritten — review. Comments/strings matched. CountFields counts a trailing empty field (e.g. 'Dan*Smith*' → 3), unchanged in API 2, so dependent loop bounds need no adjustment. RECEIVER SHAPE: the capture is identifier-only because Xojo has no member access on a literal or a parenthesised expression -- `\"0123456789\".IndexOf(c)` and `(\"00\" + Hex(r)).Right(2)` are SYNTAX ERRORS, not style. So a skipped compound-argument call has exactly two outcomes: assign to a local and call the method on that, or leave the deprecated global in place. Writing the method form by hand is not a third option. See conversion-traps.md section 4 for which to prefer.",
+     "caveat": "No index change → low semantic risk. The two-comma-arg shape limits to the global call form. User-defined CountFields rewritten — review. Comments/strings matched. CountFields counts a trailing empty field (e.g. 'Dan*Smith*' → 3), unchanged in API 2.0, so dependent loop bounds need no adjustment. RECEIVER SHAPE: the capture is identifier-only because Xojo has no member access on a literal or a parenthesised expression -- `\"0123456789\".IndexOf(c)` and `(\"00\" + Hex(r)).Right(2)` are SYNTAX ERRORS, not style. So a skipped compound-argument call has exactly two outcomes: assign to a local and call the method on that, or leave the deprecated global in place. Writing the method form by hand is not a third option. See conversion-traps.md section 4 for which to prefer.",
      "examples": [
       {
        "b": "n = CountFields(s, \"*\")",
@@ -711,7 +711,7 @@
      "forms": "global",
      "old": "Trim(sourceString)",
      "new": "sourceString.Trim",
-     "note": "None — the NAME does not change (API 2 method is still .Trim, string.md line 62). Only the global call form becomes a method call.",
+     "note": "None — the NAME does not change (API 2.0 method is still .Trim, string.md line 62). Only the global call form becomes a method call.",
      "find": "(?<![\\w.])Trim\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_.]*)\\s*\\)",
      "replace": "$1.Trim",
      "manual": "For a literal or expression argument the rule does not fire (fail-safe): convert those by hand — assign the value to a String variable first and call the method on that variable, or leave the deprecated global call. You cannot call the method on a literal or a parenthesized expression (see conversion-traps.md section 4).",
@@ -729,7 +729,7 @@
        "b": "clean = data.Trim(\"*\")  ' API2 method form",
        "a": "clean = data.Trim(\"*\")  ' API2 method form",
        "pattern": "nomatch",
-       "note": "Already the API 2 method form; the lookbehind correctly skips it."
+       "note": "Already the API 2.0 method form; the lookbehind correctly skips it."
       }
      ],
      "id": "c1r4",
@@ -741,10 +741,10 @@
      "forms": "method",
      "old": "sourceVariable.Uppercase / .Lowercase / .Titlecase",
      "new": "sourceVariable.Uppercase / .Lowercase / .Titlecase",
-     "note": "None — API 1 and API 2 method names are identical (string.md lines 43, 56, 65). No conversion required.",
+     "note": "None — API 1.0 and API 2.0 method names are identical (string.md lines 43, 56, 65). No conversion required.",
      "find": "",
      "replace": "",
-     "manual": "NO ACTION NEEDED for the method form. Do not run any find/replace — it would be a no-op at best and risk corruption at worst. (API 2 adds an optional locale parameter but the no-arg method form is unchanged.)",
+     "manual": "NO ACTION NEEDED for the method form. Do not run any find/replace — it would be a no-op at best and risk corruption at worst. (API 2.0 adds an optional locale parameter but the no-arg method form is unchanged.)",
      "caveat": "Only relevant if you mistakenly try to 'convert' these. Leave them alone.",
      "examples": [
       {
@@ -949,7 +949,7 @@
      "forms": "global",
      "old": "ReplaceAll(sourceString, oldString, newString)",
      "new": "sourceString.ReplaceAll(oldString, newString)",
-     "note": "None — String.ReplaceAll keeps the same name in API 2 (string.md line 48). Only the global call form is rewritten. The method form sourceVariable.ReplaceAll(...) is ALREADY valid API 2 and needs no change.",
+     "note": "None — String.ReplaceAll keeps the same name in API 2.0 (string.md line 48). Only the global call form is rewritten. The method form sourceVariable.ReplaceAll(...) is ALREADY valid API 2.0 and needs no change.",
      "find": "(?<![\\w.])ReplaceAll\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_.]*)\\s*,\\s*([^(),]+),\\s*([^()]+)\\)",
      "replace": "$1.ReplaceAll($2,$3)",
      "manual": "For a literal or expression argument the rule does not fire (fail-safe): convert those by hand — assign the value to a String variable first and call the method on that variable, or leave the deprecated global call. You cannot call the method on a literal or a parenthesized expression (see conversion-traps.md section 4).",
@@ -990,7 +990,7 @@
      "forms": "global",
      "old": "Split(sourceString, delimiter)",
      "new": "sourceString.Split(delimiter)",
-     "note": "None — String.Split keeps the same name in API 2 (string.md line 54). The method form source.Split(delim) is ALREADY valid API 2 and needs NO change. Only a legacy 2-arg global Split(src, delim) needs the rewrite.",
+     "note": "None — String.Split keeps the same name in API 2.0 (string.md line 54). The method form source.Split(delim) is ALREADY valid API 2.0 and needs NO change. Only a legacy 2-arg global Split(src, delim) needs the rewrite.",
      "find": "(?<![\\w.])Split\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_.]*)\\s*,\\s*([^()]+)\\)",
      "replace": "$1.Split($2)",
      "manual": "For a literal or expression argument the rule does not fire (fail-safe): convert those by hand — assign the value to a String variable first and call the method on that variable, or leave the deprecated global call. You cannot call the method on a literal or a parenthesized expression (see conversion-traps.md section 4).",
@@ -1114,7 +1114,7 @@
      "forms": "global",
      "old": "CDbl(string)",
      "new": "string.ToDouble",
-     "note": "None — pure rename plus global→method rewrite. Same locale-aware-parse semantics. (CStr, Val, Str, Format, Hex remain valid in API 2 — only CDbl is deprecated.)",
+     "note": "None — pure rename plus global→method rewrite. Same locale-aware-parse semantics. (CStr, Val, Str, Format, Hex remain valid in API 2.0 — only CDbl is deprecated.)",
      "find": "(?<![\\w.])CDbl\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_.]*)\\s*\\)",
      "replace": "$1.ToDouble",
      "manual": "For a literal or expression argument the rule does not fire (fail-safe): convert those by hand — assign the value to a String variable first and call the method on that variable, or leave the deprecated global call. You cannot call the method on a literal or a parenthesized expression (see conversion-traps.md section 4).",
@@ -1198,10 +1198,10 @@
      "forms": "global",
      "old": "Val(s), Str(v[,fmt]), Format(n, spec), Hex(v), CStr(v)",
      "new": "",
-     "note": "None — these are NOT deprecated. val.md carries no deprecation warning (it is current and explicitly contrasts itself with the also-current String.ToDouble). Str, Format, Hex, CStr likewise current. Do NOT convert them. Only CDbl is deprecated → String.ToDouble. Optional modernization (Val → String.ToDouble for user-facing values) is a developer choice, NOT an API 1→2 necessity.",
+     "note": "None — these are NOT deprecated. val.md carries no deprecation warning (it is current and explicitly contrasts itself with the also-current String.ToDouble). Str, Format, Hex, CStr likewise current. Do NOT convert them. Only CDbl is deprecated → String.ToDouble. Optional modernization (Val → String.ToDouble for user-facing values) is a developer choice, NOT an API 1.0→2 necessity.",
      "find": "",
      "replace": "",
-     "manual": "NO ACTION required for API 2 compatibility. If a developer chooses to modernize Val for user-facing numeric input, do it manually: s.ToDouble (locale-aware) or s.ToInteger / s.ToInt64. CAUTION: plain Val is US/English-only and ignores separators while ToDouble is locale-aware — per val.md, Val(\"10,000.95\") returns 10 whereas ToDouble handles embedded separators. They are NOT behavior-identical, so this is a judgment call, never a mechanical replace.",
+     "manual": "NO ACTION required for API 2.0 compatibility. If a developer chooses to modernize Val for user-facing numeric input, do it manually: s.ToDouble (locale-aware) or s.ToInteger / s.ToInt64. CAUTION: plain Val is US/English-only and ignores separators while ToDouble is locale-aware — per val.md, Val(\"10,000.95\") returns 10 whereas ToDouble handles embedded separators. They are NOT behavior-identical, so this is a judgment call, never a mechanical replace.",
      "caveat": "The only risk is erroneously 'converting' these still-valid functions and changing behavior (Val→ToDouble changes locale/separator handling). Leave them unless deliberately modernizing.",
      "examples": [
       {
@@ -1341,7 +1341,7 @@
      "forms": "method",
      "old": "array.Insert index, value",
      "new": "array.AddAt(index, value)",
-     "note": "None — pure rename, index stays 0-based and unchanged. Only the call SYNTAX differs: the old no-paren statement form must gain parentheses for API 2 method-call style.",
+     "note": "None — pure rename, index stays 0-based and unchanged. Only the call SYNTAX differs: the old no-paren statement form must gain parentheses for API 2.0 method-call style.",
      "find": "",
      "replace": "",
      "manual": "MANUAL. The value argument can itself contain commas (e.g. f(a,b) or Array(1,2)) and PCRE has no balanced-paren recursion, so a capture like ([^,]+),(.+) splits on the WRONG comma and silently corrupts the call. PROCEDURE: locate with a Find-only (no replace) regex  \\.Insert\\s+[^(]  (.Insert + whitespace + a non-paren char) — this isolates the no-paren form and skips the parenthesized form handled above. For EACH hit rewrite 'X.Insert i, v' as 'X.AddAt(i, v)' by hand, leaving i unchanged (already 0-based). Confirm the receiver is a 1-D array (not a list control / custom class). ONLY if you are certain a file's Insert values never contain a comma may you try  \\.Insert\\s+([^,]+),\\s*(.+)$  →  .AddAt($1, $2), but you MUST review every replacement: $2 greedily grabs the rest of the line including any trailing comment, and $1 breaks if the index expression contains a comma.",
@@ -1383,7 +1383,7 @@
        "b": "myDictionary.Remove(\"key\")",
        "a": "myDictionary.Remove(\"key\")",
        "pattern": "skip",
-       "note": "Dictionary.Remove is still valid API 2 — this is an array rule. A blind Replace All would wrongly produce `myDictionary.RemoveAt(\"key\")`."
+       "note": "Dictionary.Remove is still valid API 2.0 — this is an array rule. A blind Replace All would wrongly produce `myDictionary.RemoveAt(\"key\")`."
       }
      ],
      "id": "c2r3",
@@ -1907,7 +1907,7 @@
      "find": "\\.RemoveRow\\b(?!At)",
      "replace": ".RemoveRowAt",
      "manual": "",
-     "caveat": "The (?!At) lookahead prevents double-renaming an already-converted .RemoveRowAt into .RemoveRowAtAt on re-run. Low other risk. Collision: `RowSet.RemoveRow` is a VALID API 2 method (it is the replacement for RecordSet.DeleteRecord). This rule would wrongly rewrite it to RemoveRowAt. Run it only on row-control (ListBox/Popup/Combo) code, and never after the DeleteRecord->RemoveRow pass has introduced RowSet.RemoveRow. Step through with Replace & Find. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
+     "caveat": "The (?!At) lookahead prevents double-renaming an already-converted .RemoveRowAt into .RemoveRowAtAt on re-run. Low other risk. Collision: `RowSet.RemoveRow` is a VALID API 2.0 method (it is the replacement for RecordSet.DeleteRecord). This rule would wrongly rewrite it to RemoveRowAt. Run it only on row-control (ListBox/Popup/Combo) code, and never after the DeleteRecord->RemoveRow pass has introduced RowSet.RemoveRow. Step through with Replace & Find. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
      "examples": [
       {
        "b": "ListBox1.RemoveRow(2)",
@@ -2245,7 +2245,7 @@
      "find": "\\.Column(Alignment|SortDirection|Tag)\\b(?!At|Offset)",
      "replace": ".Column$1At",
      "manual": "",
-     "caveat": "The (?!At|Offset) lookahead is REQUIRED: prevents re-converting ...At members and protects ColumnAlignmentOffset (handled by the next rule). Does NOT touch ColumnCount/ColumnWidths/ColumnFromXY (those words are not in the alternation). NOTE: 'ColumnAlignment' here and the (?!Offset) guard keep ColumnAlignmentOffset out — verified. ColumnType was REMOVED from this alternation: `RowSet.ColumnType(index)` is live API 2, so sweeping it breaks database code. It now has its own receiver-checked rule. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
+     "caveat": "The (?!At|Offset) lookahead is REQUIRED: prevents re-converting ...At members and protects ColumnAlignmentOffset (handled by the next rule). Does NOT touch ColumnCount/ColumnWidths/ColumnFromXY (those words are not in the alternation). NOTE: 'ColumnAlignment' here and the (?!Offset) guard keep ColumnAlignmentOffset out — verified. ColumnType was REMOVED from this alternation: `RowSet.ColumnType(index)` is live API 2.0, so sweeping it breaks database code. It now has its own receiver-checked rule. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
      "examples": [
       {
        "b": "ListBox1.ColumnAlignment(1) = ListBox.Alignments.Right",
@@ -3053,16 +3053,16 @@
      "applies": false
     },
     {
-     "name": "`.ColumnType` → `.ColumnTypeAt` (ListBox only — RowSet.ColumnType is live API 2)",
+     "name": "`.ColumnType` → `.ColumnTypeAt` (ListBox only — RowSet.ColumnType is live API 2.0)",
      "conf": "medium",
      "forms": "method (dot form only)",
      "old": "ListBox.ColumnType (column) As Integer",
      "new": "DesktopListBox.ColumnTypeAt (column) As DesktopListBox.CellTypes",
-     "note": "Split out of the ColumnAlignment/SortDirection/Tag rule, which is safe to sweep. This member is not: `RowSet.ColumnType(index As Integer) As Integer` is live, non-deprecated API 2 (rowset.md), so a project-wide rename silently breaks every database column-type check. 0-based column index unchanged; pure rename otherwise.",
+     "note": "Split out of the ColumnAlignment/SortDirection/Tag rule, which is safe to sweep. This member is not: `RowSet.ColumnType(index As Integer) As Integer` is live, non-deprecated API 2.0 (rowset.md), so a project-wide rename silently breaks every database column-type check. 0-based column index unchanged; pure rename otherwise.",
      "find": "\\.ColumnType\\b(?!At)",
      "replace": ".ColumnTypeAt",
-     "manual": "Resolve the receiver before applying. ListBox/DesktopListBox -> rename. RowSet (anything assigned from SelectSQL / a database query) -> LEAVE ALONE; `rs.ColumnType(i)` is correct API 2 and `rs.ColumnTypeAt` does not exist, so the rename is a compile error.",
-     "caveat": "Type-blind: matches `.ColumnType` on ANY receiver. Do NOT Replace All. `RowSet.ColumnType` is a live API 2 method and the single most likely receiver in database code — the same projects this skill's cat4 targets. The `(?!At)` lookahead only prevents re-converting an already-converted member; it does nothing about the receiver. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
+     "manual": "Resolve the receiver before applying. ListBox/DesktopListBox -> rename. RowSet (anything assigned from SelectSQL / a database query) -> LEAVE ALONE; `rs.ColumnType(i)` is correct API 2.0 and `rs.ColumnTypeAt` does not exist, so the rename is a compile error.",
+     "caveat": "Type-blind: matches `.ColumnType` on ANY receiver. Do NOT Replace All. `RowSet.ColumnType` is a live API 2.0 method and the single most likely receiver in database code — the same projects this skill's cat4 targets. The `(?!At)` lookahead only prevents re-converting an already-converted member; it does nothing about the receiver. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
      "examples": [
       {
        "b": "lb1.ColumnType(1) = ListBox.CellTypes.TextField",
@@ -3072,7 +3072,7 @@
        "b": "Var t As Integer = rs.ColumnType(0)",
        "a": "Var t As Integer = rs.ColumnType(0)",
        "pattern": "skip",
-       "note": "RowSet.ColumnType is live API 2 — leave unchanged. A blind Replace All produces rs.ColumnTypeAt(0), which does not exist."
+       "note": "RowSet.ColumnType is live API 2.0 — leave unchanged. A blind Replace All produces rs.ColumnTypeAt(0), which does not exist."
       }
      ],
      "id": "c3r56",
@@ -3260,7 +3260,7 @@
      "forms": "method (dot form '.SQLSelect')",
      "old": "Database.SQLSelect(query As String, ...) As RecordSet",
      "new": "Database.SelectSQL(query As String, ParamArray values() As Variant) As RowSet",
-     "note": "Name-only at the call site: query and parameter arguments pass through unchanged, NO index arithmetic. HIDDEN behavioral shift: API 1 SQLSelect set db.Error (no exception); API 2 SelectSQL RAISES DatabaseException (verified database.md SelectSQL warning). After the rename, any surrounding `If db.Error` check is dead code and an uncaught failure crashes — handle via the manual Try/Catch rule. Also covers PreparedSQLStatement.SQLSelect -> PreparedSQLStatement.SelectSQL (identical rename).",
+     "note": "Name-only at the call site: query and parameter arguments pass through unchanged, NO index arithmetic. HIDDEN behavioral shift: API 1.0 SQLSelect set db.Error (no exception); API 2.0 SelectSQL RAISES DatabaseException (verified database.md SelectSQL warning). After the rename, any surrounding `If db.Error` check is dead code and an uncaught failure crashes — handle via the manual Try/Catch rule. Also covers PreparedSQLStatement.SQLSelect -> PreparedSQLStatement.SelectSQL (identical rename).",
      "find": "\\.SQLSelect\\b",
      "replace": ".SelectSQL",
      "manual": "After applying, locate the enclosing db.Error/db.ErrorMessage check and convert to Try/Catch per the 'db.Error → Try/Catch' manual rule. The rename alone leaves the call with no error handling.",
@@ -3284,10 +3284,10 @@
      "forms": "method (dot form '.SQLExecute')",
      "old": "Database.SQLExecute(command As String, ...)",
      "new": "Database.ExecuteSQL(command As String, ParamArray values() As Variant)",
-     "note": "Name-only at the call site; arguments unchanged, no index arithmetic. Same hidden shift as SQLSelect: API 1 set db.Error, API 2 throws DatabaseException. Rename is safe; surrounding error handling needs the manual Try/Catch conversion. Also covers PreparedSQLStatement.SQLExecute -> PreparedSQLStatement.ExecuteSQL (identical rename).",
+     "note": "Name-only at the call site; arguments unchanged, no index arithmetic. Same hidden shift as SQLSelect: API 1.0 set db.Error, API 2.0 throws DatabaseException. Rename is safe; surrounding error handling needs the manual Try/Catch conversion. Also covers PreparedSQLStatement.SQLExecute -> PreparedSQLStatement.ExecuteSQL (identical rename).",
      "find": "\\.SQLExecute\\b",
      "replace": ".ExecuteSQL",
-     "manual": "After applying, convert any enclosing db.Error/db.ErrorMessage check to Try/Catch (manual rule). Note iOSSQLiteDatabase.SQLExecute is also renamed to ExecuteSQL by this pattern — correct, iOS API 2 uses ExecuteSQL too.",
+     "manual": "After applying, convert any enclosing db.Error/db.ErrorMessage check to Try/Catch (manual rule). Note iOSSQLiteDatabase.SQLExecute is also renamed to ExecuteSQL by this pattern — correct, iOS API 2.0 uses ExecuteSQL too.",
      "caveat": "Low. '.SQLExecute' is a distinctive method token; arguments untouched (no nested-paren risk). ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
      "examples": [
       {
@@ -3308,7 +3308,7 @@
      "forms": "method (dot form '.InsertRecord')",
      "old": "Database.InsertRecord(tableName As String, record As DatabaseRecord)",
      "new": "Database.AddRow(tableName As String, row As DatabaseRow)",
-     "note": "Name-only at the call site; tableName and row arguments pass through unchanged (NOTE the row argument's type DatabaseRecord→DatabaseRow is fixed by the type-rename rules, not here). Behavioral shift: API 1 InsertRecord set db.Error; API 2 AddRow raises DatabaseException. Rename safe; error handling is the separate manual rule.",
+     "note": "Name-only at the call site; tableName and row arguments pass through unchanged (NOTE the row argument's type DatabaseRecord→DatabaseRow is fixed by the type-rename rules, not here). Behavioral shift: API 1.0 InsertRecord set db.Error; API 2.0 AddRow raises DatabaseException. Rename safe; error handling is the separate manual rule.",
      "find": "\\.InsertRecord\\b",
      "replace": ".AddRow",
      "manual": "After applying, wrap in Try/Catch if the old code used db.Error to detect insert failures (manual rule). Ensure the passed record variable's type is also converted to DatabaseRow by the type-rename rules.",
@@ -3360,7 +3360,7 @@
      "forms": "method (dot form '.IdxField(<integer literal>)')",
      "old": "RecordSet.IdxField(Index As Integer) As DatabaseColumn",
      "new": "RowSet.ColumnAt(index As Integer) As DatabaseColumn",
-     "note": "CRITICAL 1-based→0-based shift. IdxField(1) accesses the FIRST column; the API 2 equivalent is ColumnAt(0). A blind name-only rename leaves the index off by one and SILENTLY reads the wrong column (or throws OutOfBoundsException at the top index — rowset.md line 159). The index MUST be decremented by 1. Regex cannot do arithmetic, so this rule emits the literal with ' - 1' appended for the developer to simplify (IdxField(1) → ColumnAt(1 - 1) → simplify to ColumnAt(0)).",
+     "note": "CRITICAL 1-based→0-based shift. IdxField(1) accesses the FIRST column; the API 2.0 equivalent is ColumnAt(0). A blind name-only rename leaves the index off by one and SILENTLY reads the wrong column (or throws OutOfBoundsException at the top index — rowset.md line 159). The index MUST be decremented by 1. Regex cannot do arithmetic, so this rule emits the literal with ' - 1' appended for the developer to simplify (IdxField(1) → ColumnAt(1 - 1) → simplify to ColumnAt(0)).",
      "find": "\\.IdxField\\s*\\(\\s*(\\d+)\\s*\\)",
      "replace": ".ColumnAt($1 - 1)",
      "manual": "Optional cleaner alternative: per-literal passes — Find \\.IdxField\\s*\\(\\s*1\\s*\\) Replace .ColumnAt(0); Find \\.IdxField\\s*\\(\\s*2\\s*\\) Replace .ColumnAt(1); etc., one pass per distinct literal, to avoid the ugly '(N - 1)'. EITHER WAY, VERIFY every converted call: an off-by-one here is silent data corruption, not a compile error. Do NOT also run a plain IdxField→ColumnAt rename (that would rename without decrementing).",
@@ -3391,7 +3391,7 @@
      "forms": "method (dot form '.IdxField(<expression>)')",
      "old": "RecordSet.IdxField(Index As Integer) As DatabaseColumn",
      "new": "RowSet.ColumnAt(index As Integer) As DatabaseColumn",
-     "note": "CRITICAL 1-based→0-based shift, same as the literal rule. For a variable/expression the mechanically-safe transform is to wrap the captured argument in parens and append ' - 1' → ColumnAt((expr) - 1), which the developer then simplifies. VERY COMMON API 1 idiom (confirmed throughout deprecated/recordset.md, e.g. lines 82, 90, 117): `For i = 0 To rs.FieldCount - 1 ... rs.IdxField(i + 1)` — the author pre-added +1 to map a 0-based loop var onto IdxField's 1-based index. The transform yields ColumnAt((i + 1) - 1) which simplifies to ColumnAt(i) — exactly right for the now-0-based ColumnAt. So the (x+1)-1 ugliness is expected and correct.",
+     "note": "CRITICAL 1-based→0-based shift, same as the literal rule. For a variable/expression the mechanically-safe transform is to wrap the captured argument in parens and append ' - 1' → ColumnAt((expr) - 1), which the developer then simplifies. VERY COMMON API 1.0 idiom (confirmed throughout deprecated/recordset.md, e.g. lines 82, 90, 117): `For i = 0 To rs.FieldCount - 1 ... rs.IdxField(i + 1)` — the author pre-added +1 to map a 0-based loop var onto IdxField's 1-based index. The transform yields ColumnAt((i + 1) - 1) which simplifies to ColumnAt(i) — exactly right for the now-0-based ColumnAt. So the (x+1)-1 ugliness is expected and correct.",
      "find": "\\.IdxField\\s*\\(\\s*([^()]+?)\\s*\\)",
      "replace": ".ColumnAt(($1) - 1)",
      "manual": "WHY canRegex=false: the capture ([^()]+?) cannot contain parentheses, so it FAILS/CORRUPTS on nested-call arguments like IdxField(GetCol(x)) or IdxField(Array(0)) — with no balanced-paren matching the engine stops at the first ')' and leaves a stray ')' on the line. UNSAFE for blind Replace-All. PROCEDURE: (1) Find every call with the locator \\.IdxField\\s*\\( (no argument capture). (2) For each match inspect the argument: (a) if it has NO inner parentheses, you may apply Replace .ColumnAt(($1) - 1) for that single match (review-each-match mode), then simplify by hand — (i + 1) - 1 → i, (n) - 1 → n - 1. (b) if it DOES contain inner parentheses, edit by hand: wrap the whole argument and subtract 1, e.g. IdxField(GetCol(x)) → ColumnAt((GetCol(x)) - 1). (3) ALWAYS verify — an off-by-one is a silent wrong-column bug, and at the boundary becomes an OutOfBoundsException at runtime, not a compile error.",
@@ -3423,7 +3423,7 @@
      "forms": "method/property (dot form '.RecordCount')",
      "old": "RecordSet.RecordCount As Integer",
      "new": "RowSet.RowCount As Integer",
-     "note": "Name change is mechanical, but a SEMANTIC SHIFT in the not-supported sentinel: API 1 RecordCount returned -1 when the database could not report a count; API 2 RowCount RAISES UnsupportedOperationException instead. Therefore any test like `If rs.RecordCount = -1`, `< 0`, `>= 0`, or `<> -1` to detect support is BROKEN after the rename — the -1 branch is unreachable and an unsupported DB throws instead. The rename is regex-safe; the -1 sentinel logic MUST be reviewed by hand.",
+     "note": "Name change is mechanical, but a SEMANTIC SHIFT in the not-supported sentinel: API 1.0 RecordCount returned -1 when the database could not report a count; API 2.0 RowCount RAISES UnsupportedOperationException instead. Therefore any test like `If rs.RecordCount = -1`, `< 0`, `>= 0`, or `<> -1` to detect support is BROKEN after the rename — the -1 branch is unreachable and an unsupported DB throws instead. The rename is regex-safe; the -1 sentinel logic MUST be reviewed by hand.",
      "find": "\\.RecordCount\\b",
      "replace": ".RowCount",
      "manual": "After renaming, search the converted code for any nearby comparison of the count to -1 / 0 (patterns: '= -1', '<> -1', '< 0', '>= 0'). Where the comparison was a support test, replace it with a Try/Catch around .RowCount catching UnsupportedOperationException, since RowCount no longer returns -1. This logic change cannot be regex'd.",
@@ -3476,7 +3476,7 @@
      "find": "\\.EOF\\b",
      "replace": ".AfterLastRow",
      "manual": "Review each match; apply only to RowSet/RecordSet variables (optionally restrict the Find, e.g. \\brs\\.EOF\\b). For a stream variable, convert its .EOF to .EndOfFile instead (Find (?<=\\.)EOF\\b -> Replace EndOfFile, restricted to stream variables / verified per match).",
-     "caveat": "HIGH collision. '.EOF' also occurs on legacy stream code (TextInputStream, BinaryStream); the regex cannot tell a RowSet variable from a stream variable, so this is review-each-match. IMPORTANT: in API 2 a stream's end check is .EndOfFile, NOT .EOF (and NOT .AfterLastRow) — do not convert a stream here; migrate a stream's own .EOF to .EndOfFile separately. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
+     "caveat": "HIGH collision. '.EOF' also occurs on legacy stream code (TextInputStream, BinaryStream); the regex cannot tell a RowSet variable from a stream variable, so this is review-each-match. IMPORTANT: in API 2.0 a stream's end check is .EndOfFile, NOT .EOF (and NOT .AfterLastRow) — do not convert a stream here; migrate a stream's own .EOF to .EndOfFile separately. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
      "examples": [
       {
        "b": "While Not rs.EOF",
@@ -3490,7 +3490,7 @@
        "b": "While Not myStream.EOF   ' BinaryStream, NOT a RowSet",
        "a": "While Not myStream.EndOfFile",
        "pattern": "skip",
-       "note": "Streams use EndOfFile in API 2, not the RowSet `AfterLastRow` this rule produces."
+       "note": "Streams use EndOfFile in API 2.0, not the RowSet `AfterLastRow` this rule produces."
       }
      ],
      "id": "c4r15",
@@ -3526,7 +3526,7 @@
      "find": "\\.MoveNext\\b",
      "replace": ".MoveToNextRow",
      "manual": "",
-     "caveat": "Low. '.MoveNext' is distinctive but is also the conventional name of an iterator-pattern method; review if the project has custom iterators exposing .MoveNext. Comment/string hits cosmetic. RECEIVER REQUIRED: `Iterator.MoveNext As Boolean` is live API 2 (iterator.md) and is the conventional name of any custom iterator. Only `RecordSet.MoveNext` is deprecated. Resolve the receiver's declared type before applying; do not Replace All. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
+     "caveat": "Low. '.MoveNext' is distinctive but is also the conventional name of an iterator-pattern method; review if the project has custom iterators exposing .MoveNext. Comment/string hits cosmetic. RECEIVER REQUIRED: `Iterator.MoveNext As Boolean` is live API 2.0 (iterator.md) and is the conventional name of any custom iterator. Only `RecordSet.MoveNext` is deprecated. Resolve the receiver's declared type before applying; do not Replace All. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
      "examples": [
       {
        "b": "rs.MoveNext",
@@ -3550,7 +3550,7 @@
      "find": "\\.MoveFirst\\b",
      "replace": ".MoveToFirstRow",
      "manual": "",
-     "caveat": "Low. Distinctive token. Comment/string hits cosmetic. RECEIVER REQUIRED: `DragItem.MoveFirst` is live API 2 (dragitem.md). Only `RecordSet.MoveFirst` is deprecated. Resolve the receiver's declared type before applying; do not Replace All. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
+     "caveat": "Low. Distinctive token. Comment/string hits cosmetic. RECEIVER REQUIRED: `DragItem.MoveFirst` is live API 2.0 (dragitem.md). Only `RecordSet.MoveFirst` is deprecated. Resolve the receiver's declared type before applying; do not Replace All. ZERO IS NOT COMPLETION: this pattern is anchored on a literal dot, so it cannot see a receiverless call on the enclosing instance -- Xojo lets you write `Invalidate` for `Self.Invalidate`, and older code usually does. No match count from this rule is evidence that the member is fully converted. Finish with the bare-name sweep in phase 8 (`scripts/sweep.py`), which is the only pass that sees that form.",
      "examples": [
       {
        "b": "rs.MoveFirst",
@@ -3606,7 +3606,7 @@
      "forms": "method (dot form '.Edit')",
      "old": "RecordSet.Edit",
      "new": "RowSet.EditRow",
-     "note": "None — pure method rename, same lock-and-edit semantics. Behavioral note: API 1 often checked db.Error after Edit; API 2 EditRow raises DatabaseException on lock failure (verified rowset.md Notes line 317) — handle via the manual Try/Catch rule.",
+     "note": "None — pure method rename, same lock-and-edit semantics. Behavioral note: API 1.0 often checked db.Error after Edit; API 2.0 EditRow raises DatabaseException on lock failure (verified rowset.md Notes line 317) — handle via the manual Try/Catch rule.",
      "find": "\\.Edit\\b",
      "replace": ".EditRow",
      "manual": "Review EACH match — only RowSet/RecordSet '.Edit' converts. If the old code did 'rs.Edit' then 'If Not db.Error Then ...', convert the error handling to Try/Catch (manual rule). Consider restricting to your RowSet variable names.",
@@ -3632,7 +3632,7 @@
      "forms": "method (dot form '.Update')",
      "old": "RecordSet.Update",
      "new": "RowSet.SaveRow",
-     "note": "None — pure method rename, same save semantics. Behavioral notes: API 1 set db.Error on failure; API 2 SaveRow raises DatabaseException (manual Try/Catch rule). Also RowSets from MySQL/PostgreSQL/SQLite are cached so the RowSet appears unchanged after SaveRow — re-query to refresh (verified rowset.md SaveRow warning, line 314; behavior, not a code change).",
+     "note": "None — pure method rename, same save semantics. Behavioral notes: API 1.0 set db.Error on failure; API 2.0 SaveRow raises DatabaseException (manual Try/Catch rule). Also RowSets from MySQL/PostgreSQL/SQLite are cached so the RowSet appears unchanged after SaveRow — re-query to refresh (verified rowset.md SaveRow warning, line 314; behavior, not a code change).",
      "find": "\\.Update\\b",
      "replace": ".SaveRow",
      "manual": "Review EACH match; restrict to RowSet/RecordSet variables only. If the old code tested db.Error after .Update, convert to Try/Catch (manual rule). If your RowSets share a naming convention, restrict the pattern (e.g. \\brs\\.Update\\b).",
@@ -3658,7 +3658,7 @@
      "forms": "method (dot form '.DeleteRecord')",
      "old": "RecordSet.DeleteRecord",
      "new": "RowSet.RemoveRow",
-     "note": "None — pure method rename, same delete-current-row semantics. Behavioral note: API 1 set db.Error; API 2 RemoveRow raises DatabaseException (manual Try/Catch rule, shown in rowset.md RemoveRow example).",
+     "note": "None — pure method rename, same delete-current-row semantics. Behavioral note: API 1.0 set db.Error; API 2.0 RemoveRow raises DatabaseException (manual Try/Catch rule, shown in rowset.md RemoveRow example).",
      "find": "\\.DeleteRecord\\b",
      "replace": ".RemoveRow",
      "manual": "If old code tested db.Error after .DeleteRecord, convert to Try/Catch (manual rule).",
@@ -3678,10 +3678,10 @@
      "forms": "method (dot form '.Close')",
      "old": "RecordSet.Close / Database.Close",
      "new": "RowSet.Close / Database.Close",
-     "note": "None and NO RENAME NEEDED. Close is spelled identically in API 1 and API 2 on RecordSet/RowSet, Database, and stream classes. This entry exists to WARN against writing a rule — renaming .Close would break working code.",
+     "note": "None and NO RENAME NEEDED. Close is spelled identically in API 1.0 and API 2.0 on RecordSet/RowSet, Database, and stream classes. This entry exists to WARN against writing a rule — renaming .Close would break working code.",
      "find": "",
      "replace": "",
-     "manual": "No action. Leave all .Close calls as-is. Database.Close, RowSet.Close, and stream .Close are all still .Close in API 2.",
+     "manual": "No action. Leave all .Close calls as-is. Database.Close, RowSet.Close, and stream .Close are all still .Close in API 2.0.",
      "caveat": "N/A — no rule. Listed only to prevent an erroneous rename.",
      "examples": [
       {
@@ -3700,12 +3700,12 @@
      "name": "If db.Error / db.ErrorMessage check → Try/Catch DatabaseException (MANUAL — structural, multi-line)",
      "conf": "manual-only",
      "forms": "global structural pattern (spans multiple lines/statements)",
-     "old": "Database.Error As Boolean (set True after a failed call) and Database.ErrorMessage As String (the message). API 1 pattern (verified deprecated/recordset.md Edit/Update/DeleteRecord examples, lines 200-222, 401-410): call DB op, then 'If db.Error Then MsgBox(db.ErrorMessage)' or 'If Not db.Error Then ... rs.Update ... If db.Error Then ...'.",
-     "new": "API 2 Database has NO Error/ErrorMessage properties (VERIFIED: database.md properties table lists only DatabaseName, Host, Password, UserName). Every DB operation (Connect, SelectSQL, ExecuteSQL, AddRow, EditRow, SaveRow, RemoveRow, BeginTransaction, CommitTransaction, RollbackTransaction, and RowCount on unsupported DBs) RAISES DatabaseException. You catch it: 'Catch error As DatabaseException' and read error.Message (String) / error.ErrorNumber (Integer)",
+     "old": "Database.Error As Boolean (set True after a failed call) and Database.ErrorMessage As String (the message). API 1.0 pattern (verified deprecated/recordset.md Edit/Update/DeleteRecord examples, lines 200-222, 401-410): call DB op, then 'If db.Error Then MsgBox(db.ErrorMessage)' or 'If Not db.Error Then ... rs.Update ... If db.Error Then ...'.",
+     "new": "API 2.0 Database has NO Error/ErrorMessage properties (VERIFIED: database.md properties table lists only DatabaseName, Host, Password, UserName). Every DB operation (Connect, SelectSQL, ExecuteSQL, AddRow, EditRow, SaveRow, RemoveRow, BeginTransaction, CommitTransaction, RollbackTransaction, and RowCount on unsupported DBs) RAISES DatabaseException. You catch it: 'Catch error As DatabaseException' and read error.Message (String) / error.ErrorNumber (Integer)",
      "note": "FUNDAMENTAL shift from flag/return-code error handling to exception-based. The single-line regex engine CANNOT restructure across lines (Find is one line at a time and cannot wrap a preceding statement in Try ... Catch ... End Try). Worse, a regex that merely deleted or rewrote the 'If db.Error' line would leave the DB call UNGUARDED so a real failure crashes uncaught. MUST be done by hand.",
      "find": "",
      "replace": "",
-     "manual": "STEP 1 — FIND every site (RegEx on, Match Case off), Find-only (do not Replace): (a) \\bdb\\.Error\\b  (b) \\.ErrorMessage\\b  (c) generally \\b\\w+\\.Error\\b and \\b\\w+\\.ErrorMessage\\b to catch any DB-variable name (mDB.Error, App.db.Error, conn.Error). STEP 2 — for EACH site, identify the DB call(s) the check guards (the SelectSQL/ExecuteSQL/AddRow/EditRow/SaveRow/RemoveRow/Connect/Commit/etc. statement immediately before the 'If db.Error' test, or the block an 'If Not db.Error Then' wraps). STEP 3 — wrap those calls in Try/Catch and delete the flag test. Template:\\n\\n  API 1:\\n    rs = db.SQLSelect(sql)\\n    If db.Error Then\\n      MsgBox(\"DB Error: \" + db.ErrorMessage)\\n      Return\\n    End If\\n\\n  API 2:\\n    Try\\n      rs = db.SelectSQL(sql)\\n    Catch error As DatabaseException\\n      MessageBox(\"DB Error: \" + error.Message)\\n      Return\\n    End Try\\n\\n  API 1 (edit guarded by Not db.Error):\\n    rs.Edit\\n    If Not db.Error Then\\n      rs.Field(\"ProductName\").StringValue = \"Generic Widgets\"\\n      rs.Update\\n      If db.Error Then MsgBox(db.ErrorMessage)\\n    Else\\n      MsgBox(db.ErrorMessage)\\n    End If\\n\\n  API 2:\\n    Try\\n      rs.EditRow\\n      rs.Column(\"ProductName\").StringValue = \"Generic Widgets\"\\n      rs.SaveRow\\n    Catch error As DatabaseException\\n      MessageBox(\"DB Error: \" + error.Message)\\n    End Try\\n\\nMapping: db.ErrorMessage → error.Message (the Catch variable's property); db had no public numeric code but DatabaseException exposes error.ErrorNumber. MsgBox → MessageBox is a different category's rule. Fold in the SelectSQL/ExecuteSQL renames (separate rules) and remember RowCount now throws UnsupportedOperationException where RecordCount returned -1. STEP 4 — after converting, search again for any leftover \\.Error\\b / \\.ErrorMessage\\b on a database variable; remaining ones now reference non-existent members and will FAIL TO COMPILE — that compile error is the desired signal nothing was missed.",
+     "manual": "STEP 1 — FIND every site (RegEx on, Match Case off), Find-only (do not Replace): (a) \\bdb\\.Error\\b  (b) \\.ErrorMessage\\b  (c) generally \\b\\w+\\.Error\\b and \\b\\w+\\.ErrorMessage\\b to catch any DB-variable name (mDB.Error, App.db.Error, conn.Error). STEP 2 — for EACH site, identify the DB call(s) the check guards (the SelectSQL/ExecuteSQL/AddRow/EditRow/SaveRow/RemoveRow/Connect/Commit/etc. statement immediately before the 'If db.Error' test, or the block an 'If Not db.Error Then' wraps). STEP 3 — wrap those calls in Try/Catch and delete the flag test. Template:\\n\\n  API 1.0:\\n    rs = db.SQLSelect(sql)\\n    If db.Error Then\\n      MsgBox(\"DB Error: \" + db.ErrorMessage)\\n      Return\\n    End If\\n\\n  API 2.0:\\n    Try\\n      rs = db.SelectSQL(sql)\\n    Catch error As DatabaseException\\n      MessageBox(\"DB Error: \" + error.Message)\\n      Return\\n    End Try\\n\\n  API 1.0 (edit guarded by Not db.Error):\\n    rs.Edit\\n    If Not db.Error Then\\n      rs.Field(\"ProductName\").StringValue = \"Generic Widgets\"\\n      rs.Update\\n      If db.Error Then MsgBox(db.ErrorMessage)\\n    Else\\n      MsgBox(db.ErrorMessage)\\n    End If\\n\\n  API 2.0:\\n    Try\\n      rs.EditRow\\n      rs.Column(\"ProductName\").StringValue = \"Generic Widgets\"\\n      rs.SaveRow\\n    Catch error As DatabaseException\\n      MessageBox(\"DB Error: \" + error.Message)\\n    End Try\\n\\nMapping: db.ErrorMessage → error.Message (the Catch variable's property); db had no public numeric code but DatabaseException exposes error.ErrorNumber. MsgBox → MessageBox is a different category's rule. Fold in the SelectSQL/ExecuteSQL renames (separate rules) and remember RowCount now throws UnsupportedOperationException where RecordCount returned -1. STEP 4 — after converting, search again for any leftover \\.Error\\b / \\.ErrorMessage\\b on a database variable; remaining ones now reference non-existent members and will FAIL TO COMPILE — that compile error is the desired signal nothing was missed.",
      "caveat": "N/A for regex (none provided). The risk being AVOIDED is exactly why this is manual: a naive regex on 'If db.Error Then' would either leave the DB call unguarded (silent crash on real errors) or match '.Error'/'.ErrorMessage' on unrelated objects (sockets, other exceptions, etc.). Hand-conversion confirms each site is a Database flag check and wraps the correct statements.",
      "examples": [
       {
@@ -3969,10 +3969,10 @@
      "forms": "global function call form",
      "old": "ParseDate(stringValue, dateRef)",
      "new": "DateTime.FromString(dateValue As String, locale As Locale = Nil, timeZone As TimeZone = Nil) As DateTime",
-     "note": "SEMANTIC SHAPE CHANGE, not an index change. API 1 ParseDate(s, d) returns a Boolean and writes the parsed value into a by-ref Date argument; on failure returns False (silent). DateTime.FromString(s) RETURNS the DateTime and RAISES a RuntimeException on bad input — no Boolean, no out-parameter. The result must move from the out-param to the assignment target, and failure handling moves from an If-check to a Try/Catch. Cannot be mechanically backref-mapped.",
+     "note": "SEMANTIC SHAPE CHANGE, not an index change. API 1.0 ParseDate(s, d) returns a Boolean and writes the parsed value into a by-ref Date argument; on failure returns False (silent). DateTime.FromString(s) RETURNS the DateTime and RAISES a RuntimeException on bad input — no Boolean, no out-parameter. The result must move from the out-param to the assignment target, and failure handling moves from an If-check to a Try/Catch. Cannot be mechanically backref-mapped.",
      "find": "",
      "replace": "",
-     "manual": "Find every occurrence with \\bParseDate\\s*\\( (Match Case OFF, SEARCH only). API 1 ParseDate has ONE form: ParseDate(stringValue, ByRef parsedDate) As Boolean — it returns success and fills the date by-ref. Rewrite 'If ParseDate(s, d) Then ... Else ...' as a multi-line Try/Catch: Try / d = DateTime.FromString(s) / [old Then-branch] / Catch e As RuntimeException / [old Else-branch] / End Try. This is a structural, multi-line change — do it by hand.",
+     "manual": "Find every occurrence with \\bParseDate\\s*\\( (Match Case OFF, SEARCH only). API 1.0 ParseDate has ONE form: ParseDate(stringValue, ByRef parsedDate) As Boolean — it returns success and fills the date by-ref. Rewrite 'If ParseDate(s, d) Then ... Else ...' as a multi-line Try/Catch: Try / d = DateTime.FromString(s) / [old Then-branch] / Catch e As RuntimeException / [old Else-branch] / End Try. This is a structural, multi-line change — do it by hand.",
      "caveat": "Literal 'ParseDate' can appear in comments/strings. The trap is a blind 'ParseDate(' -> 'DateTime.FromString(' rename: it changes a Boolean-returning, by-ref, silent-failure call into a value-returning call that throws on bad input, and it does not compile in the 'If ParseDate(s, d)' form. Never Replace-All.",
      "examples": [
       {
@@ -4179,7 +4179,7 @@
      "name": "Date passed where a DateTime is needed → New DateTime(source As Date) conversion bridge (MANUAL)",
      "conf": "manual-only",
      "forms": "interop/bridging form during a partial migration",
-     "old": "An existing Date object that must be handed to API 2 code expecting a DateTime (e.g. during a partial migration)",
+     "old": "An existing Date object that must be handed to API 2.0 code expecting a DateTime (e.g. during a partial migration)",
      "new": "New DateTime(source As Date)",
      "note": "No index change. This is the SAFE bridge when you cannot migrate a Date all at once: New DateTime(someDate) copies the instant correctly across the epoch difference (the framework handles the 1904↔1970 conversion internally — confirmed by datetime.md line 228-230). Use it instead of any hand arithmetic on TotalSeconds.",
      "find": "",
@@ -4188,7 +4188,7 @@
      "caveat": "None (manual insertion only). Just ensure the source variable is genuinely still a Date and not already a DateTime (passing a DateTime selects the Constructor(source As DateTime) overload — harmless copy, but unnecessary).",
      "examples": [
       {
-       "b": "' theOldDate is still an API 1 Date; NewLogEntry expects a DateTime\nNewLogEntry(theOldDate)",
+       "b": "' theOldDate is still an API 1.0 Date; NewLogEntry expects a DateTime\nNewLogEntry(theOldDate)",
        "a": "NewLogEntry(New DateTime(theOldDate))"
       }
      ],
@@ -4206,9 +4206,9 @@
      "name": "SocketCore.Error event handler mapped via AddHandler — add the new RuntimeException parameter (signature change)",
      "conf": "manual-only",
      "forms": "both (the AddHandler statement that wires the method, and the bound method's own signature declaration on a different line)",
-     "old": "API 1 Error event had no exception parameter. A method bound with AddHandler looked like:",
-     "new": "API 2 event signature (confirmed socketcore.md line 35/121):",
-     "note": "Signature/arity change, NOT an index change. The handler method GAINS a trailing parameter (e As RuntimeException). A numeric code that API 1 read from a LastErrorCode property (or a passed Integer) is now e.ErrorNumber. If AddHandler's bound-method signature does not match the event's new signature the project will NOT compile — so an unfixed handler is a hard compile error (a loud failure, not a silent corruption), but a regex that fixes only ONE of the two coordinated sites (the AddHandler line OR the method declaration, never both, since they are on different lines) leaves the project non-compiling.",
+     "old": "API 1.0 Error event had no exception parameter. A method bound with AddHandler looked like:",
+     "new": "API 2.0 event signature (confirmed socketcore.md line 35/121):",
+     "note": "Signature/arity change, NOT an index change. The handler method GAINS a trailing parameter (e As RuntimeException). A numeric code that API 1.0 read from a LastErrorCode property (or a passed Integer) is now e.ErrorNumber. If AddHandler's bound-method signature does not match the event's new signature the project will NOT compile — so an unfixed handler is a hard compile error (a loud failure, not a silent corruption), but a regex that fixes only ONE of the two coordinated sites (the AddHandler line OR the method declaration, never both, since they are on different lines) leaves the project non-compiling.",
      "find": "(?i)\\bAddHandler\\b[^,]*\\.Error\\s*,",
      "replace": "",
      "manual": "1) LOCATE the wiring: RegEx ON, Match Case OFF, search  \\bAddHandler\\b[^,]*\\.Error\\s*,  to find every  AddHandler someSocket.Error, AddressOf SomeMethod  line. 2) For each, note the bound method name after AddressOf (or WeakAddressOf). 3) Open that method's declaration (a DIFFERENT line/item — the single-line engine cannot touch it from the AddHandler hit) and append a trailing parameter so it reads  (sender As <SocketType>, e As RuntimeException). 4) If the old method had a legacy Integer error-code parameter, replace its body uses with e.ErrorNumber and remove the Integer param. 5) In the body, replace any former code reference (the old Integer, or Me.LastErrorCode) with e.ErrorNumber. 6) SEPARATELY locate implemented (non-AddHandler) Error event handlers on socket subclasses: search  \\bSub\\s+Error\\s*\\(  and cross-check  \\.ErrorNumber|LastErrorCode  to confirm the body reads the code from the new parameter. Two coordinated edits on different lines = cannot be one single-line regex; fix by hand.",
@@ -4275,7 +4275,7 @@
      "conf": "manual-only",
      "forms": "property read",
      "old": "stream.LastErrorCode read after Open/Create/Read/Write. Deprecated.",
-     "new": "Wrap Open/Create/Write/WriteLine in Try / Catch error As IOException (those methods raise IOException). There is NO LastErrorCode-equivalent property in API 2.",
+     "new": "Wrap Open/Create/Write/WriteLine in Try / Catch error As IOException (those methods raise IOException). There is NO LastErrorCode-equivalent property in API 2.0.",
      "note": "Control-flow move to exceptions for OPEN/CREATE/WRITE failures only. CRITICAL non-obvious caveat: reading PAST the end of a stream still returns 0 / \"\" / False with NO exception — so a LastErrorCode check that was really detecting end-of-data must become an EndOfFile / BytePosition / Length check, NOT a Catch. You must decide per occurrence which case it was; converting an end-of-data probe into a Catch would silently lose the loop-termination logic.",
      "find": "(?i)\\.LastErrorCode\\b",
      "replace": "",
@@ -4300,7 +4300,7 @@
      "forms": "property read in a condition",
      "old": "If stream.ReadError Then …",
      "new": "Catch error As IOException for genuine I/O failures; for over-read use EndOfFile / BytePosition / Length (over-read does not raise).",
-     "note": "Control-flow change. CRITICAL distinction: an over-read returns 0/\"\"/False with NO error and NO exception, so ReadError was historically often used as an end-of-data probe; in API 2 that case is handled by EndOfFile, NOT by a Catch. A blind 'wrap in Try/Catch' would silently lose end-of-data detection. Decide per occurrence.",
+     "note": "Control-flow change. CRITICAL distinction: an over-read returns 0/\"\"/False with NO error and NO exception, so ReadError was historically often used as an end-of-data probe; in API 2.0 that case is handled by EndOfFile, NOT by a Catch. A blind 'wrap in Try/Catch' would silently lose end-of-data detection. Decide per occurrence.",
      "find": "(?i)\\.(ReadError|WriteError)\\b",
      "replace": "",
      "manual": "LOCATE with  \\.(ReadError|WriteError)\\b  (RegEx ON, Match Case OFF). For each: confirm the receiver is a BinaryStream / TextInputStream (NOT a SQLiteBlob — that is the separate rule below, where the properties were REMOVED). If it followed an Open/Create or a Write that can fail (disk full, perms), wrap the operation in  Try … Catch error As IOException. If it was inside a read loop guarding end of data, convert the loop to  Do Until stream.EndOfFile … Loop  and delete the ReadError test. Multi-line; manual.",
@@ -4323,11 +4323,11 @@
      "conf": "manual-only",
      "forms": "property read in a condition",
      "old": "blob.ReadError / blob.WriteError checks after blob.Read / blob.Write. Confirmed by updating_older_projects.md line 113-115: SQLiteBLOB 'now raises an IOException on any Read/Write errors (instead of you having to check the ReadError/WriteError methods to see if they are True).'",
-     "new": "Wrap blob.Read / blob.Write in Try / Catch error As IOException. There is NO ReadError/WriteError property in API 2",
+     "new": "Wrap blob.Read / blob.Write in Try / Catch error As IOException. There is NO ReadError/WriteError property in API 2.0",
      "note": "Pure control-flow move to exceptions; no index change. Unlike BinaryStream, these properties are GONE on SQLiteBlob, so an unfixed reference eventually fails to compile (loud failure) rather than silently no-op.",
      "find": "(?i)\\.(ReadError|WriteError)\\b",
      "replace": "",
-     "manual": "LOCATE with  \\.(ReadError|WriteError)\\b  then CONFIRM the receiver is a SQLiteBlob (look for a nearby OpenBlob / SQLiteBlob declaration). Rewrite the surrounding read/write loop into  Try … Catch error As IOException … End Try  and DELETE the  If blob.ReadError / If blob.WriteError  test entirely. NOTE: SQLiteBlob's end marker is EndOfFile (API 2), not the API 1 EOF — verify the loop condition was modernized too. Multi-line; manual.",
+     "manual": "LOCATE with  \\.(ReadError|WriteError)\\b  then CONFIRM the receiver is a SQLiteBlob (look for a nearby OpenBlob / SQLiteBlob declaration). Rewrite the surrounding read/write loop into  Try … Catch error As IOException … End Try  and DELETE the  If blob.ReadError / If blob.WriteError  test entirely. NOTE: SQLiteBlob's end marker is EndOfFile (API 2.0), not the API 1.0 EOF — verify the loop condition was modernized too. Multi-line; manual.",
      "caveat": "Shares the token with BinaryStream/TextInputStream ReadError (which STILL exists) — you must inspect the receiver type. Matches strings/comments.",
      "examples": [
       {
@@ -4407,8 +4407,8 @@
      "note": "None — pure rename, no exception/index semantics. Boolean meaning unchanged.",
      "find": "(?i)\\.IsVisible\\b",
      "replace": ".Visible",
-     "manual": "DO NOT blind Replace-All. VERIFIED by grep: .IsVisible is a real, NON-deprecated, still-valid API 2 member on DesktopColorPicker AND ChartDataset (both confirmed present in the docs), so a project-wide swap would wrongly rename valid members and BREAK compilation. Procedure: search  \\.IsVisible\\b ; for EACH hit confirm the receiver is a MessageDialogButton (ActionButton / CancelButton / AlternateActionButton of a MessageDialog) and only then apply  .Visible . Leave DesktopColorPicker.IsVisible, ChartDataset.IsVisible, and any Web*/Chart IsVisible untouched.",
-     "caveat": "HIGH. VERIFIED: .IsVisible is a legitimate API 2 member on DesktopColorPicker and ChartDataset (grep of api/ confirms both files contain a live IsVisible). Replacing all occurrences would corrupt those into a non-existent .Visible and break the build. Must review each match — that is why canRegex is false here even though the rename is mechanical for the dialog-button case.",
+     "manual": "DO NOT blind Replace-All. VERIFIED by grep: .IsVisible is a real, NON-deprecated, still-valid API 2.0 member on DesktopColorPicker AND ChartDataset (both confirmed present in the docs), so a project-wide swap would wrongly rename valid members and BREAK compilation. Procedure: search  \\.IsVisible\\b ; for EACH hit confirm the receiver is a MessageDialogButton (ActionButton / CancelButton / AlternateActionButton of a MessageDialog) and only then apply  .Visible . Leave DesktopColorPicker.IsVisible, ChartDataset.IsVisible, and any Web*/Chart IsVisible untouched.",
+     "caveat": "HIGH. VERIFIED: .IsVisible is a legitimate API 2.0 member on DesktopColorPicker and ChartDataset (grep of api/ confirms both files contain a live IsVisible). Replacing all occurrences would corrupt those into a non-existent .Visible and break the build. Must review each match — that is why canRegex is false here even though the rename is mechanical for the dialog-button case.",
      "examples": [
       {
        "b": "If d.CancelButton.IsVisible Then d.CancelButton.Caption = \"Cancel\"   ' MessageDialog button — convert",
@@ -4419,7 +4419,7 @@
        "b": "If ColorPicker1.IsVisible Then Return   ' DesktopColorPicker — LEAVE AS-IS, IsVisible is still valid",
        "a": "If ColorPicker1.IsVisible Then Return   ' DesktopColorPicker — LEAVE AS-IS, IsVisible is still valid",
        "pattern": "skip",
-       "note": "DesktopColorPicker.IsVisible is still valid API 2 — leave unchanged."
+       "note": "DesktopColorPicker.IsVisible is still valid API 2.0 — leave unchanged."
       }
      ],
      "id": "c6r9",
@@ -4461,7 +4461,7 @@
       {
        "b": "msgbox \"Could not open the file\"",
        "a": "MessageBox \"Could not open the file\"",
-       "note": "paren-less statement form, the dominant shape in API 1 code"
+       "note": "paren-less statement form, the dominant shape in API 1.0 code"
       },
       {
        "b": "' shows a MsgBox when the export finishes",
@@ -4965,7 +4965,7 @@
       {
        "b": "Dim parser As RBScript",
        "a": "Dim parser As XojoScript",
-       "note": "Also change `Dim` to `Var` per API 2 style — a separate edit."
+       "note": "Also change `Dim` to `Var` per API 2.0 style — a separate edit."
       }
      ],
      "id": "c7r20",
@@ -5024,11 +5024,11 @@
      "conf": "manual-only",
      "forms": "both",
      "old": "As Text -- the deprecated framework Text datatype",
-     "new": "As String -- the API 2 String datatype",
+     "new": "As String -- the API 2.0 String datatype",
      "note": "SEMANTIC RISK confirmed from api/deprecated/text.md: Text is deprecated in favor of String and 'Text values automatically convert to String' -- so the value-level conversion is automatic (less dire than 'distinct, no conversion'). BUT Text exposes methods/overloads that String does not: Compare(other, options, Optional locale), BeginsWith/EndsWith with a Locale, Characters/Codepoints returning Xojo.Core.Iterable, etc. Simply changing the DECLARED type from Text to String can therefore break method calls made on that variable, and changes comparison/encoding behavior. This is NOT a safe blind Replace-All.",
      "find": "",
      "replace": "",
-     "manual": "Find every occurrence with the regex \\bAs\\s+Text\\b (Use RegEx on, Match Case off) but do NOT use Replace-All. Step through each match individually. For each, after changing 'As Text' to 'As String', verify: (1) any Text-specific methods used on that variable (e.g. .Compare with a Locale, .BeginsWith/.EndsWith with a Locale, .Characters/.Codepoints iterables, .Replace/.ReplaceAll Text overloads) have valid String equivalents and are converted in the same pass; (2) character/index handling still behaves (String indexing is 0-based like Text, but encodings/normalization differ); (3) the value's source actually returns a String after the surrounding API 2 migration. Treat as fully manual.",
+     "manual": "Find every occurrence with the regex \\bAs\\s+Text\\b (Use RegEx on, Match Case off) but do NOT use Replace-All. Step through each match individually. For each, after changing 'As Text' to 'As String', verify: (1) any Text-specific methods used on that variable (e.g. .Compare with a Locale, .BeginsWith/.EndsWith with a Locale, .Characters/.Codepoints iterables, .Replace/.ReplaceAll Text overloads) have valid String equivalents and are converted in the same pass; (2) character/index handling still behaves (String indexing is 0-based like Text, but encodings/normalization differ); (3) the value's source actually returns a String after the surrounding API 2.0 migration. Treat as fully manual.",
      "caveat": "Beyond strings/comments, the deeper risk is SILENT semantic drift: the code may compile after the swap (Text auto-converts to String) yet behave differently, or fail to compile where a Text-only method was called. Do not Replace-All. 'As Text' can also appear as a parameter type of unrelated APIs -- review.",
      "examples": [
       {
@@ -5049,10 +5049,10 @@
      "forms": "both",
      "old": "As Task -- class keyword in declarations",
      "new": "As Thread -- class name",
-     "note": "None for the value type per se: api/deprecated/task.md confirms Task was a Thread subclass adding a UI-update mechanism, deprecated in favor of Thread. API 2 Thread itself provides AddUserInterfaceUpdate and a UserInterfaceUpdate event, so the migration target is correct. CAVEAT: if the code used Task-specific members, those must line up with the Thread API after the rename -- hence medium, with a review step.",
+     "note": "None for the value type per se: api/deprecated/task.md confirms Task was a Thread subclass adding a UI-update mechanism, deprecated in favor of Thread. API 2.0 Thread itself provides AddUserInterfaceUpdate and a UserInterfaceUpdate event, so the migration target is correct. CAVEAT: if the code used Task-specific members, those must line up with the Thread API after the rename -- hence medium, with a review step.",
      "find": "(?<![\\w.])As\\s+Task\\b",
      "replace": "As Thread",
-     "manual": "After renaming, confirm the object's method/event usage matches the API 2 Thread class -- in particular AddUserInterfaceUpdate(data As Dictionary), the UserInterfaceUpdate event, Start/Pause/Resume/Sleep. Any Task member without a direct Thread equivalent must be reworked by hand.",
+     "manual": "After renaming, confirm the object's method/event usage matches the API 2.0 Thread class -- in particular AddUserInterfaceUpdate(data As Dictionary), the UserInterfaceUpdate event, Start/Pause/Resume/Sleep. Any Task member without a direct Thread equivalent must be reworked by hand.",
      "caveat": "Anchored on 'As ' so a variable named Task is not hit. 'As Task' could appear in a comment. \\b after Task avoids 'TaskQueue'. 'Task' is a common English word -- restricting to 'As Task' is what keeps this safe; do NOT broaden to a bare \\bTask\\b.",
      "examples": [
       {
@@ -5150,7 +5150,7 @@
      "find": "(?<![\\w.])Xojo\\.Core\\.(?!Date\\b)([A-Za-z_][A-Za-z0-9_]*)",
      "replace": "$1",
      "manual": "After Replace-All, search remaining 'Xojo.Core.Date' occurrences and convert them to DateTime by hand (the (?!Date\\b) lookahead deliberately leaves them alone). Also confirm no name collision is introduced (e.g. a local class also named Dictionary/Timer) -- in projects with such custom classes, review each match because the now-unqualified reference could resolve to the wrong type.",
-     "caveat": "(?!Date\\b) keeps Xojo.Core.Date out of this rule. Capture group $1 (one group) is correctly referenced by $1. Removing the prefix is generally safe because these are top-level API 2 classes, but if the project defines its OWN same-named class the reference could rebind -- review. Matches inside strings/comments too. Spot-check member usage since a few new-framework members were renamed in API 2.",
+     "caveat": "(?!Date\\b) keeps Xojo.Core.Date out of this rule. Capture group $1 (one group) is correctly referenced by $1. Removing the prefix is generally safe because these are top-level API 2.0 classes, but if the project defines its OWN same-named class the reference could rebind -- review. Matches inside strings/comments too. Spot-check member usage since a few new-framework members were renamed in API 2.0.",
      "examples": [
       {
        "b": "Var d As New Xojo.Core.Dictionary",
@@ -5176,7 +5176,7 @@
      "forms": "both",
      "old": "Xojo.IO.BinaryStream | Xojo.IO.FolderItem | Xojo.IO.SpecialFolder | Xojo.IO.TextInputStream | Xojo.IO.TextOutputStream",
      "new": "BinaryStream | FolderItem | SpecialFolder | TextInputStream | TextOutputStream (the 'Xojo.IO.' prefix is dropped)",
-     "note": "None -- the leading 'Xojo.IO.' module prefix is removed; the classes map to the global API 2 classes. Member APIs are broadly compatible but a few names differ, so confidence is medium not high.",
+     "note": "None -- the leading 'Xojo.IO.' module prefix is removed; the classes map to the global API 2.0 classes. Member APIs are broadly compatible but a few names differ, so confidence is medium not high.",
      "find": "(?<![\\w.])Xojo\\.IO\\.([A-Za-z_][A-Za-z0-9_]*)",
      "replace": "$1",
      "manual": "After the prefix strip, spot-check method/member usage on the converted classes (e.g. SpecialFolder member names, stream Open/Create forms), and confirm no custom same-named class collides.",
@@ -5200,7 +5200,7 @@
      "forms": "both",
      "old": "Xojo.Threading.Thread | Xojo.Threading.CriticalSection | Xojo.Threading.Semaphore",
      "new": "Thread | CriticalSection | Semaphore (the 'Xojo.Threading.' prefix is dropped)",
-     "note": "None -- the 'Xojo.Threading.' module prefix is removed; classes map to the global API 2 classes. Spot-check member usage since some thread members were reworked in API 2.",
+     "note": "None -- the 'Xojo.Threading.' module prefix is removed; classes map to the global API 2.0 classes. Spot-check member usage since some thread members were reworked in API 2.0.",
      "find": "(?<![\\w.])Xojo\\.Threading\\.([A-Za-z_][A-Za-z0-9_]*)",
      "replace": "$1",
      "manual": "Spot-check Thread member/event usage after the strip (Start/Run, AddUserInterfaceUpdate, UserInterfaceUpdate event); confirm no custom same-named class collides.",
@@ -5250,7 +5250,7 @@
      "forms": "both",
      "old": "Xojo.Crypto.<member> -- module reference in code",
      "new": "Crypto.<member>",
-     "note": "None -- 'Xojo.' prefix removed; the module is just 'Crypto' in API 2.",
+     "note": "None -- 'Xojo.' prefix removed; the module is just 'Crypto' in API 2.0.",
      "find": "(?<![\\w.])Xojo\\.Crypto\\b",
      "replace": "Crypto",
      "manual": "",
@@ -5274,11 +5274,11 @@
      "forms": "both",
      "old": "Xojo.Introspection.<member> -- module reference in code",
      "new": "Introspection.<member>",
-     "note": "None -- 'Xojo.' prefix removed; the module is 'Introspection' in API 2.",
+     "note": "None -- 'Xojo.' prefix removed; the module is 'Introspection' in API 2.0.",
      "find": "(?<![\\w.])Xojo\\.Introspection\\b",
      "replace": "Introspection",
      "manual": "",
-     "caveat": "Distinctive prefix; safe. Matches in strings/comments. Some Introspection member/type names changed between the new framework and API 2 (e.g. TypeInfo members) -- spot-check member usage after the strip.",
+     "caveat": "Distinctive prefix; safe. Matches in strings/comments. Some Introspection member/type names changed between the new framework and API 2.0 (e.g. TypeInfo members) -- spot-check member usage after the strip.",
      "examples": [
       {
        "b": "Var ti As Xojo.Introspection.TypeInfo = Xojo.Introspection.GetType(obj)",
@@ -7472,8 +7472,8 @@
    "anchor": "c4r24"
   },
   {
-   "old": "Database.Error As Boolean (set True after a failed call) and Database.ErrorMessage As String (the message). API 1 pattern (verified deprecated/recordset.md Edit/Update/DeleteRecord examples, lines 200-222, 401-410): call DB op, then 'If db.Error Then MsgBox(db.ErrorMessage)' or 'If Not db.Error Then ... rs.Update ... If db.Error Then ...'.",
-   "new": "API 2 Database has NO Error/ErrorMessage properties (VERIFIED: database.md properties table lists only DatabaseName, Host, Password, UserName). Every DB operation (Connect, SelectSQL, ExecuteSQL, AddRow, EditRow, SaveRow, RemoveRow, BeginTransaction, CommitTransaction, RollbackTransaction, and RowCount on unsupported DBs) RAISES DatabaseException. You catch it: 'Catch error As DatabaseException' and read error.Message (String) / error.ErrorNumber (Integer)",
+   "old": "Database.Error As Boolean (set True after a failed call) and Database.ErrorMessage As String (the message). API 1.0 pattern (verified deprecated/recordset.md Edit/Update/DeleteRecord examples, lines 200-222, 401-410): call DB op, then 'If db.Error Then MsgBox(db.ErrorMessage)' or 'If Not db.Error Then ... rs.Update ... If db.Error Then ...'.",
+   "new": "API 2.0 Database has NO Error/ErrorMessage properties (VERIFIED: database.md properties table lists only DatabaseName, Host, Password, UserName). Every DB operation (Connect, SelectSQL, ExecuteSQL, AddRow, EditRow, SaveRow, RemoveRow, BeginTransaction, CommitTransaction, RollbackTransaction, and RowCount on unsupported DBs) RAISES DatabaseException. You catch it: 'Catch error As DatabaseException' and read error.Message (String) / error.ErrorNumber (Integer)",
    "conf": "manual-only",
    "cat": "Database (RowSet)",
    "anchor": "c4r25"
@@ -7598,15 +7598,15 @@
    "anchor": "c5r8"
   },
   {
-   "old": "An existing Date object that must be handed to API 2 code expecting a DateTime (e.g. during a partial migration)",
+   "old": "An existing Date object that must be handed to API 2.0 code expecting a DateTime (e.g. during a partial migration)",
    "new": "New DateTime(source As Date)",
    "conf": "manual-only",
    "cat": "Date → DateTime",
    "anchor": "c5r9"
   },
   {
-   "old": "API 1 Error event had no exception parameter. A method bound with AddHandler looked like:",
-   "new": "API 2 event signature (confirmed socketcore.md line 35/121):",
+   "old": "API 1.0 Error event had no exception parameter. A method bound with AddHandler looked like:",
+   "new": "API 2.0 event signature (confirmed socketcore.md line 35/121):",
    "conf": "manual-only",
    "cat": "Error handling",
    "anchor": "c6r0"
@@ -7627,7 +7627,7 @@
   },
   {
    "old": "stream.LastErrorCode read after Open/Create/Read/Write. Deprecated.",
-   "new": "Wrap Open/Create/Write/WriteLine in Try / Catch error As IOException (those methods raise IOException). There is NO LastErrorCode-equivalent property in API 2.",
+   "new": "Wrap Open/Create/Write/WriteLine in Try / Catch error As IOException (those methods raise IOException). There is NO LastErrorCode-equivalent property in API 2.0.",
    "conf": "manual-only",
    "cat": "Error handling",
    "anchor": "c6r3"
@@ -7641,7 +7641,7 @@
   },
   {
    "old": "blob.ReadError / blob.WriteError checks after blob.Read / blob.Write. Confirmed by updating_older_projects.md line 113-115: SQLiteBLOB 'now raises an IOException on any Read/Write errors (instead of you having to check the ReadError/WriteError methods to see if they are True).'",
-   "new": "Wrap blob.Read / blob.Write in Try / Catch error As IOException. There is NO ReadError/WriteError property in API 2",
+   "new": "Wrap blob.Read / blob.Write in Try / Catch error As IOException. There is NO ReadError/WriteError property in API 2.0",
    "conf": "manual-only",
    "cat": "Error handling",
    "anchor": "c6r5"
@@ -7837,7 +7837,7 @@
   },
   {
    "old": "As Text -- the deprecated framework Text datatype",
-   "new": "As String -- the API 2 String datatype",
+   "new": "As String -- the API 2.0 String datatype",
    "conf": "manual-only",
    "cat": "Globals & namespaces",
    "anchor": "c7r23"

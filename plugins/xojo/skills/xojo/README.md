@@ -66,7 +66,7 @@ The slow stages draw an in-place progress bar on a terminal. Through a pipe, whi
 
 ## Checking Xojo source for deprecated APIs
 
-`scripts/check-deprecated.py` reads the indexes and reports the API 1 symbols a source file still uses, with what replaced each one:
+`scripts/check-deprecated.py` reads the indexes and reports the API 1.0 symbols a source file still uses, with what replaced each one:
 
 ```console
 $ python3 scripts/check-deprecated.py ~/Projects/MyApp/Window1.xojo_code

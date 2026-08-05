@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inventory deprecated API 1 symbols in a Xojo text-format project (stdlib only).
+"""Inventory deprecated API 1.0 symbols in a Xojo text-format project (stdlib only).
 
 Usage:
   python3 scan.py /path/to/xojo/project [--format text|json]
@@ -15,9 +15,9 @@ ViewBehavior property tables, #tag Note prose, comments and string literals.
 Only the in-code number is a worklist -- the gap runs 3-4x on a real project.
 
 Member matches (.Name) are TYPE-BLIND: the same member name can be deprecated
-on one class and valid API 2 on another. Treat member counts as leads to
+on one class and valid API 2.0 on another. Treat member counts as leads to
 review, not as a to-do list -- even the in-code number is an upper bound. Where
-the matrix knows a name is live API 2 on some receiver, the report says so, and
+the matrix knows a name is live API 2.0 on some receiver, the report says so, and
 where the receivers disagree about severity it says that too rather than
 silently filing the symbol under the worst of them.
 """
@@ -37,7 +37,7 @@ XML_EXTS = {".xojo_xml_project", ".rbx"}
 # and renamed items are left on disk, so a stray .xojo_code file is not
 # necessarily live code.
 MANIFEST_EXTS = {".xojo_project", ".rbvcp"}
-# Member names so generic that most matches are valid API 2 or user code.
+# Member names so generic that most matches are valid API 2.0 or user code.
 NOISY_MEMBERS = {"append", "insert", "remove", "count", "value", "close",
                  "open", "text", "name", "type", "reset", "lookup", "column"}
 # Global names common enough in prose, comments and unrelated identifiers that
@@ -528,7 +528,7 @@ def main():
         # on several classes. Filing the symbol under the most severe of them
         # and saying nothing else is actively misleading: `.Bold` reports as
         # Removed on the strength of MenuItem.Bold while Graphics.Bold and
-        # TextShape.Bold are live API 2, so 71 hits present as build errors when
+        # TextShape.Bold are live API 2.0, so 71 hits present as build errors when
         # zero are. Same for `.Pixel` (System.Pixel is Removed, RGBSurface.Pixel
         # is the replacement) and `.SelStart` (MoviePlayer vs TextEdit). Keep
         # the severity ordering for filing, but say when the receivers disagree.
@@ -567,7 +567,7 @@ def main():
     print("(`Left = 110`, `Text = \"OK\"`), #tag Note prose, comments and string")
     print("literals -- none of which is a conversion. Even the in-code number is an")
     print("upper bound: member matches are type-blind, so a symbol whose receivers")
-    print("all turn out to be user classes or live API 2 controls goes to zero.\n")
+    print("all turn out to be user classes or live API 2.0 controls goes to zero.\n")
     for bucket in BUCKET_ORDER:
         group = sorted((r for r in report if r["bucket"] == bucket and r["code"]),
                        key=lambda r: -r["code"])
@@ -600,7 +600,7 @@ def main():
             print(f"  {r['match']:<28} {r['code']:>4} in code{raw:<12} "
                   f"in {len(r['files'])} file(s)   rules: {rids}{tag}")
             if r["live_on"]:
-                print(f"      LIVE API 2 on: {', '.join(r['live_on'])} "
+                print(f"      LIVE API 2.0 on: {', '.join(r['live_on'])} "
                       f"-- on those receivers this name is correct; do not convert")
             for cand in r["candidates"][:4]:
                 print(f"      {cand['old']} -> {cand['new']}")
@@ -620,7 +620,7 @@ def main():
         names = ", ".join(r["match"] for r in sorted(metadata_only, key=lambda r: -r["count"]))
         print(f"   {names}\n")
     if not live:
-        print("No deprecated API 1 symbols detected in code; project may already be API 2.")
+        print("No deprecated API 1.0 symbols detected in code; project may already be API 2.0.")
 
 
 if __name__ == "__main__":

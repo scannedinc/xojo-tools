@@ -4,7 +4,7 @@ Read this before touching any string, array, date, or error-handling code. Every
 
 ## 1. Index-base shifts: what shifts, and what doesn't
 
-Some API 1 functions are 1-based and their API 2 forms are 0-based; others do not change at all. Never assume; check this table.
+Some API 1.0 functions are 1-based and their API 2.0 forms are 0-based; others do not change at all. Never assume; check this table.
 
 | Conversion | First element | Shift? |
 |---|---|---|
@@ -33,19 +33,19 @@ For a literal start, convert the literal directly: `Mid(s, 1)` -> `s.Middle(0)`,
 
 ### `Mid` was forgiving about a start below 1; `Middle` is not
 
-This is what makes the decrement dangerous rather than merely fiddly. API 1 `Mid` clamps a start position below 1, so `Mid(s, 0, 1)` returns the *first* character and a loop written `For i = 0 To n ... Mid(s, i, 1)` was working code. Apply the decrement mechanically and the first iteration becomes `s.Middle(-1, 1)`, which is not the same call.
+This is what makes the decrement dangerous rather than merely fiddly. API 1.0 `Mid` clamps a start position below 1, so `Mid(s, 0, 1)` returns the *first* character and a loop written `For i = 0 To n ... Mid(s, i, 1)` was working code. Apply the decrement mechanically and the first iteration becomes `s.Middle(-1, 1)`, which is not the same call.
 
 So the decrement is not complete until you have checked **the lower bound of whatever feeds the start argument**:
 
 ```
-For i = 0 To s.Length - 1          ' 0-based loop over a 1-based function: legal API 1
+For i = 0 To s.Length - 1          ' 0-based loop over a 1-based function: legal API 1.0
   c = Mid(s, i, 1)                 ' i = 0 clamps to the first character
 Next
 ' Converting the call alone yields s.Middle((i) - 1, 1) -> Middle(-1, 1) at i = 0.
 ' The loop bound is the thing that has to change, not just the call.
 ```
 
-Audit every converted `Mid` whose start is a variable rather than a literal: find where that variable originates and confirm it is `>= 1` in API 1 terms. A loop that already started at 1 converts cleanly; one that started at 0 was relying on the clamp.
+Audit every converted `Mid` whose start is a variable rather than a literal: find where that variable originates and confirm it is `>= 1` in API 1.0 terms. A loop that already started at 1 converts cleanly; one that started at 0 was relying on the clamp.
 
 ## 2. The not-found sentinel (`InStr` -> `IndexOf`)
 
@@ -53,7 +53,7 @@ Audit every converted `Mid` whose start is a variable rather than a literal: fin
 
 Fix every comparison **before** renaming the function:
 
-| API 1 test | API 2 test |
+| API 1.0 test | API 2.0 test |
 |---|---|
 | `InStr(s, x) > 0` (found) | `s.IndexOf(x) >= 0` (also written `> -1`) |
 | `InStr(s, x) = 0` (not found) | `s.IndexOf(x) = -1` (or `< 0`) |
@@ -74,9 +74,9 @@ The bundled rules (`c0r14`, `c0r16`, and the `InStrB` pair) already emit the `(s
 
 The index base and the sentinel are the whole of the behavioral change. Case matching is unaffected, in both families—worth stating, because the asymmetry between them is exactly where a reader expects a trap:
 
-| API 1 | API 2 | Case |
+| API 1.0 | API 2.0 | Case |
 |---|---|---|
-| `InStr` | `String.IndexOf` | Both **case-insensitive** by default. `IndexOf` takes an optional `ComparisonOptions` to opt into case sensitivity; passing nothing preserves API 1 behavior. |
+| `InStr` | `String.IndexOf` | Both **case-insensitive** by default. `IndexOf` takes an optional `ComparisonOptions` to opt into case sensitivity; passing nothing preserves API 1.0 behavior. |
 | `InStrB` | `String.IndexOfBytes` | Both **case-sensitive** (byte-level). |
 
 So neither rename changes what matches. Do not "helpfully" add a `ComparisonOptions` argument during conversion: that is a behavior change disguised as a migration.
@@ -86,8 +86,8 @@ So neither rename changes what matches. Do not "helpfully" add a `ComparisonOpti
 When an `InStr` result flows into another call you are *also* making 0-based, the two decrements cancel; do **not** apply both:
 
 ```
-p = InStr(s, ":") : rest = Mid(s, p + 1)     ' API 1
-p = s.IndexOf(":") : rest = s.Middle(p + 1)  ' API 2: p is already 0-based; do NOT also subtract 1
+p = InStr(s, ":") : rest = Mid(s, p + 1)     ' API 1.0
+p = s.IndexOf(":") : rest = s.Middle(p + 1)  ' API 2.0: p is already 0-based; do NOT also subtract 1
 ```
 
 Single-line rules cannot see across statements, so after any pass that touches `InStr`/`Mid`/`IdxField`, audit places where one converted result feeds another converted call, and simplify leftover `(...) - 1` wrappers while you are there.
@@ -135,16 +135,16 @@ Every member rule in this skill is anchored on a literal dot, so **none of them 
 1. **A rule reporting zero matches is not evidence of completion.** It may be structurally unable to match the shape your project uses. This is why phase 8 requires `scripts/sweep.py`, which searches bare names and reports receiverless member calls as its headline section.
 2. **The receiverless form is *harder* to resolve, not easier.** There is no receiver token on the line, so the type comes from the enclosing class—the file's `Inherits` line, or the `Begin <Class>` header of the window the code lives in. Still deterministic, just not local.
 
-**Member renames are type-blind.** The same member name can be deprecated on several classes with *different* replacements, or deprecated on one class and valid API 2 on another. Before renaming any `.Member`, find the receiver's declared type (`Var x As ...`, parameter declarations, the control's class) and confirm which replacement applies. The recurring offenders:
+**Member renames are type-blind.** The same member name can be deprecated on several classes with *different* replacements, or deprecated on one class and valid API 2.0 on another. Before renaming any `.Member`, find the receiver's declared type (`Var x As ...`, parameter declarations, the control's class) and confirm which replacement applies. The recurring offenders:
 
 | Member | Receiver -> correct replacement |
 |---|---|
 | `.Append` | array -> `.Add`; `JSONItem` -> `.Add`; `Group2D` -> `.AddObject`; `FigureShape` -> `.AddCurve`; `TextOutputStream.Append` (shared) -> `.Open` |
 | `.Insert` | array -> `.AddAt`; `Group2D` -> `.AddObjectAt`; `FigureShape` -> `.AddCurveAt`; `JSONItem` -> `.AddAt` |
 | `.Remove` | array -> `.RemoveAt`; `Group2D` -> `.RemoveObjectAt`; `FigureShape` -> `.RemoveCurveAt` |
-| `.RemoveRow` | ListBox -> `.RemoveRowAt`; but `RowSet.RemoveRow` is **valid API 2** (it replaces `RecordSet.DeleteRecord`); never sweep this rename project-wide, and never after the RecordSet pass has introduced `RowSet.RemoveRow`. |
-| `.AddRow` | array -> `.Add`; ListBox/DesktopListBox `.AddRow` is valid API 2. **RowSet has no `AddRow`**: inserting a row is `db.AddRow(tableName, row As DatabaseRow)` on the *Database*, which is what `InsertRecord` becomes. A `.AddRow` whose receiver is a RowSet is a mistake, not already-converted code. |
-| `.ColumnType` | ListBox -> `.ColumnTypeAt`; but `RowSet.ColumnType(index)` is **valid API 2** and has no `...At` form; renaming it is a compile error. |
+| `.RemoveRow` | ListBox -> `.RemoveRowAt`; but `RowSet.RemoveRow` is **valid API 2.0** (it replaces `RecordSet.DeleteRecord`); never sweep this rename project-wide, and never after the RecordSet pass has introduced `RowSet.RemoveRow`. |
+| `.AddRow` | array -> `.Add`; ListBox/DesktopListBox `.AddRow` is valid API 2.0. **RowSet has no `AddRow`**: inserting a row is `db.AddRow(tableName, row As DatabaseRow)` on the *Database*, which is what `InsertRecord` becomes. A `.AddRow` whose receiver is a RowSet is a mistake, not already-converted code. |
+| `.ColumnType` | ListBox -> `.ColumnTypeAt`; but `RowSet.ColumnType(index)` is **valid API 2.0** and has no `...At` form; renaming it is a compile error. |
 
 ## 5. Date -> DateTime: not a rename
 
@@ -158,7 +158,7 @@ Every member rule in this skill is anchored on a literal dot, so **none of them 
 
 Formatting also changes, and the two directions use different calls; do not route formatting through the parser:
 
-| API 1 | API 2 |
+| API 1.0 | API 2.0 |
 |---|---|
 | `d.ShortDate` (format a date) | `d.ToString(DateTime.FormatStyles.Short, DateTime.FormatStyles.None)` |
 | `d.LongDate` | `d.ToString(DateTime.FormatStyles.Long, DateTime.FormatStyles.None)` |
@@ -170,16 +170,16 @@ Formatting also changes, and the two directions use different calls; do not rout
 
 ## 6. Error codes -> exceptions
 
-API 2 replaces error-flag checks with exceptions. The regex rules in the error-handling category only *locate* occurrences; the rewrite is structural:
+API 2.0 replaces error-flag checks with exceptions. The regex rules in the error-handling category only *locate* occurrences; the rewrite is structural:
 
 ```
-' API 1
+' API 1.0
 Dim rs As RecordSet = db.SQLSelect("SELECT ...")
 If db.Error Then
   MsgBox db.ErrorMessage
 End If
 
-' API 2
+' API 2.0
 Try
   Var rs As RowSet = db.SelectSQL("SELECT ...")
 Catch e As DatabaseException
@@ -198,16 +198,16 @@ Notes:
 
 Section 6 covers the *explicit* form, where the code checks `db.Error` and you can see the check. The more common form has no check to find:
 
-> **An API 1 call that signaled failure by its return value, and an API 2 call that signals failure by raising, are not a rename.** Renaming compiles, and then does two wrong things at once.
+> **An API 1.0 call that signaled failure by its return value, and an API 2.0 call that signals failure by raising, are not a rename.** Renaming compiles, and then does two wrong things at once.
 
 ```
-' API 1 -- returns Nil on failure
+' API 1.0 -- returns Nil on failure
 Dim b As BinaryStream = f.CreateBinaryFile("")
 If b <> Nil Then
   b.Write data
 End If
 
-' API 2 -- RAISES IOException on failure
+' API 2.0 -- RAISES IOException on failure
 Try
   Var b As BinaryStream = BinaryStream.Create(f, True)
   b.Write data
@@ -220,7 +220,7 @@ Carry the old shape across and both halves break: the `If b <> Nil Then` guard b
 
 The pattern covers more than one call. Check each of these for a `Nil` guard:
 
-| API 1 (returns Nil / False on failure) | API 2 (raises) |
+| API 1.0 (returns Nil / False on failure) | API 2.0 (raises) |
 |---|---|
 | `FolderItem.CreateBinaryFile` | `BinaryStream.Create(f, overwrite)` — `IOException` |
 | `FolderItem.CreateTextFile` | `TextOutputStream.Create(f)` — `IOException` |
@@ -234,7 +234,7 @@ So the conversion is three edits, not one: rename the call, **delete the now-dea
 
 The `Get*FolderItem` globals become constructors, shared methods, or dialogs:
 
-| API 1 | API 2 |
+| API 1.0 | API 2.0 |
 |---|---|
 | `GetFolderItem(path)` | `New FolderItem(path, pathMode, followAlias)` |
 | `GetTrueFolderItem(path)` | `New FolderItem(path, pathMode, False)`, the same constructor, with `followAlias` explicitly `False` |
@@ -249,14 +249,14 @@ The trap: **path-mode defaults and relative paths.** `GetFolderItem` with a rela
 - Relative name like `"data.txt"` -> decide what the code *meant*, usually a file beside the app: `App.ExecutableFile.Parent.Child("data.txt")` or a `SpecialFolder` location. Do not blind-convert; confirm with the user.
 - URL/shell path constants -> the matching `FolderItem.PathModes` enum value. The whole family, because this is an integer-constant-to-enum move and the constants travel with every call you convert:
 
-  | API 1 constant | API 2 |
+  | API 1.0 constant | API 2.0 |
   |---|---|
   | `FolderItem.PathTypeNative` | `FolderItem.PathModes.Native` |
   | `FolderItem.PathTypeShell` | `FolderItem.PathModes.Shell` |
   | `FolderItem.PathTypeURL` | `FolderItem.PathModes.URL` |
   | `FolderItem.PathTypeAbsolute` | **nothing** — see below |
 
-  `PathTypeAbsolute` is the trap, and it is both the API 1 **default** and therefore the one most code passes. `PathModes` has `Native`, `Shell` and `URL` only: there is no `Absolute`, because the HFS `AbsolutePath` it selected is itself Removed. Do not map it to `PathModes.Native` reflexively—on macOS those are different paths. Decide per call site what the path actually was.
+  `PathTypeAbsolute` is the trap, and it is both the API 1.0 **default** and therefore the one most code passes. `PathModes` has `Native`, `Shell` and `URL` only: there is no `Absolute`, because the HFS `AbsolutePath` it selected is itself Removed. Do not map it to `PathModes.Native` reflexively—on macOS those are different paths. Decide per call site what the path actually was.
 
 Also note `FolderItem.LastErrorCode` checks become `Try/Catch ... As IOException` (same structural pattern as section 6).
 

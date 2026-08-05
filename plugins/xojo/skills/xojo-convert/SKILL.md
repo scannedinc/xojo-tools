@@ -3,12 +3,15 @@ name: xojo-convert
 description: >-
   Convert a Xojo project between its three storage formats, by hand and
   without the Xojo IDE: Xojo Project (text), Xojo Binary Project
-  (.xojo_binary_project), and Xojo XML Project (.xojo_xml_project). Use when
-  the user asks to convert a project between these formats, to turn a binary
-  or XML project into text format for source control or agent work, or to
-  recover source from a project the other Xojo skills cannot read, and the
-  IDE's own File > Save As is not an option. Experimental: always offer the
-  IDE route first.
+  (.xojo_binary_project), and Xojo XML Project (.xojo_xml_project). For turning
+  a binary or XML project into text format for source control or agent work, or
+  recovering source from a project the other Xojo skills cannot read, when the
+  IDE's own File > Save As is not an option. Experimental: always offer the IDE
+  route first. Invoke this skill only when the user asks for it by name: it
+  rewrites a project file by hand, so never start it on inference. When a user
+  needs a format conversion the IDE cannot do, tell them to run /xojo-convert
+  and wait for them to do it.
+disable-model-invocation: true
 ---
 
 # Xojo project format conversion

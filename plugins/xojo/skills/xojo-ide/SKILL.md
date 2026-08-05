@@ -8,6 +8,7 @@ description: >-
   or automate the Xojo IDE, or to run Xojo IDE scripts. Also use after
   editing Xojo project files on disk while the IDE is open, so the IDE
   reloads them instead of running stale code.
+disable-model-invocation: false
 ---
 
 # Xojo IDE

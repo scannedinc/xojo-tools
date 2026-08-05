@@ -308,7 +308,7 @@ def report(wl):
 
     if wl["errors"]:
         print(f"== Build errors ({len(wl['errors'])}) -- fix before converting ==")
-        print("  These do not compile today. Removed API 1 symbols land here.")
+        print("  These do not compile today. Removed API 1.0 symbols land here.")
         for d in wl["errors"]:
             print(f"  {d.get('position') or d.get('location')}: {d['message']}")
         print()
