@@ -42,7 +42,7 @@ Stop and resolve that; do not convert types by hand. See "What the IDE handles" 
 
 ## Deprecated vs removed
 
-Deprecated API 1 calls still compile and run; Analyze Project flags them once "Item1 is deprecated" warnings are enabled (Project ▸ Analysis Warnings, off by default). This means conversion can proceed category by category with a working project at every checkpoint.
+Deprecated API 1 calls still compile and run; Analyze Project flags them once "Item1 is deprecated" warnings are enabled (Project ▸ Analysis Warnings, off by default—see **Turning the deprecation warnings on** below for the programmatic path). This means conversion can proceed category by category with a working project at every checkpoint.
 
 The two buckets that are *not* ordinary deprecations are easy to confuse, and only one of them blocks a build:
 
@@ -52,3 +52,23 @@ The two buckets that are *not* ordinary deprecations are easy to confuse, and on
 | `No replacement` | Yes | Deprecated, but Xojo documents no API 2 replacement. It keeps working; there is simply nothing to rename it to. |
 
 The status comes from the per-release tables in Xojo's own `deprecations.md`, not from whether a replacement happens to be documented; those are different questions, and treating them as one put `AddressBook` and `Line` (both still compiling) in the same bucket as symbols that had been deleted, while `FolderItem.AbsolutePath` and the rest of the genuinely-removed set were missing from the matrix altogether.
+
+## Turning the deprecation warnings on
+
+Analyze Project reports deprecations only while the "Item1 is deprecated" warnings are enabled, and the setting is **per project**—there is no global preference, no key in the IDE's plist, and no IDE-scripting command that reaches it (`DoCommand` offers `CheckProjectErrors`, which *runs* the analysis, but nothing that configures it). The IDE stores the checkbox states in a binary `WrnPGrup` record: at offset 0 of the project's hidden `.xojo_uistate` for text-format projects, embedded in the container itself for `.xojo_binary_project` files. A brand-new project has no record at all until the IDE first writes one when the project closes.
+
+The bundled script reads and patches it:
+
+```
+python3 $SKILL/scripts/analysis_warnings.py <project-dir>            # report
+python3 $SKILL/scripts/analysis_warnings.py <project-dir> --enable   # turn on
+```
+
+`--enable` sets both deprecation warnings plus "Show API 2 Desktop control deprecations" (warning ids -2, 2 and 16; the record format is documented in the script's docstring). Two rules, both mandatory:
+
+- **The project must be closed in the IDE while patching.** Warning preferences live on the in-memory document, and the IDE rewrites the file when the project closes, so a patch made while the project is open is silently undone. The sequence: `xojoctl close --save` → `analysis_warnings.py --enable` → `xojoctl open` → `xojoctl analyze`.
+- **Missing or incomplete record?** Open the project in the IDE and close it once; the IDE materializes the record with every entry present. The script refuses to append entries itself, by design—only a same-size in-place patch cannot corrupt the surrounding structure.
+
+Verified live against Xojo 2026.2.1: on a project with a deprecated `Left` call, analyze before the patch reported only default-on warnings; after close → patch → reopen, the same analyze reported `Left is deprecated. You should use String.Left instead` with file, method and line, and Project ▸ Analysis Warnings showed the boxes ticked.
+
+One scope caveat carried from the analyzer itself: Analyze Project checks code for the platform the IDE is running on, so other platforms' `#If` branches stay invisible regardless of warning settings. That is what the bundled scanner's closing pass is for.

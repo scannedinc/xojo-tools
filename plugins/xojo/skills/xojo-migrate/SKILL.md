@@ -16,11 +16,13 @@ description: >-
 
 Rule-driven, confidence-tiered conversion of Xojo source code. This skill bundles the complete deprecation matrix (more than a thousand symbols, generated from Xojo's own deprecation docs) and hundreds of reviewed conversion rules with find/replace regexes, caveats, and before/after examples, each one machine-checked against the rule that carries it.
 
+Detection is IDE-first: when the sibling **xojo-ide** skill can reach a running IDE, the worklist comes from Xojo's own Analyze Project, which resolves receivers and types the way no regex can. The bundled scanner remains as the fallback—no IDE reachable, project will not open, or the user asks for it—and as the closing cross-platform check either way (phase 2 explains the split). The conversion rules, caveats and traps apply identically whichever path located the work.
+
 The mindset that matters: **the dangerous bugs here are runtime bugs, not compile errors.** Several API 1 functions changed index base (1-based → 0-based), one changed its not-found sentinel (`InStr`'s 0 → `IndexOf`'s -1), and `Date`'s epoch moved 66 years. A rename that compiles can still be wrong. That is why rules carry confidence tiers and why the workflow below fixes *semantics before names*.
 
 ## What this is, and what it needs
 
-**Requirements.** Desktop Xojo projects saved in **text format**, built with **Xojo 2021r3 or later** (when the `Desktop*` classes arrived), in a **git repository**, with **python3** on PATH for the bundled scripts. The **Xojo IDE is required**—this skill never compiles anything, so every checkpoint is a compile the user performs. iOS, Web and Android surfaces are out of scope.
+**Requirements.** Desktop Xojo projects saved in **text format**, built with **Xojo 2021r3 or later** (when the `Desktop*` classes arrived), in a **git repository**, with **python3** on PATH for the bundled scripts. The **Xojo IDE is required**—this skill never compiles anything itself, so every checkpoint is an IDE compile: run through the xojo-ide skill when it can reach a running IDE, performed by the user otherwise. iOS, Web and Android surfaces are out of scope.
 
 **Provenance, and what that means for trusting it.** The deprecation matrix is *derived* from Xojo's own published documentation—the deprecated-symbol indexes and the per-release deprecation tables—so its coverage is a property of those sources rather than of anyone's memory. The conversion rules, caveats and traps are hand-written on top of it and reviewed against real migrations; they are the opinionated part. Where a mapping could not be verified against a documentation page, the row says so in its `note`. Treat a row's note as part of the answer, not decoration.
 
@@ -55,7 +57,7 @@ Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo"
 
    "Before" means *within the same edit*, not in an earlier commit. Splitting them leaves a tree where `InStr(...) >= 0` is API 1 code read with an API 2 sentinel—always true, compiles, wrong—which **Commit discipline** below forbids. Convert each site atomically, comparison and rename together, and commit the sites as one batch.
 5. **Byte-variants before base names**: `LenB/MidB/InStrB/ReplaceB/SplitB` before `Len/Mid/InStr/Replace/Split`, or the base-name pass mangles the byte variants.
-6. **Claude cannot compile or run Xojo.** There is no Xojo CLI. Every phase ends with the user compiling / running Analyze Project in the Xojo IDE and reporting back. Never claim a conversion "works"; say it awaits an IDE check.
+6. **Nothing compiles Xojo except the Xojo IDE.** There is no standalone compiler. When the xojo-ide skill can reach a running IDE, run the checkpoints yourself—`analyze` compiles the project's front end and reports errors and warnings with file, method and line. When it cannot, every phase ends with the user compiling / running Analyze Project and reporting back. Either way an analyze pass is not a runtime pass: never claim a conversion "works"; say it analyzed clean and awaits the runtime check, which is always the user's—the dangerous bugs here are runtime bugs.
 7. **Match rule casing exactly** in replacements (Xojo identifiers are case-insensitive, but canonical casing keeps the code readable and consistent with the docs).
 8. **Git is not optional, and one commit is not enough.** Do not begin editing outside a git repository. Commit at every checkpoint, one commit per category, so each batch can be reviewed and reverted on its own. A single commit at the end is a wall of renames nobody can review; a rule that over-matched is then indistinguishable from one that worked. See **Commit discipline** below.
 
@@ -80,13 +82,13 @@ Before editing anything, confirm with the user:
   - **Binary/XML project?** The text-format save (below) is itself the first commit, before any conversion.
 - **Text-format project.** Source must be `.xojo_code` / `.xojo_window` etc. If the project is binary (`.xojo_binary_project`) or XML, ask the user to File ▸ Save As... in "Xojo Project" (text) format first. `$SKILL/scripts/scan.py` detects this and prints the instruction.
 - **Xojo version.** Desktop* control classes need Xojo 2021r3+. Ask which release they build with.
-- **Deprecation warnings on.** Project ▸ Analysis Warnings → enable "Item1 is deprecated" (off by default), so Analyze Project shows the worklist.
+- **Deprecation warnings on.** They are off by default, stored **per project**, and Analyze Project says nothing about deprecations until they are on. With the IDE reachable, do it yourself, in this order: close the project (`python3 -m xojoctl close --save`), run `python3 $SKILL/scripts/analysis_warnings.py <project-dir> --enable`, reopen. The ordering is mandatory—the IDE rewrites the settings file when the project closes, so a patch made while it is open is silently undone. Otherwise ask the user: Project ▸ Analysis Warnings → check both "Item1 is deprecated" warnings and "Show API 2 Desktop control deprecations". Mechanism and caveats in `$SKILL/references/ide-vs-source.md`.
 
 ## Commit discipline
 
 **One commit per category.** Arrays, then ListBox, then Database, then Date, and so on, each its own commit, so the reviewer reads "what happened to the arrays" rather than 4,000 renamed lines. Within a category, `high` and `medium`/`low` work can share a commit; across categories, never.
 
-**Commit only after the user confirms the checkpoint.** Claude cannot compile Xojo (hard rule 6). The order is always: make the edits → ask the user to compile / Analyze Project → they report back → commit. Never commit changes whose compile status nobody has checked.
+**Commit only after the checkpoint is confirmed.** The order is always: make the edits → Analyze Project (run it yourself through xojoctl when the IDE is reachable, per hard rule 6; ask the user otherwise) → read the result → commit. Never commit changes whose compile status nobody has checked.
 
 **When the user declines the checkpoints.** Some users will opt out of compiling per category and ask you to run the whole migration through. That is their call to make, and it does not change the commit discipline—it changes what the `Compiles:` trailer says. Record the fact in **every** affected commit, in these words, rather than omitting the trailer:
 
@@ -107,7 +109,7 @@ Xojo API 2: <category>, <what changed>
 Skipped: <what and why>
 Still manual: <what remains>
 
-Compiles: confirmed by <user> / expected errors, fixed in the next commit
+Compiles: analyze clean via xojoctl / confirmed by <user> / expected errors, fixed in the next commit
 ```
 
 Listing the rule ids matters: when a rename turns out wrong three commits later, the id is how you find every other place that rule touched.
@@ -125,6 +127,24 @@ Ask the user to run **Project ▸ Update Controls to API 2.0** in the IDE, then 
 ### 2. Inventory
 
 Set `SKILL` to the installed skill directory first (see **Data access** below); the scripts live there, not in the user's project.
+
+Two ways to build the worklist, and the preference between them is not a coin flip. Use the IDE's analyzer whenever the xojo-ide skill can reach a running IDE; use the bundled scanner when it cannot, when the project will not open or analyze, or when the user asks for the scanner. They fail in different directions. The analyzer resolves receivers and types—`.ListCount` on a ListBox is a finding, `.ListCount` on the user's own class is silence, and receiverless calls, paren-less statement calls and continued lines are all visible to it, because it is the compiler. The scanner reads text and is type-blind. But the analyzer only compiles the platform the IDE is running on, so `#If TargetWindows` bodies are invisible to it on macOS; the scanner is the only inventory those branches get. An IDE-driven migration therefore still ends with one scanner pass (phase 8).
+
+#### 2a. IDE analyze (preferred)
+
+With the deprecation warnings on (phase 0) and the project open in the IDE:
+
+```
+python3 -m xojoctl analyze --json     # from the xojo-ide skill; see Data access
+```
+
+Each deprecation warning is a compiler-verified work site with file, method, line and the replacement named in the message ("Left is deprecated. You should use String.Left instead"). No receiver check is needed to trust the *finding*—the compiler resolved the receiver to produce it. Errors in the same output are the `Removed` bucket locating itself.
+
+The warnings name symbols; the conversion still runs on rules. Map each warned symbol to its rules, category and caveats with `lookup.py symbol <Name>`, then plan and execute phases 3–7 unchanged: the index-shift, sentinel and epoch caveats apply to a compiler-located site exactly as to a scanner-located one. The analyzer found the line; it did not make the rename safe.
+
+Run the scanner as well when the up-front plan needs the shape of the job—its per-bucket counts (`Removed`, `No replacement`, and so on) remain the fastest overview to present before the first category.
+
+#### 2b. The bundled scanner (fallback, and the closing cross-platform check)
 
 ```
 python3 $SKILL/scripts/scan.py /path/to/project            # human-readable
@@ -224,7 +244,7 @@ python3 $SKILL/scripts/sweep.py <project-dir> --only Invalidate,MsgBox,ReplaceAl
 
 The leftovers are the receiverless calls, the continued calls, and anything a lookahead declined. This is a per-category step, not an end-of-run one: done at the end, you can no longer tell which pass should have caught them.
 
-**Category checkpoint, then commit:** ask the user to compile / Analyze Project, wait for their answer, then commit that category alone. The Date and error-handling categories are *expected* to produce compile errors; the compiler is locating the manual work, so handle those two per **Commit discipline** rather than committing a broken tree as if it were done.
+**Category checkpoint, then commit:** run Analyze Project—`python3 -m xojoctl analyze` yourself when the IDE is reachable, the user otherwise—confirm the result, then commit that category alone. The Date and error-handling categories are *expected* to produce compile errors; the compiler is locating the manual work, so handle those two per **Commit discipline** rather than committing a broken tree as if it were done.
 
 ### 5. Receiver pass (`medium` / `low`)
 
@@ -274,9 +294,11 @@ Commit 7a and 7b separately. A type rename touches both code and layout metadata
 
 ### 8. Validation and report
 
-Ask the user to run **Analyze Project** and a full runtime pass (the traps are runtime bugs).
+Run **Analyze Project** until it is clean of deprecations—`python3 -m xojoctl analyze` yourself when the IDE is reachable, through the user otherwise—and ask the user for a full runtime pass (the traps are runtime bugs; no analyze result speaks to them).
 
-**Both scripts run again here, and neither is optional.** They fail in opposite directions, which is why one cannot stand in for the other.
+**Both scripts run here, whichever path built the inventory, and neither is optional.** They fail in opposite directions, which is why one cannot stand in for the other.
+
+A clean analyze does not retire either of them, because its authority stops at the platform the IDE compiled. Inside another platform's `#If` branch, *nothing* has looked yet—and that untouched region contains both of the shapes these scripts split between them: `scan.py` finds the ordinary dot-anchored and global hits there, `sweep.py` finds the receiverless and paren-less calls that no rule can match anywhere. Skipping the sweep on an IDE-driven migration therefore leaves the one class of site that neither the analyzer nor `scan.py` can see. Treat any in-code hit inside such a branch as unfinished work, not scanner noise.
 
 ```
 python3 $SKILL/scripts/scan.py  <project-dir>
@@ -344,7 +366,10 @@ python3 $SKILL/scripts/lookup.py symbol <name>   # coverage entries + full rules
 python3 $SKILL/scripts/lookup.py rule <id>       # one rule, apply-ready (regex, caveats, examples)
 python3 $SKILL/scripts/lookup.py category [catN] # the 11 categories / one category's rules
 python3 $SKILL/scripts/lookup.py tier <t> [catN] # rules by confidence: high|medium|low|manual
+python3 $SKILL/scripts/analysis_warnings.py <project> [--enable]  # report / enable the per-project deprecation warnings (phase 0)
 ```
+
+`xojoctl` is not this skill's script: it belongs to the sibling **xojo-ide** skill (`$SKILL/../xojo-ide` in this plugin), whose own SKILL.md covers connecting to the IDE. The commands this workflow uses are `open`, `close --save`, `analyze [--json]` and `projects`; run them from that skill's `scripts` directory (`python3 -m xojoctl ...`). When that skill or a running IDE is unavailable, the whole workflow still runs through the user and the scanner path—the IDE preference is a preference, not a dependency.
 
 `scan.py` and `sweep.py` answer different questions and both are required. `scan.py` opens the migration: what is here, per bucket, as a plan. `sweep.py` closes it: what did every rule structurally fail to see. Its main section is **receiverless member calls**—`Invalidate` where the code means `Self.Invalidate`—which no dot-anchored rule can match, and which therefore never appear as a remaining match anywhere else.
 
@@ -359,7 +384,7 @@ Bundled with the skill:
 - `$SKILL/references/conversion-traps.md` — read before touching string/array/ Date/error code. Index shifts, sentinels, double-decrement, receiver rule.
 - `$SKILL/references/applying-rules-by-script.md` — the `$1` backreference dialect and the `applies` gate. Only needed if you drive the rules from a script rather than the IDE's Find panel.
 - `$SKILL/references/pass-hazards.md` — read once before the first category pass. Why a rule's zero is not completion, why its large match count is not work, and how one pass creates what the next pass matches.
-- `$SKILL/references/ide-vs-source.md` — what the IDE converter does and does not touch, how to read its silence, deprecated-vs-removed.
+- `$SKILL/references/ide-vs-source.md` — what the IDE converter does and does not touch, how to read its silence, deprecated-vs-removed, and enabling the analyzer's deprecation warnings programmatically.
 - `$SKILL/references/coverage.json` / `$SKILL/references/rules.json` — the datasets behind the scripts.
 
 Fetched from Xojo when you need them. **The bundled matrix is the authority on what is deprecated**; these are for understanding an API you are converting *to*, or for anything the matrix does not cover:
