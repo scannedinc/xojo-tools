@@ -135,12 +135,16 @@ Two ways to build the worklist, and the preference between them is not a coin fl
 With the deprecation warnings on (phase 0) and the project open in the IDE:
 
 ```
-python3 -m xojoctl analyze --json     # from the xojo-ide skill; see Data access
+python3 -m xojoctl analyze --json | python3 $SKILL/scripts/worklist.py
 ```
 
-Each deprecation warning is a compiler-verified work site with file, method, line and the replacement named in the message ("Left is deprecated. You should use String.Left instead"). No receiver check is needed to trust the *finding*—the compiler resolved the receiver to produce it. Errors in the same output are the `Removed` bucket locating itself.
+Each deprecation warning is a compiler-verified work site with method, line and the replacement named in the message ("Left is deprecated. You should use String.Left instead"). No receiver check is needed to trust the *finding*—the compiler resolved the receiver to produce it. Errors in the same output are the `Removed` bucket locating itself.
 
-The warnings name symbols; the conversion still runs on rules. Map each warned symbol to its rules, category and caveats with `lookup.py symbol <Name>`, then plan and execute phases 3–7 unchanged: the index-shift, sentinel and epoch caveats apply to a compiler-located site exactly as to a scanner-located one. The analyzer found the line; it did not make the rename safe.
+**Do not work from the raw warnings.** The IDE's message reads like a complete instruction, and for a handful of symbols the rename it proposes is the part that compiles and is still wrong: `InStr`'s not-found sentinel moves from 0 to -1, several functions change index base, and `Date.TotalSeconds` → `SecondsFrom1970` shifts the epoch by 66 years. The IDE never mentions any of it. `worklist.py` joins every warning to the matrix and leads with the sites that need more than a rename, in four groups: **hand conversion required**, **read the caveat before renaming**, **mechanical rename**, and **the IDE converter handles this** (control type renames, phase 1). It reports rule ids for `lookup.py rule <id>`; it decides nothing, and where the join is ambiguous it says so instead of picking.
+
+Two properties of the real messages are worth knowing, because they bound what the join can do. Member deprecations arrive with **no receiver**—"ListCount is deprecated. You should use RowCount instead"—so the replacement is what disambiguates `ListBox.ListCount` from `PopupMenu.ListCount`; when it cannot, the report says AMBIGUOUS and you confirm the receiver yourself. And a symbol the matrix does not cover is listed separately rather than dropped: the IDE found a deprecation the bundled data missed, which is worth knowing.
+
+Then plan and execute phases 3–7 unchanged. The analyzer found the line; it did not make the rename safe.
 
 Run the scanner as well when the up-front plan needs the shape of the job—its per-bucket counts (`Removed`, `No replacement`, and so on) remain the fastest overview to present before the first category.
 
@@ -367,6 +371,7 @@ python3 $SKILL/scripts/lookup.py rule <id>       # one rule, apply-ready (regex,
 python3 $SKILL/scripts/lookup.py category [catN] # the 11 categories / one category's rules
 python3 $SKILL/scripts/lookup.py tier <t> [catN] # rules by confidence: high|medium|low|manual
 python3 $SKILL/scripts/analysis_warnings.py <project> [--enable]  # report / enable the per-project deprecation warnings (phase 0)
+python3 $SKILL/scripts/worklist.py [analyze.json] [--format json]  # join `xojoctl analyze --json` to the rules (phase 2a); reads stdin
 ```
 
 `xojoctl` is not this skill's script: it belongs to the sibling **xojo-ide** skill (`$SKILL/../xojo-ide` in this plugin), whose own SKILL.md covers connecting to the IDE. The commands this workflow uses are `open`, `close --save`, `analyze [--json]` and `projects`; run them from that skill's `scripts` directory (`python3 -m xojoctl ...`). When that skill or a running IDE is unavailable, the whole workflow still runs through the user and the scanner path—the IDE preference is a preference, not a dependency.
