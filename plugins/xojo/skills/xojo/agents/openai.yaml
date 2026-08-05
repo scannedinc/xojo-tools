@@ -1,0 +1,6 @@
+interface:
+  display_name: "Xojo"
+  short_description: "Look up the Xojo language and framework"
+  default_prompt: "Use $xojo to confirm a Xojo class or member exists, get its signature, and check whether it is deprecated."
+policy:
+  allow_implicit_invocation: true

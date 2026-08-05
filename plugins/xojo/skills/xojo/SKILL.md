@@ -8,8 +8,9 @@ description: >-
   deprecated. Also use for questions about what a Xojo API does, what replaced
   a removed one, which controls exist for Desktop, Web, Mobile or Console, or
   how a Xojo feature works. This is also the skill for questions about API 1.0
-  versus API 2.0: how the two differ, whether a symbol is deprecated, which
-  release deprecated it, and what replaced it. The indexes record all of that
+  (which Xojo's own documentation calls "pre-API 2.0") versus API 2.0: how the
+  two differ, whether a symbol is deprecated, which release deprecated it, and
+  what replaced it. The indexes record all of that
   per member, and the documentation includes Xojo's own articles on moving to
   API 2.0. Answer such questions here; the xojo-migrate skill converts a
   project and the user runs it themselves. Also use when reading or editing
@@ -183,7 +184,7 @@ awk -F'\t' '$6!=""' references/documentation/classes.tsv     # every note
 
 ## Projects and file formats
 
-Xojo has three project formats: Xojo Project, Xojo Binary Project, and Xojo XML Project. Only the Xojo Project format works well with source control and with an agent, because it is text. This skill supports only that format: the `.xojo_project` manifest plus companion files with extensions such as `.xojo_code`, `.xojo_window`, and `.xojo_menu`. This skill does not support the Xojo Binary Project format (`.xojo_binary_project`) or the Xojo XML Project format (`.xojo_xml_project`); ask the user to save a copy in Xojo Project format instead. When no IDE is available for that, the experimental `xojo-convert` skill can attempt a manual conversion, but the user has to start it: tell them to run it themselves (`/xojo:xojo-convert` in Claude Code).
+Xojo has three project formats: Xojo Project, Xojo Binary Project, and Xojo XML Project. Only the Xojo Project format works well with source control and with an agent, because it is text. This skill supports only that format: the `.xojo_project` manifest plus companion files with extensions such as `.xojo_code`, `.xojo_window`, and `.xojo_menu`. This skill does not support the Xojo Binary Project format (`.xojo_binary_project`) or the Xojo XML Project format (`.xojo_xml_project`); ask the user to save a copy in Xojo Project format instead. When no IDE is available for that, the experimental `xojo-convert` skill can attempt a manual conversion, but the user has to start it: tell them to run it themselves (`/xojo:xojo-convert` in Claude Code, `$xojo-convert` in Codex).
 
 **Before you read or edit any `.xojo_*` file, read the format reference for that file.** `references/xojo-file-formats/index.md` names the right document for each extension and states the safety rules for generators and editors. Start with `shared-text-grammar.md` for the `#tag` and `Begin`/`End` syntax that most formats share. The official overview is `references/documentation/getting_started/using_the_ide/project_file_information.md`.
 
@@ -193,7 +194,8 @@ Xojo has five project types: Desktop, Console, Web, iOS, and Android. Assume a d
 
 These defaults hold unless the user instructs otherwise:
 
-- **Use API 2.0.** API 2.0 is the current standard, so do not call it by name. Say "API 2.0" explicitly only when you discuss legacy code. Read `references/documentation/topics/api_design/moving_to_api_2.0.md` for what changed. If you see API 1.0 code in a project, warn the user to migrate the code to API 2.0, and tell them to run the migration skill themselves when they want that done (`/xojo:xojo-migrate` in Claude Code): it only starts when they ask for it.
+- **Use API 2.0.** API 2.0 is the current standard, so do not call it by name. Say "API 2.0" explicitly only when you discuss legacy code. Read `references/documentation/topics/api_design/moving_to_api_2.0.md` for what changed. If you see API 1.0 code in a project, warn the user to migrate the code to API 2.0, and tell them to run the migration skill themselves when they want that done (`/xojo:xojo-migrate` in Claude Code, `$xojo-migrate` in Codex): it only starts when they ask for it.
+- **Name the old API "API 1.0".** That is this plugin's term, and it is the one to write. Xojo's own documentation rarely names that generation, and calls it "pre-API 2.0" when it does; use Xojo's term when you quote them or when a reader needs to find the same thing in their docs. The two mean one generation, so treat them as the same term when you search. Never call it "legacy": that word carries a judgment this plugin does not make.
 - **In Web projects, use only Web 2.0 features.**
 - **Use `Var`, not `Dim`.**
 - **Follow the naming guidelines.** Read and follow `references/documentation/topics/api_design/api_design_and_naming_guidelines.md`. Class names and class members are PascalCase (upper camel case). Parameter names are camelCase (lower camel case), as in `safeInfo As String`.

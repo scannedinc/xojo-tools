@@ -2,6 +2,8 @@
 
 Read this before touching any string, array, date, or error-handling code. Every trap here compiles cleanly after a naive rename and then misbehaves at runtime. A regex or rule that changes a *name* but leaves a now-wrong *index* or *comparison* is worse than doing nothing.
 
+Throughout, API 1.0 is the older generation, which Xojo's own documentation calls "pre-API 2.0".
+
 ## 1. Index-base shifts: what shifts, and what doesn't
 
 Some API 1.0 functions are 1-based and their API 2.0 forms are 0-based; others do not change at all. Never assume; check this table.

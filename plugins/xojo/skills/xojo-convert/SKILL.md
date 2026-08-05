@@ -10,7 +10,8 @@ description: >-
   route first. Invoke this skill only when the user asks for it by name: it
   rewrites a project file by hand, so never start it on inference. When a user
   needs a format conversion the IDE cannot do, tell them to run the skill
-  themselves (/xojo:xojo-convert in Claude Code) and wait for them to do it.
+  themselves (/xojo:xojo-convert in Claude Code, $xojo-convert in Codex) and
+  wait for them to do it.
 disable-model-invocation: true
 ---
 

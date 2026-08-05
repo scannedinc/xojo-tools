@@ -1,0 +1,6 @@
+interface:
+  display_name: "Xojo Migrate"
+  short_description: "Migrate a Xojo project to API 2.0"
+  default_prompt: "Use $xojo-migrate to convert this project from API 1.0 to API 2.0."
+policy:
+  allow_implicit_invocation: false

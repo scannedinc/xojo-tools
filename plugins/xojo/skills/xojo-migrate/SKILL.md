@@ -1,23 +1,26 @@
 ---
 name: xojo-migrate
 description: >-
-  Migrate a Xojo desktop project from API 1.0 to API 2.0: a rule-driven,
-  confidence-tiered conversion of the source code, committed one category at a
-  time, that fixes the index bases, sentinels and epoch shift a rename alone
-  leaves wrong. Replaces deprecated APIs such as MsgBox, Dim, RecordSet,
-  SQLSelect, Date, InStr, Mid, Len, Ubound, ListBox members, GetFolderItem and
-  error-code checks. Covers more than a thousand deprecated and removed symbols
-  with hundreds of vetted conversion rules. Invoke this skill only when the user
-  asks for it by name: it rewrites a whole project across many commits, so never
-  start it on inference. When a user wants a migration, tell them to run the
-  skill themselves (/xojo:xojo-migrate in Claude Code) and wait for them to do
-  it. Questions about API 1.0 versus
-  API 2.0, whether a symbol is deprecated, and what replaced it belong to the
-  xojo skill instead, which holds the documentation and the deprecation indexes.
+  Migrate a Xojo desktop project from API 1.0 (which Xojo's own documentation
+  calls "pre-API 2.0") to API 2.0: a rule-driven, confidence-tiered conversion
+  of the source code, committed one category at a time, that fixes the index
+  bases, sentinels and epoch shift a rename alone leaves wrong. Replaces
+  deprecated APIs such as MsgBox, Dim, RecordSet, SQLSelect, Date, InStr, Mid,
+  Len, Ubound, ListBox members, GetFolderItem and error-code checks. Covers
+  more than a thousand deprecated and removed symbols with hundreds of vetted
+  conversion rules. Invoke this skill only when the user asks for it by name:
+  it rewrites a whole project across many commits, so never start it on
+  inference. When a user wants a migration, tell them to run the skill
+  themselves (/xojo:xojo-migrate in Claude Code, $xojo-migrate in Codex) and
+  wait for them to do it. Questions about API 1.0 versus API 2.0, whether a
+  symbol is deprecated, and what replaced it belong to the xojo skill instead,
+  which holds the documentation and the deprecation indexes.
 disable-model-invocation: true
 ---
 
 # Xojo API 1.0 → API 2.0 migration
+
+**The two names for the old API.** This skill calls it API 1.0. Xojo's own documentation almost never names it at all, and where it does the term is "pre-API 2.0". The two mean the same generation, so search for either.
 
 Rule-driven, confidence-tiered conversion of Xojo source code. This skill bundles the complete deprecation matrix (more than a thousand symbols, generated from Xojo's own deprecation docs) and hundreds of reviewed conversion rules with find/replace regexes, caveats, and before/after examples, each one machine-checked against the rule that carries it.
 

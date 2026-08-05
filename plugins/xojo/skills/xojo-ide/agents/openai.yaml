@@ -1,0 +1,6 @@
+interface:
+  display_name: "Xojo IDE"
+  short_description: "Drive a running Xojo IDE from the command line"
+  default_prompt: "Use $xojo-ide to analyze this Xojo project in the running IDE."
+policy:
+  allow_implicit_invocation: true

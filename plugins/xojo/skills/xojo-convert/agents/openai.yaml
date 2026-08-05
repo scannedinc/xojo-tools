@@ -1,0 +1,6 @@
+interface:
+  display_name: "Xojo Convert"
+  short_description: "Convert a Xojo project between file formats"
+  default_prompt: "Use $xojo-convert to turn this binary project into text format."
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Xojo Lint"
+  short_description: "Validate and format Xojo project files"
+  default_prompt: "Use $xojo-lint to check this Xojo project before I commit."
+policy:
+  allow_implicit_invocation: true
