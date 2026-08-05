@@ -9,8 +9,9 @@ description: >-
   error-code checks. Covers more than a thousand deprecated and removed symbols
   with hundreds of vetted conversion rules. Invoke this skill only when the user
   asks for it by name: it rewrites a whole project across many commits, so never
-  start it on inference. When a user wants a migration, tell them to run
-  /xojo-migrate and wait for them to do it. Questions about API 1.0 versus
+  start it on inference. When a user wants a migration, tell them to run the
+  skill themselves (/xojo:xojo-migrate in Claude Code) and wait for them to do
+  it. Questions about API 1.0 versus
   API 2.0, whether a symbol is deprecated, and what replaced it belong to the
   xojo skill instead, which holds the documentation and the deprecation indexes.
 disable-model-invocation: true

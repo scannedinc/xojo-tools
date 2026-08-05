@@ -2,7 +2,7 @@
 
 This skill converts Xojo desktop projects from API 1.0 to API 2.0. It runs in [Claude Code](https://claude.com/claude-code).
 
-You start the skill yourself, with `/xojo-migrate`. The agent cannot start it for you, because a migration rewrites your whole project.
+You start the skill yourself. The agent cannot start it for you, because a migration rewrites your whole project. In Claude Code, run `/xojo:xojo-migrate` when you install the plugin, or `/xojo-migrate` when you copy the skill folder by hand.
 
 The skill contains three parts:
 

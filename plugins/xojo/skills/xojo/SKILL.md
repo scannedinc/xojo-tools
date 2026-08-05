@@ -183,7 +183,7 @@ awk -F'\t' '$6!=""' references/documentation/classes.tsv     # every note
 
 ## Projects and file formats
 
-Xojo has three project formats: Xojo Project, Xojo Binary Project, and Xojo XML Project. Only the Xojo Project format works well with source control and with an agent, because it is text. This skill supports only that format: the `.xojo_project` manifest plus companion files with extensions such as `.xojo_code`, `.xojo_window`, and `.xojo_menu`. This skill does not support the Xojo Binary Project format (`.xojo_binary_project`) or the Xojo XML Project format (`.xojo_xml_project`); ask the user to save a copy in Xojo Project format instead. When no IDE is available for that, the experimental `xojo-convert` skill can attempt a manual conversion, but the user has to start it: tell them to run `/xojo-convert`.
+Xojo has three project formats: Xojo Project, Xojo Binary Project, and Xojo XML Project. Only the Xojo Project format works well with source control and with an agent, because it is text. This skill supports only that format: the `.xojo_project` manifest plus companion files with extensions such as `.xojo_code`, `.xojo_window`, and `.xojo_menu`. This skill does not support the Xojo Binary Project format (`.xojo_binary_project`) or the Xojo XML Project format (`.xojo_xml_project`); ask the user to save a copy in Xojo Project format instead. When no IDE is available for that, the experimental `xojo-convert` skill can attempt a manual conversion, but the user has to start it: tell them to run it themselves (`/xojo:xojo-convert` in Claude Code).
 
 **Before you read or edit any `.xojo_*` file, read the format reference for that file.** `references/xojo-file-formats/index.md` names the right document for each extension and states the safety rules for generators and editors. Start with `shared-text-grammar.md` for the `#tag` and `Begin`/`End` syntax that most formats share. The official overview is `references/documentation/getting_started/using_the_ide/project_file_information.md`.
 
@@ -193,7 +193,7 @@ Xojo has five project types: Desktop, Console, Web, iOS, and Android. Assume a d
 
 These defaults hold unless the user instructs otherwise:
 
-- **Use API 2.0.** API 2.0 is the current standard, so do not call it by name. Say "API 2.0" explicitly only when you discuss legacy code. Read `references/documentation/topics/api_design/moving_to_api_2.0.md` for what changed. If you see API 1.0 code in a project, warn the user to migrate the code to API 2.0, and tell them to run `/xojo-migrate` when they want that done: the migration skill only starts when they ask for it.
+- **Use API 2.0.** API 2.0 is the current standard, so do not call it by name. Say "API 2.0" explicitly only when you discuss legacy code. Read `references/documentation/topics/api_design/moving_to_api_2.0.md` for what changed. If you see API 1.0 code in a project, warn the user to migrate the code to API 2.0, and tell them to run the migration skill themselves when they want that done (`/xojo:xojo-migrate` in Claude Code): it only starts when they ask for it.
 - **In Web projects, use only Web 2.0 features.**
 - **Use `Var`, not `Dim`.**
 - **Follow the naming guidelines.** Read and follow `references/documentation/topics/api_design/api_design_and_naming_guidelines.md`. Class names and class members are PascalCase (upper camel case). Parameter names are camelCase (lower camel case), as in `safeInfo As String`.

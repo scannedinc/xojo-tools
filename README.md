@@ -14,7 +14,7 @@ The plugin contains five Agent Skills:
 | [`xojo-migrate`](plugins/xojo/skills/xojo-migrate/) | Converts Xojo source code from API 1.0 to API 2.0 with vetted, confidence-tiered conversion rules, and knows which changes a rename does not fix. |
 | [`xojo-convert`](plugins/xojo/skills/xojo-convert/) | Converts a project between the Xojo Project, Xojo Binary Project, and Xojo XML Project formats by hand when no IDE is available. Highly experimental and not advised; the IDE's own **File ▸ Save As** is the reliable converter. |
 
-The agent uses `xojo`, `xojo-ide`, and `xojo-lint` on its own. You start `xojo-migrate` and `xojo-convert` yourself, with `/xojo-migrate` and `/xojo-convert`, because each one rewrites a whole project.
+The agent uses `xojo`, `xojo-ide`, and `xojo-lint` on its own. You start `xojo-migrate` and `xojo-convert` yourself, because each one rewrites a whole project. In Claude Code, run `/xojo:xojo-migrate` or `/xojo:xojo-convert`; the `xojo:` prefix is the plugin name.
 
 ## Install
 
