@@ -390,7 +390,7 @@ python3 $SKILL/scripts/worklist.py [analyze.json] [--format json]  # join `xojoc
 
 **python3 is a requirement, not a convenience.** The scripts are stdlib-only, but `scan.py` and `sweep.py` have no hand equivalent—segmenting a Xojo file into code and metadata, and censusing a project's declared identifiers, are not things to do by eye. If python3 is genuinely unavailable, say so and stop rather than half-running the workflow.
 
-The two datasets are readable directly if you need to check one symbol without running anything: `coverage.json` is a JSON array of rows (`old`, `new`, `cat`, `status`, `since`, `note`, and where relevant `live_on` / `chains_to`), and `rules.json` holds full rule detail. **Do not read either whole**—they are ~390 KB and ~520 KB. Grep for the symbol, or use `lookup.py`, which is what it is for.
+The two datasets are readable directly if you need to check one symbol without running anything: `coverage.json` is a JSON array of rows (`old`, `new`, `cat`, `status`, `since`, `note`, and where relevant `live_on` / `chains_to` / `src`), and `rules.json` holds full rule detail. A row carrying `"src": "xojo-ide-db"` was filled from the Xojo IDE's own deprecation database rather than from a documentation page, and its replacement was confirmed against the API 2 class page before import—see `ide-vs-source.md`, which also covers why the IDE's own suggestion is sometimes not the API 2 destination. **Do not read either whole**—they are ~390 KB and ~520 KB. Grep for the symbol, or use `lookup.py`, which is what it is for.
 
 ## References
 

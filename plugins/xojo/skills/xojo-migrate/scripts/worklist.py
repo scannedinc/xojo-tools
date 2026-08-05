@@ -199,6 +199,30 @@ def rules_for(rows, matrix, new=None):
     return out, confirmed
 
 
+def ide_disagrees(rows, new):
+    """True when the IDE's proposed replacement contradicts the matrix.
+
+    The IDE's suggestion is not always the API 2 destination. Verified
+    against Xojo 2026.2.1: it reports "GridLinesHorizontal is deprecated.
+    You should use GridLinesHorizontalStyle instead", and that property
+    does exist -- on the deprecated ListBox class. DesktopListBox has no
+    such member; its property is GridLineStyle. Taking the suggestion
+    moves you from one deprecated member to another on the class you are
+    leaving. The matrix's replacements were read off the API 2 class
+    pages, so where the two disagree the matrix is the one to follow --
+    but silently preferring it would hide that the IDE said otherwise,
+    and the reader is looking at the IDE's message.
+    """
+    if not new or not rows:
+        return False
+    known = [r for r in rows if known_replacement(r)]
+    if not known:
+        return False
+    wanted = _tokens(_head(new))
+    return bool(wanted) and not any(_tokens(_head(r["new"])) & wanted
+                                    for r in known)
+
+
 def is_ambiguous(rows):
     """True when the candidate rows do not settle on one replacement.
 
@@ -216,10 +240,14 @@ def is_ambiguous(rows):
     return len({(r.get("new") or "").strip().lower() for r in rows}) > 1
 
 
-def action_for(rows, rules, confirmed=True):
+def action_for(rows, rules, confirmed=True, disagrees=False):
     """What this symbol asks of the reader."""
     if rows and all(r.get("cat") == IDE_BUCKET for r in rows):
         return CONVERTER
+    if disagrees:
+        # The reader is holding two different answers; that is never a
+        # rename to make without looking.
+        return REVIEW
     if confirmed and any(r["conf"] == "manual-only" or not r["applies"]
                          for r in rules):
         return HAND
@@ -273,10 +301,12 @@ def build(doc):
                                            for r in rows)
             rules, confirmed = (([], True) if converter
                                 else rules_for(rows, matrix, new))
+            disagrees = ide_disagrees(rows, new)
             group = groups[key] = {
                 "symbol": old, "replacement": new,
-                "action": action_for(rows, rules, confirmed),
+                "action": action_for(rows, rules, confirmed, disagrees),
                 "ambiguous": is_ambiguous(rows),
+                "ide_disagrees": disagrees,
                 "rules_confirmed": confirmed,
                 "rows": [{"old": r["old"], "new": r["new"], "cat": r["cat"],
                           "note": r.get("note", "")}
@@ -340,6 +370,16 @@ def report(wl):
             rids = " ".join(f"{r['id']}({r['conf']})" for r in g["rules"]) or "-"
             print(f"  {g['symbol']} -> {g['replacement'] or '(none named)'}"
                   f"   {len(g['sites'])} site(s)")
+            if g["ide_disagrees"]:
+                targets = ", ".join(r["new"] for r in g["rows"]
+                                    if known_replacement(r))
+                print(wrap(f"THE IDE'S SUGGESTION DISAGREES WITH THE MATRIX. "
+                           f"It proposes {g['replacement']}; the matrix, read "
+                           f"off the API 2 class pages, says {targets}. The "
+                           f"IDE sometimes names another member of the "
+                           f"deprecated class, which is not a migration "
+                           f"target. Verify on the API 2 class page before "
+                           f"converting.", "      "))
             if g["ambiguous"]:
                 olds = ", ".join(r["old"] for r in g["rows"])
                 print(wrap(f"AMBIGUOUS: the IDE named no receiver and the "

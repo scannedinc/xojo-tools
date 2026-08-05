@@ -226,6 +226,35 @@ class WorklistTests(unittest.TestCase):
                     self.assertTrue(worklist.known_replacement(row),
                                     f"{g['symbol']}: {row}")
 
+    def test_ide_suggestion_contradicting_the_matrix_is_flagged(self):
+        # Verified live against Xojo 2026.2.1: the IDE really does say
+        # "GridLinesHorizontal is deprecated.  You should use
+        # GridLinesHorizontalStyle instead". That property exists -- on the
+        # deprecated ListBox class. DesktopListBox has GridLineStyle and no
+        # GridLinesHorizontalStyle, so following the IDE moves you from one
+        # deprecated member to another. The disagreement must be visible.
+        wl = worklist.build(dict(LIVE, diagnostics=[
+            diag("GridLinesHorizontal is deprecated.  You should use "
+                 "GridLinesHorizontalStyle instead")]))
+        g = wl["groups"][0]
+        self.assertTrue(g["ide_disagrees"])
+        self.assertNotEqual(g["action"], worklist.MECHANICAL)
+
+    def test_agreeing_suggestion_is_not_flagged(self):
+        wl = worklist.build(dict(LIVE, diagnostics=[
+            diag("ListCount is deprecated.  You should use RowCount instead")]))
+        self.assertFalse(wl["groups"][0]["ide_disagrees"])
+
+    def test_disagreement_is_reported_in_the_text_output(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            worklist.report(worklist.build(dict(LIVE, diagnostics=[
+                diag("GridLinesHorizontal is deprecated.  You should use "
+                     "GridLinesHorizontalStyle instead")])))
+        text = out.getvalue()
+        self.assertIn("GridLineStyle", text)
+        self.assertIn("matrix", text.lower())
+
     def test_equivalent_rows_are_not_called_ambiguous(self):
         # Date and Xojo.Core.Date both become DateTime; there is nothing for
         # the reader to resolve.

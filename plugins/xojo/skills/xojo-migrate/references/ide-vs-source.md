@@ -72,3 +72,29 @@ python3 $SKILL/scripts/analysis_warnings.py <project-dir> --enable   # turn on
 Verified live against Xojo 2026.2.1: on a project with a deprecated `Left` call, analyze before the patch reported only default-on warnings; after close → patch → reopen, the same analyze reported `Left is deprecated. You should use String.Left instead` with file, method and line, and Project ▸ Analysis Warnings showed the boxes ticked.
 
 One scope caveat carried from the analyzer itself: Analyze Project checks code for the platform the IDE is running on, so other platforms' `#If` branches stay invisible regardless of warning settings. That is what the bundled scanner's closing pass is for.
+
+## The replacement the IDE names is not always the API 2 destination
+
+A deprecation warning ends with a suggestion—"You should use `X` instead"—and it reads as the answer. Usually it is. Sometimes it names another member of the *deprecated* class, so following it moves you off one deprecated member and onto another, on the class you are supposed to be leaving. It compiles, and the next analyze pass flags the new member too.
+
+The IDE draws these suggestions from `deprecation_cache.db`, a small database inside its own application bundle. The bundled matrix draws them from the API 2 class pages. Where the two disagree, **the matrix is the one to follow**, and `worklist.py` prints the disagreement rather than quietly preferring one:
+
+```
+THE IDE'S SUGGESTION DISAGREES WITH THE MATRIX. It proposes
+GridLinesHorizontalStyle; the matrix, read off the API 2 class pages, says
+DesktopListBox.GridLineStyle.
+```
+
+That example is verified against Xojo 2026.2.1: the IDE really does say `GridLinesHorizontal is deprecated.  You should use GridLinesHorizontalStyle instead`. `ListBox.GridLinesHorizontalStyle` exists—on the deprecated `ListBox`. `DesktopListBox` has no such property; it has `GridLineStyle`, and the two old Booleans merge into that one enum.
+
+The same check, run across the whole database against the API 2 class pages, rejected 35 of its entries. A few of the clearer ones:
+
+| The IDE suggests | The API 2 class actually has |
+|---|---|
+| `Canvas.DoubleClick` → `DoubleClicked` | `DesktopCanvas.DoublePressed` |
+| `ListBox.DoubleClick` → `DoubleClicked` | `DesktopListBox.DoublePressed` |
+| `Window.EnableMenuItems` → `MenuSelected` | `DesktopWindow.MenuBarSelected` |
+| `IPCSocket.DataAvailable` → `DataReceived` | `DataAvailable`, still current—not renamed at all |
+| `HTMLViewer.DocumentComplete` → `DocumentCompleted` | `DocumentComplete`, still current |
+
+None of those suggestions was imported into the matrix, and none should be applied on the IDE's word. The rule to carry away is narrow and worth stating plainly: **the IDE is authoritative about *where* a deprecation is—it resolved the receiver to raise the warning—and merely helpful about what to replace it with.** Trust the location; verify the replacement on the API 2 class page.
