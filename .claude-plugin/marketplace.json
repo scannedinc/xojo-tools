@@ -1,7 +1,7 @@
 {
   "name": "xojo-tools",
   "owner": {
-    "name": "Travis Hicks"
+    "name": "Scanned Inc."
   },
   "description": "AI agent plugin for working with Xojo projects.",
   "plugins": [
@@ -10,8 +10,8 @@
       "source": "./plugins/xojo",
       "description": "Plugin of Agent Skills for working with Xojo projects.",
       "author": {
-        "name": "Travis Hicks",
-        "url": "https://github.com/travisjhicks"
+        "name": "Scanned Inc.",
+        "url": "https://github.com/scannedinc"
       },
       "homepage": "https://github.com/travisjhicks/xojo-tools",
       "repository": "https://github.com/travisjhicks/xojo-tools",
