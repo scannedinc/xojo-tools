@@ -167,26 +167,64 @@ class FindDbTests(unittest.TestCase):
         self.assertTrue(E.usable(make_db(self.dir / "ok.db",
                                          items=[("A", "b", "c")])))
 
-    def test_newest_usable_install_wins_over_a_later_name(self):
-        # Xojo 79 (2019) sorts after Xojo 2026 as a string and ships an
-        # unreadable file; picking it silently imported six-year-old data.
-        import os
-        root = self.dir / "Applications"
-        old = root / "Xojo 79" / "x.app" / "Contents" / "Resources"
-        new = root / "Xojo 2026.2.1" / "x.app" / "Contents" / "Resources"
-        for d in (old, new):
-            d.mkdir(parents=True)
-        (old / "deprecation_cache.db").write_bytes(b"not a database")
-        make_db(new / "deprecation_cache.db", items=[("A", "b", "c")])
-        os.utime(new / "deprecation_cache.db", (1_700_000_000, 1_700_000_000))
-        os.utime(old / "deprecation_cache.db", (1_500_000_000, 1_500_000_000))
+    def install(self, root, folder, app, content=None):
+        d = root / folder / f"{app}.app" / "Contents" / "Resources"
+        d.mkdir(parents=True)
+        target = d / "deprecation_cache.db"
+        if content is None:
+            make_db(target, items=[("A", "b", "c")])
+        else:
+            target.write_bytes(content)
+        return target
+
+    def find_in(self, root):
         original = E.XOJO_APPS
         E.XOJO_APPS = root
         try:
-            self.assertEqual(E.find_db().parent.parent.parent.parent.name,
-                             "Xojo 2026.2.1")
+            return E.find_db()
         finally:
             E.XOJO_APPS = original
+
+    def test_highest_version_wins_over_a_later_folder_name(self):
+        # Folder names under /Applications/Xojo are the user's own
+        # numbering, not Xojo versions: "Xojo 79 (2019R3.2)" sorts after
+        # "Xojo 2026.2.1" as a string while being seven years older.
+        root = self.dir / "Applications"
+        self.install(root, "Xojo 79", "Xojo 79 (2019R3.2)")
+        self.install(root, "Xojo 2026.2.1.67756", "Xojo 2026.2.1.67756")
+        self.assertIn("2026.2.1", str(self.find_in(root)))
+
+    def test_unreadable_newest_falls_back_to_the_next_usable(self):
+        root = self.dir / "Applications"
+        self.install(root, "Xojo 156", "Xojo 156 (2026.2)",
+                     content=b"not a database")
+        self.install(root, "Xojo 148", "Xojo 148 (2025.2.1)")
+        self.assertIn("2025.2.1", str(self.find_in(root)))
+
+
+class ParseVersionTests(unittest.TestCase):
+    def test_reads_both_release_spellings(self):
+        for path, want in (
+                ("/Applications/Xojo/Xojo 138 (2024.4.2)/x.app", (2024, 4, 2)),
+                ("/Applications/Xojo/Xojo 156 (2026.2)/x.app", (2026, 2, 0)),
+                ("/Applications/Xojo/Xojo 2026.2.1.67756/x.app", (2026, 2, 1)),
+                ("/Applications/Xojo/Xojo 79 (2019R3.2)/x.app", (2019, 3, 2)),
+                ("/Applications/Xojo/Xojo 66 (2018R3)/x.app", (2018, 3, 0)),
+        ):
+            self.assertEqual(E.parse_version(path), want, path)
+
+    def test_private_folder_numbering_is_not_read_as_a_version(self):
+        # "Xojo <n>" for n under 2000 is a private install number, never a
+        # release. A version always begins with its four-digit year.
+        for n in (66, 73, 79, 138, 148, 156, 1999):
+            self.assertIsNone(E.parse_version(f"/Applications/Xojo/Xojo {n}/x.app"),
+                              n)
+
+    def test_orders_releases_correctly(self):
+        order = [E.parse_version(p) for p in (
+            "Xojo 66 (2018R3)", "Xojo 79 (2019R3.2)", "Xojo 138 (2024.4.2)",
+            "Xojo 156 (2026.2)", "Xojo 2026.2.1.67756")]
+        self.assertEqual(order, sorted(order))
 
 
 if __name__ == "__main__":

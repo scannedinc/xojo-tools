@@ -69,16 +69,41 @@ def usable(path):
         return False
 
 
-def find_db():
-    """Newest usable deprecation_cache.db in an installed Xojo, or None.
+# A Xojo release is [Year].[ReleaseNumber].[MinorRelease] -- 2026.2.1 --
+# and older ones spell the same thing 2019R3.2. Both forms turn up in an
+# installation path, either as the folder name or in parentheses after it.
+VERSION = re.compile(r"(20\d{2})[.rR](\d+)(?:\.(\d+))?")
 
-    Sorted by modification time, not by name: a machine with several
-    releases installed sorts "Xojo 79" after "Xojo 2026.2.1" as strings,
-    which picked a 2019 build -- six years stale, and unreadable besides.
+
+def parse_version(path):
+    """(year, release, minor) for an installation path, or None.
+
+    Read from the path rather than assumed from its order. Folder names
+    under /Applications/Xojo are whatever the user calls them -- "Xojo
+    138 (2024.4.2)" pairs a private numbering with the real version --
+    so sorting the names sorts nothing meaningful: "Xojo 79" lands after
+    "Xojo 2026.2.1", and that install is from 2019.
+    """
+    best = None
+    for m in VERSION.finditer(str(path)):
+        found = (int(m.group(1)), int(m.group(2)), int(m.group(3) or 0))
+        if best is None or found > best:
+            best = found
+    return best
+
+
+def find_db():
+    """The newest usable deprecation_cache.db installed, or None.
+
+    Ordered by the Xojo version in the path, with modification time as
+    the tiebreak for an install whose path states no version. Both beat
+    sorting by name; see parse_version.
     """
     found = sorted(XOJO_APPS.glob("*/*.app/Contents/Resources/"
                                   "deprecation_cache.db"),
-                   key=lambda p: p.stat().st_mtime, reverse=True)
+                   key=lambda p: (parse_version(p) or (0, 0, 0),
+                                  p.stat().st_mtime),
+                   reverse=True)
     return next((p for p in found if usable(p)), None)
 
 
