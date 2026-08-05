@@ -212,7 +212,27 @@ def _rows_section(th: Theme, title: str, rows: Sequence[tuple[str, str]]) -> str
 
 
 def _cap(text: str) -> str:
+    """Capitalize a description, unless its first word is deliberately cased.
+
+    House style capitalizes the first letter of a help string, which turns
+    "iOS or macOS target" into "IOS or macOS target". A first word that
+    already carries an interior capital chose its own casing -- iOS, macOS,
+    eBay -- so leave it.
+    """
+    first = text.split(" ", 1)[0]
+    if any(ch.isupper() for ch in first[1:]):
+        return text
     return text[:1].upper() + text[1:]
+
+
+def _prompt(th: "Theme", config: "HelpConfig") -> str:
+    """The shell prompt drawn before `prog`, carrying its trailing space.
+
+    Empty is the obvious spelling for "draw no prompt", so it must take the
+    space with it rather than leaving a stray one -- and, with color on, an
+    empty escape wrapper.
+    """
+    return "%s " % th.dim(config.prompt) if config.prompt else ""
 
 
 def _metavar_str(action: argparse.Action) -> str:
@@ -256,7 +276,7 @@ def _flag_rows(parser: argparse.ArgumentParser) -> list[tuple[str, str]]:
 
 def _usage_lines(th: Theme, config: HelpConfig) -> str:
     return "".join(
-        "    %s %s %s\n" % (th.dim(config.prompt), config.prog, th.dim(usage))
+        "    %s%s %s\n" % (_prompt(th, config), config.prog, th.dim(usage))
         for usage in config.usage
     )
 
@@ -301,7 +321,7 @@ def render_root_help(
         buf.append(_section(th, "EXAMPLES"))
         for example in config.root_examples:
             buf.append(
-                "    %s %s %s\n" % (th.dim(config.prompt), config.prog, example)
+                "    %s%s %s\n" % (_prompt(th, config), config.prog, example)
             )
         buf.append("\n")
 
@@ -334,9 +354,9 @@ def render_command_help(
         shown.append("[%s]" % metavar if action.nargs in ("?", "*") else metavar)
     buf.append(_section(th, "USAGE"))
     buf.append(
-        "    %s %s %s%s %s\n\n"
+        "    %s%s %s%s %s\n\n"
         % (
-            th.dim(config.prompt),
+            _prompt(th, config),
             config.prog,
             name,
             (" " + " ".join(shown)) if shown else "",
@@ -357,7 +377,7 @@ def render_command_help(
         buf.append(_section(th, "EXAMPLES"))
         for example in command_examples[name]:
             buf.append(
-                "    %s %s %s\n" % (th.dim(config.prompt), config.prog, example)
+                "    %s%s %s\n" % (_prompt(th, config), config.prog, example)
             )
         buf.append("\n")
 
@@ -438,8 +458,8 @@ class HelpfulParser(argparse.ArgumentParser):
         config = self.get_help_config()
         th = help_theme(config.color_env, sys.stderr)
         if self.command_name:
-            return "    %s %s %s %s\n" % (
-                th.dim(config.prompt),
+            return "    %s%s %s %s\n" % (
+                _prompt(th, config),
                 config.prog,
                 self.command_name,
                 th.dim("[flags]"),

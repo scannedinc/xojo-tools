@@ -171,7 +171,9 @@ def pair(old):
 
 
 def ide_rows(db):
-    con = sqlite3.connect(str(db))
+    # Read-only: the database lives inside the Xojo application bundle and
+    # is never ours to modify, not even to leave a journal beside.
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     items = [(c, o, n, "member") for c, o, n in
              con.execute("select class_name, old_name, new_name from items")]
     events = [(c, o, n, "event") for c, o, n in con.execute(

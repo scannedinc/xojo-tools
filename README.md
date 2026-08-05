@@ -21,14 +21,14 @@ The agent uses `xojo`, `xojo-ide`, and `xojo-lint` on its own. You start `xojo-m
 For Claude Code, add this repository as a marketplace, then install the plugin:
 
 ```text
-/plugin marketplace add travisjhicks/xojo-tools
+/plugin marketplace add scannedinc/xojo-tools
 /plugin install xojo@xojo-tools
 ```
 
 For Codex, add the repository as a marketplace, then add the plugin:
 
 ```sh
-codex plugin marketplace add travisjhicks/xojo-tools
+codex plugin marketplace add scannedinc/xojo-tools
 codex plugin add xojo@xojo-tools
 ```
 

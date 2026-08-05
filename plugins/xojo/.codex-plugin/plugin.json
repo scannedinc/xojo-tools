@@ -6,8 +6,8 @@
     "name": "Scanned Inc.",
     "url": "https://github.com/scannedinc"
   },
-  "homepage": "https://github.com/travisjhicks/xojo-tools",
-  "repository": "https://github.com/travisjhicks/xojo-tools",
+  "homepage": "https://github.com/scannedinc/xojo-tools",
+  "repository": "https://github.com/scannedinc/xojo-tools",
   "license": "MIT",
   "keywords": [
     "xojo",
@@ -22,7 +22,7 @@
     "developerName": "Scanned Inc.",
     "category": "Developer Tools",
     "capabilities": [],
-    "websiteURL": "https://github.com/travisjhicks/xojo-tools",
+    "websiteURL": "https://github.com/scannedinc/xojo-tools",
     "defaultPrompt": "Help me understand this Xojo project."
   }
 }

@@ -13,6 +13,7 @@ Exits 0 if every check passes.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
@@ -828,6 +829,26 @@ def test_helptext_generic() -> None:
     named.add_argument("command", help="the command to send")
     check("a positional named 'command' is documented",
           H._arg_rows(named), [("COMMAND", "The command to send")])
+
+    # House style capitalizes a description's first letter, which mangles a
+    # word that chose its own casing.
+    check("ordinary descriptions still capitalize",
+          H._cap("show this help"), "Show this help")
+    for word in ("iOS or macOS target", "macOS only", "eBay export"):
+        check("deliberate inner capitals survive", H._cap(word), word)
+
+    # An empty prompt is the obvious spelling for "draw no prompt"; it must
+    # take its trailing space with it rather than misaligning the line.
+    noprompt = H.HelpConfig(prog="onetool", command_blurbs={},
+                            usage=("FILE",), prompt="")
+    plain = H.help_theme("never", io.StringIO())
+    check("an empty prompt leaves no stray space",
+          H._usage_lines(plain, noprompt), "    onetool FILE\n")
+    check("a prompt still renders with one space",
+          H._usage_lines(plain, H.HelpConfig(prog="onetool",
+                                             command_blurbs={},
+                                             usage=("FILE",))),
+          "    % onetool FILE\n")
 
     # Error humanizing follows the parser's own subcommand naming.
     check("invalid choice on a custom dest is still a command error",
