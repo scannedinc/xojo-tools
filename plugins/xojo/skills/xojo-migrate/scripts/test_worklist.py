@@ -143,6 +143,7 @@ class WorklistTests(unittest.TestCase):
     def test_every_diagnostic_is_accounted_for_exactly_once(self):
         seen = ([s["message"] for g in self.wl["groups"] for s in g["sites"]]
                 + [d["message"] for d in self.wl["unmatched"]]
+                + [d["message"] for d in self.wl["related"]]
                 + [d["message"] for d in self.wl["other"]]
                 + [d["message"] for d in self.wl["errors"]])
         self.assertEqual(sorted(seen),
@@ -150,6 +151,30 @@ class WorklistTests(unittest.TestCase):
 
     def test_non_deprecation_warning_is_not_forced_through_the_matrix(self):
         self.assertEqual([d["message"] for d in self.wl["other"]],
+                         ["unused is an unused local variable"])
+
+    def test_deprecation_in_another_wording_is_not_dismissed(self):
+        # Extracted from the IDE binary's own string table: the two "%1 is
+        # deprecated..." templates are not the only deprecation findings it
+        # writes. These four are migration work -- a Super that is a
+        # deprecated class, an old-style constructor -- so filing them with
+        # the unused-variable warnings under "not deprecations" is wrong.
+        others = [
+            "This class is based on a deprecated class. It is recommended "
+            "that you update this.",
+            "This control is based on a deprecated class. It is recommended "
+            "that you update this.",
+            "This class is using a deprecated type of constructor. It is "
+            "recommended that you update this.",
+            "You cannot have a Menu Bar that contains DesktopMenuItems when "
+            "the project contains deprecated Windows. Convert all Windows to "
+            "DesktopWindows first.",
+        ]
+        wl = worklist.build(dict(LIVE, diagnostics=(
+            [diag(m) for m in others]
+            + [diag("unused is an unused local variable")])))
+        self.assertEqual([d["message"] for d in wl["related"]], others)
+        self.assertEqual([d["message"] for d in wl["other"]],
                          ["unused is an unused local variable"])
 
     def test_instr_needs_hand_conversion(self):
@@ -333,6 +358,13 @@ class CliTests(unittest.TestCase):
         code, out, _ = self.run_cli(dict(LIVE, diagnostics=[]))
         self.assertEqual(code, 0)
         self.assertIn("no deprecation", out.lower())
+
+    def test_a_differently_worded_finding_is_not_called_clean(self):
+        code, out, _ = self.run_cli(dict(LIVE, diagnostics=[
+            diag("This class is based on a deprecated class. It is "
+                 "recommended that you update this.")]))
+        self.assertEqual(code, 0)
+        self.assertNotIn("no deprecation", out.lower())
 
 
 if __name__ == "__main__":

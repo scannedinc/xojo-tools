@@ -242,7 +242,7 @@ def action_for(rows, rules, confirmed=True):
 def build(doc):
     """Group an analyze document into a worklist. Lossless: every diagnostic
     leaves in exactly one of errors / groups / unmatched / other."""
-    errors, other, unmatched = [], [], []
+    errors, other, unmatched, related = [], [], [], []
     groups = {}
     matrix = load_matrix()
     for d in doc.get("diagnostics") or []:
@@ -251,7 +251,15 @@ def build(doc):
             continue
         parsed = parse_deprecation(d.get("message", ""))
         if not parsed:
-            other.append(d)
+            # The two "%1 is deprecated..." templates are not the only
+            # deprecation findings the IDE writes. Its string table also
+            # carries "This class is based on a deprecated class", the
+            # old-style constructor and destructor warnings, and the
+            # deprecated-Windows menu bar error -- all migration work in a
+            # different wording. Filing those with the unused-variable
+            # warnings would dismiss them.
+            (related if "deprecat" in d.get("message", "").lower()
+             else other).append(d)
             continue
         old, new = parsed
         rows = match_rows(old, new, matrix)
@@ -286,7 +294,7 @@ def build(doc):
                      key=lambda g: (ACTION_ORDER.index(g["action"]),
                                     -len(g["sites"]), g["symbol"].lower()))
     return {"errors": errors, "groups": ordered, "unmatched": unmatched,
-            "other": other,
+            "related": related, "other": other,
             "counts": {"diagnostics": len(doc.get("diagnostics") or []),
                        "symbols": len(ordered),
                        "sites": sum(len(g["sites"]) for g in ordered)}}
@@ -302,8 +310,9 @@ def report(wl):
     c = wl["counts"]
     print(f"{c['diagnostics']} diagnostics from the IDE: "
           f"{c['sites']} deprecation site(s) across {c['symbols']} symbol(s), "
-          f"{len(wl['unmatched'])} unrecognized, {len(wl['other'])} other "
-          f"warning(s), {len(wl['errors'])} error(s)")
+          f"{len(wl['unmatched'])} unrecognized, {len(wl['related'])} in "
+          f"another wording, {len(wl['other'])} other warning(s), "
+          f"{len(wl['errors'])} error(s)")
     print()
 
     if wl["errors"]:
@@ -391,14 +400,25 @@ def report(wl):
             print(f"  {d.get('position') or d.get('location')}: {d['message']}")
         print()
 
+    if wl["related"]:
+        print(f"== Deprecation findings in another wording ({len(wl['related'])}) ==")
+        print("  Migration work the standard warning form does not cover: a")
+        print("  class or control whose Super is deprecated, an old-style")
+        print("  constructor, a menu bar mixing Desktop and deprecated types.")
+        print("  Convert these too; they carry no symbol to look up.")
+        for d in wl["related"]:
+            print(f"  {d.get('position') or d.get('location')}: {d['message']}")
+        print()
+
     if wl["other"]:
-        print(f"== Other warnings ({len(wl['other'])}) -- not deprecations ==")
-        print("  Outside this migration's scope; left for the user to judge.")
+        print(f"== Other warnings ({len(wl['other'])}) ==")
+        print("  Not deprecation findings. Judge them on their own merits;")
+        print("  this migration neither fixes nor licenses ignoring them.")
         for d in wl["other"]:
             print(f"  {d.get('position') or d.get('location')}: {d['message']}")
         print()
 
-    if not wl["groups"] and not wl["unmatched"]:
+    if not wl["groups"] and not wl["unmatched"] and not wl["related"]:
         print("No deprecation warnings in this analysis.")
         print("Note what that does and does not mean: Analyze Project compiles")
         print("only the platform the IDE is running on, so other platforms'")
