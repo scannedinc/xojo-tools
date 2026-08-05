@@ -322,6 +322,92 @@ def build_patterns(coverage, rules_data=None):
     return pats
 
 
+# ------------------------------------------------------------- token prefilter
+# Scanning used to run every one of the ~950 compiled patterns over every
+# file, and nearly all of that work is provably unnecessary. Both pattern
+# shapes embed a literal ASCII identifier (`\.Member\b`, `(?<![\w.])Name\b`),
+# so a match can only exist where that identifier appears as a whole token in
+# the text: its characters are contiguous, the character after fails \w (the
+# trailing \b), and the character before is either the literal `.` or fails
+# the lookbehind. One tokenizing pass over the file therefore yields a
+# necessary condition for every pattern at once, and only the patterns whose
+# token is present need to run at all.
+#
+# CODE_TOKEN is deliberately ASCII-only while the patterns are Unicode-aware.
+# That mismatch has two directions, and both must be covered for the
+# necessary-condition argument to hold:
+#
+#   - Adjacency: a non-ASCII character next to a name splits the token early
+#     (`éMid(` still yields a `Mid` token), so the tokenizer emits the bare
+#     name MORE often than the pattern can match -- a wasted candidate, never
+#     a miss, because a non-ASCII LETTER neighbor is `\w` and already defeats
+#     `\b` or the lookbehind at that junction.
+#   - The name itself: re.IGNORECASE folds exactly four non-ASCII codepoints
+#     onto ASCII letters (U+0130 İ and U+0131 ı match i, U+017F ſ matches s,
+#     U+212A Kelvin K matches k), so `\.Mid\b` matches `.Mıd` -- a span the
+#     ASCII tokenizer would break apart. candidate_keys() folds those four to
+#     their ASCII partners before tokenizing, mirroring the folding the
+#     engine itself applies. The fold is harmless on any other input: each
+#     impostor is a letter, so a token merged across one sits at a junction
+#     where `\b` or the lookbehind already forbids a match.
+#
+# test_scan.py pins each direction and holds the filtered scan equal to the
+# exhaustive one over every shipped key and the fixture projects.
+CODE_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+CASE_FOLD_IMPOSTORS = {0x130: "i", 0x131: "i", 0x17F: "s", 0x212A: "k"}
+
+
+def build_prefilter(pats):
+    """Index pattern keys by the identifier token that must be present.
+
+    Returns (by_token, residual): {token: [keys]} plus the keys carrying no
+    plain-identifier token, which always run. Every shipped key is an
+    identifier today, so the residual is empty; it exists so a future exotic
+    key degrades to the old scan-everything behavior instead of silently
+    never matching.
+    """
+    by_token = {}
+    residual = []
+    for key in pats:
+        name = key[1:] if key.startswith(".") else key
+        if CODE_TOKEN.fullmatch(name):
+            by_token.setdefault(name.lower(), []).append(key)
+        else:
+            residual.append(key)
+    return by_token, residual
+
+
+def candidate_keys(text, prefilter):
+    """The pattern keys that could match `text`, from one tokenizing pass."""
+    by_token, residual = prefilter
+    cand = set(residual)
+    folded = text.translate(CASE_FOLD_IMPOSTORS)
+    for token in {t.lower() for t in CODE_TOKEN.findall(folded)}:
+        cand.update(by_token.get(token, ()))
+    return cand
+
+
+def scan_text(text, pats, prefilter=None):
+    """Per-key (raw, in-code) match counts for one file's text.
+
+    With a prefilter, only candidate patterns run; the result is identical
+    to running every pattern -- dict order included, because iteration stays
+    in `pats` order and a skipped pattern is one whose token is absent and
+    so cannot match. Report assembly and JSON output follow this dict order,
+    which is why preserving it is part of the contract.
+    """
+    code = code_only(text)
+    cand = candidate_keys(text, prefilter) if prefilter is not None else None
+    out = {}
+    for key, (rx, _m, _rows) in pats.items():
+        if cand is not None and key not in cand:
+            continue
+        n = len(rx.findall(text))
+        if n:
+            out[key] = (n, len(rx.findall(code)))
+    return out
+
+
 def collect_files(root):
     src, binary, xml, manifests = [], [], [], []
     for p in sorted(root.rglob("*")):
@@ -406,6 +492,7 @@ def main():
     pats = build_patterns(coverage, rules_data)
     rules = rule_index()
 
+    prefilter = build_prefilter(pats)
     hits = defaultdict(lambda: {"count": 0, "code": 0, "files": set()})
     for f in src:
         try:
@@ -413,17 +500,13 @@ def main():
         except OSError as e:
             print(f"warning: cannot read {f}: {e}", file=sys.stderr)
             continue
-        code = code_only(text)
-        for key, (rx, _m, _rows) in pats.items():
-            n = len(rx.findall(text))
-            if n:
-                n_code = len(rx.findall(code))
-                hits[key]["count"] += n
-                hits[key]["code"] += n_code
-                # Only files with a live-code hit are worth opening. A file that
-                # matches purely in layout metadata is not part of the worklist.
-                if n_code:
-                    hits[key]["files"].add(str(f.relative_to(root)))
+        for key, (n, n_code) in scan_text(text, pats, prefilter).items():
+            hits[key]["count"] += n
+            hits[key]["code"] += n_code
+            # Only files with a live-code hit are worth opening. A file that
+            # matches purely in layout metadata is not part of the worklist.
+            if n_code:
+                hits[key]["files"].add(str(f.relative_to(root)))
 
     # ---- assemble per-symbol report rows
     report = []
