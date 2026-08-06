@@ -60,7 +60,7 @@ A skill copied by hand carries no plugin name, so you run it as `/xojo-migrate` 
 
 ## Not a Xojo, Inc. product
 
-Xojo, Inc. did not produce, review, or endorse this plugin, and this plugin has no affiliation with Xojo, Inc. "Xojo" is a trademark of Xojo, Inc. The name appears here only to identify the software that these tools work with. The repository redistributes no Xojo documentation.
+"Xojo" is a trademark of Xojo, Inc., and the name appears here only to identify the software these tools work with. Xojo, Inc. did not produce, review, or endorse this software, and this software has no affiliation with Xojo, Inc. The deprecation data bundled with this software is derived from facts stated in Xojo's published documentation; the documentation itself is not redistributed here.
 
 ## License
 
