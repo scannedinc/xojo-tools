@@ -31,9 +31,14 @@ Common fields are:
 - `AutoEnabled` and the legacy spelling `AutoEnable`, sometimes emitted together with the same logical setting;
 - `ShortcutKey` and legacy `Shortcut`, also sometimes emitted together;
 - `MenuModifier`, with occasional `AltMenuModifier`;
+- `MacOptionKey` and `PCAltKey` when the shortcut distinguishes the Mac Option key from the Windows Alt key;
 - `SubMenu` in a small number of legacy records.
 
 Fields are not guaranteed to be present on every menu-item subclass. Numeric values such as `SpecialMenu` are designer enums and should be copied from a known equivalent item.
+
+`MacOptionKey` maps to XML `MacOptionModifier` and RbBF `Mopt`; `PCAltKey` maps to XML `PCAltModifier` and RbBF `MiAK`.
+
+`AutoEnabled` and `AutoEnable` are two tagged-text spellings of the same XML `MenuAutoEnable` / RbBF `maEn` value. When both appear, they carry the same Boolean. `SubMenu=True` maps to bit 0 of XML `ItemFlags` / RbBF `flag`; the nested child tree remains the authoritative submenu contents.
 
 ## Text, localization, and separators
 

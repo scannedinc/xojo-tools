@@ -1,6 +1,6 @@
 # `.xojo_database_connection`
 
-The corpus contains one IDE-managed SQLite local connection. It is enough to describe the container, but not other database engines or every stage option.
+The IDE-managed SQLite local connection container is documented here. Other database engines and some stage options remain unassigned.
 
 ```text
 #tag DatabaseConnection 1

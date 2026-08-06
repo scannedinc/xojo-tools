@@ -34,7 +34,7 @@ End Module
 #tag EndModule
 ```
 
-A module file contains methods, properties, constants, delegates, enums, and structures using the same tags as a class. Modules do not define events. A manifest item whose parent ID is a module's item ID is a child of that namespace. The controlled examples include classes, interfaces, and another module nested inside modules. Every nested item remains a separate file; the child module's manifest row uses the outer module's item ID as its parent and its path follows the nested directory.
+A module file contains methods, properties, constants, delegates, enums, and structures using the same tags as a class. Modules do not define events. A manifest item whose parent ID is a module's item ID is a child of that namespace. Classes, interfaces, and modules can be nested inside modules. Every nested item remains a separate file; the child module's manifest row uses the outer module's item ID as its parent and its path follows the nested directory.
 
 A file-level `Using` clause is serialized as an empty named region within the class or module:
 
@@ -43,7 +43,9 @@ A file-level `Using` clause is serialized as an empty named region within the cl
 #tag EndUsing
 ```
 
-The region appears after ordinary members and before `ViewBehavior` when that region is present. Repeated file-level clauses are repeated `Using` regions in source order; the controlled class and module each contain two such regions, with no enclosing collection or count field. A method-local `Using Utilities` statement remains ordinary source text inside its `Method` region.
+The region appears after ordinary members and before `ViewBehavior` when that region is present. Repeated file-level clauses are repeated `Using` regions in source order, with no enclosing collection or count field. A method-local `Using Utilities` statement remains ordinary source text inside its `Method` region.
+
+In XML each clause is a `Using` element containing `ItemName`. In RbBF it is a `USng` group whose `name` record contains the namespace.
 
 ## Interfaces
 
@@ -75,6 +77,8 @@ Everything needed to reproduce a method—scope, `Shared`, `Extends`, `Assigns`,
 Some older files carry an additional `&h1000` bit on methods, producing values such as `&h1000`, `&h1001`, and `&h1021`. The bit occurs on constructors and ordinary methods. Deleting and recreating an otherwise identical constructor in the current IDE removes it, so it is legacy method metadata rather than a constructor or inheritance flag. Its historical meaning is unknown. Readers should accept it, lossless editors should preserve it, and writers should not add it based on constructor or inheritance semantics.
 
 An optional `Description = <hex>` field on the opening tag is the Inspector description encoded as hexadecimal UTF-8 bytes.
+
+Tagged text can retain editor indentation before each source line. The corresponding XML `SourceLine` elements and RbBF `srcl` records are left-aligned, so leading code indentation is presentation data that is normalized when text passes through either single-file format. Relative indentation is not part of Xojo's language semantics.
 
 ## Stored and computed properties
 
@@ -149,13 +153,13 @@ At class or WindowCode level this implements an inherited event. For a placed co
 
 ```text
 #tag Hook, Flags = &h0
-	Event Completed(result As String)
+	Attributes( CompletionKind = "Final" ) Event Completed(result As String)
 #tag EndHook
 ```
 
-Event definitions belong to classes; modules do not have events. The IDE does not offer a scope setting for an event definition. Definitions are displayed in red, consistent with `RaiseEvent` being callable only from the defining class. Follow the serialized `Flags` value rather than synthesizing a scope; the controlled definitions use `Flags = &h0`.
+Event definitions belong to classes; modules do not have events. The IDE does not offer a scope setting for an event definition. Definitions are displayed in red, consistent with `RaiseEvent` being callable only from the defining class. Tagged text always uses `Flags = &h0` for an event definition, while the corresponding XML `ItemFlags` and RbBF `flag` use the private-scope value `33` (`&h21`). This is a format-specific translation performed by the IDE, not evidence of a user-selectable scope.
 
-Hooks can carry a hex `Description` field. Event implementations can also carry descriptions in newer examples. Compatibility flags are not observed on events, consistent with current IDE behavior.
+Event-definition attributes precede `Event` on the declaration line. XML stores their contents in `Attributes`; RbBF stores them in an optional `Atrb` record after `rslt` and before `kCod`. Attributes do not change the event-definition flag translation. Hooks can also carry a hex `Description` field, which maps to XML `CodeDescription` and RbBF `kCod`. Event implementations can carry descriptions in newer examples. Compatibility flags are not observed on events, consistent with current IDE behavior.
 
 ## Menu handlers
 
@@ -170,7 +174,7 @@ Menu handlers are methods in a class/window code region with a dedicated tag:
 #tag EndMenuHandler
 ```
 
-The link to the menu item is the `Handles <name>.Action` clause. The menu tree itself is in `.xojo_menu`.
+The link to the menu item is the `Handles <name>.Action` clause. The menu tree itself is in `.xojo_menu`. XML and RbBF also store the menu-handler identity separately. A current binary saved from a native Xojo Project can retain the complete declaration, including the `Handles` suffix, while older binary/XML source can omit the suffix even though exporting that binary as Xojo Project adds it. A reader must accept both forms. A writer importing Xojo Project must preserve a supplied suffix; the separate identity is sufficient to interpret an older declaration that omits it but is not a reason to delete text added by the IDE's export.
 
 ## Constants and localization
 
@@ -239,8 +243,10 @@ A Navigator Note is named in its tag and contains raw indented lines:
 #tag EndNote
 ```
 
-The corpus also has an unnamed Note nested inside one Property region, showing that Notes are not limited to top-level Navigator items. Code comments remain ordinary method/event source and accept both `//` and apostrophe forms.
+An unnamed Note can be nested inside a Property region, so Notes are not limited to top-level Navigator items. Code comments remain ordinary method/event source and accept both `//` and apostrophe forms.
+
+In XML and RbBF, the source of a named top-level Note repeats the Note name as its first `NoteLine`/`ntln` entry. The text tag carries the name instead, so the repeated first line is not written as part of the text body. An intentional blank line immediately before `#tag EndNote` is stored as a final empty source line and must not be stripped. A nested property Note does not use the top-level Navigator-note framing rule.
 
 ## Breakpoints and bookmarks
 
-Breakpoints are not annotated in these source files. Observed breakpoint records live in `.xojo_uistate` and identify an item, unit type/signature, and line number. No bookmark record was found. See `xojo-uistate.md`; do not move these transient records into source files.
+Breakpoints and bookmarks are not annotated in these source files. Their records live in `.xojo_uistate` and identify an item, unit type/signature, and line number. Breakpoints are established for methods, computed-property accessors, class and control event handlers, while bookmarks use the same reference fields and can coexist with a breakpoint on one source line. IDE scripts do not support breakpoints. See `xojo-uistate.md`; do not move these transient records into source files.

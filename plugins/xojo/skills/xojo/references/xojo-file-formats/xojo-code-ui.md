@@ -95,7 +95,7 @@ Other examples use container/view root classes. Code may be under `WindowCode`, 
 
 ## iOS layouts and layout trees
 
-The corpus contains both `IOSLayout` and `iOSLayout` spellings. A layout is not a control designer. It stores supported orientations and a nested navigation tree:
+Both `IOSLayout` and `iOSLayout` spellings occur. A layout is not a control designer. It stores supported orientations and a nested navigation tree:
 
 ```text
 #tag IOSLayout
@@ -111,7 +111,7 @@ The corpus contains both `IOSLayout` and `iOSLayout` spellings. A layout is not 
 #tag EndIOSLayout
 ```
 
-For a leaf, `Target` is normally the referenced screen's low 32-bit project ID pattern written as signed decimal. Eight top/container nodes instead use `-1` or `-2` as structural sentinels; their exact distinction is not established, so do not try to resolve those values as project IDs. `Icon` is zero or an image reference using the same signed-decimal convention. Nested `ScreenContent` nodes form tab/navigation hierarchies. Empty top nodes occur. Do not reorder nodes; their order is UI order.
+For a leaf, `Target` is normally the referenced screen's low 32-bit project ID pattern written as signed decimal. Eight top/container nodes instead use `-1` or `-2` as structural sentinels. A `-2` root represents a tab container; its first child target is also stored in the layout's `Tab_0_Content` property and the layout has an empty `Tabs` property. A `-1` root represents a split container; its first two child targets are also stored in `Left_Content` and `Right_Content`. Every layout additionally stores the root target in its `Content` property. `Icon` is zero or an image reference using the same signed-decimal convention. Nested `ScreenContent` nodes form tab/navigation hierarchies. Empty top nodes occur. Do not reorder nodes; their order is UI order.
 
 Legacy `IOSScreen` files use the same orientation and `ScreenContent` grammar but a different outer tag/project item kind.
 
@@ -155,7 +155,7 @@ Worker events and properties then use ordinary source tags. The manifest kind is
 ProjectItemsToInclude=JobClass\nUtilities\nUtilities.Record
 ```
 
-Names may be namespace-qualified. One-item and multi-item forms are observed; an explicit empty form has not been isolated.
+Names may be namespace-qualified. The field is always present in the observed Worker settings region. An explicitly empty list is written as `ProjectItemsToInclude=` with nothing after the equals sign; it must not be confused with an omitted Worker region.
 
 ## Threads and notification centers
 

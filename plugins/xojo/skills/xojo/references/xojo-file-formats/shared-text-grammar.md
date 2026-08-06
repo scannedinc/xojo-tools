@@ -57,15 +57,15 @@ Designer strings use backslash escapes such as `\n`. Constant metadata uses a di
 
 ## Source item flags and scope
 
-Methods, stored properties, computed properties, delegates, external methods, enums and structures carry a `Flags = &h...` value. Controlled 2026r2.1 examples establish the following scope correlations across methods, stored and computed properties, external methods, enums, and structures; the larger corpus confirms the same three values for delegates:
+Methods, stored properties, computed properties, delegates, external methods, enums, and structures carry a `Flags = &h...` value. The following scope correlations are established across these member kinds:
 
-| Flags | Declaration found in corpus | Practical meaning |
+| Flags | Declaration form | Practical meaning |
 | --- | --- | --- |
 | `&h0` | no access keyword | Public/default scope |
 | `&h1` | `Protected` | Protected scope |
 | `&h21` | `Private` | Private scope |
 | `&h4` | public properties also exposed in the control Inspector | Public plus an Inspector-related bit; only two examples |
-| `&h1000` | subclass constructors | Additional constructor/superclass bit; exact semantics not established |
+| `&h1000` | legacy high bit combined with an ordinary scope value | Historical method metadata; preserve it, but do not infer it from inheritance |
 
 Do not compute flags solely from this table. The source declaration is the clearest scope signal, and unknown bits may carry IDE state. When changing scope, use a same-kind IDE-produced example; otherwise preserve the full mask.
 
@@ -93,14 +93,14 @@ Members place the same field on their opening tag:
 #tag Method, Flags = &h0, CompatibilityFlags = API2Only and ( (TargetDesktop and (Target32Bit or Target64Bit)) )
 ```
 
-Observed atoms are `API1Only`, `API2Only`, `Target32Bit`, `Target64Bit`, `TargetAndroid`, `TargetConsole`, `TargetDesktop`, `TargetHasGUI`, `TargetIOS`, and `TargetWeb`, combined with lowercase `and`, `or`, `false`, and parentheses. These expressions are the inclusion rules for project family, word size, and API generation. An all-disabled member is written `CompatibilityFlags = false`; a default member omits the field. The IDE emits API 1.0 and API 2.0 forms asymmetrically, for example:
+Observed atoms are `API1Only`, `API2Only`, `Target32Bit`, `Target64Bit`, `TargetAndroid`, `TargetConsole`, `TargetDesktop`, `TargetHasGUI`, `TargetIOS`, and `TargetWeb`, combined with lowercase `and`, `or`, `false`, and parentheses. These expressions are the inclusion rules for project family, word size, and API generation. An all-disabled member is written `CompatibilityFlags = false`; a default member omits the field. The IDE emits API 1 and API 2 forms asymmetrically, for example:
 
 ```text
 CompatibilityFlags = API1Only or ( (TargetConsole and (Target32Bit or Target64Bit)) or ... )
 CompatibilityFlags = API2Only and ( (TargetConsole and (Target32Bit or Target64Bit)) or ... )
 ```
 
-Preserve the IDE's operator choice, spacing, target list, and parenthesization. In particular, do not simplify the API 1.0 expression using ordinary boolean-algebra assumptions.
+Preserve the IDE's operator choice, spacing, target list, and parenthesization. In particular, do not simplify the API 1 expression using ordinary boolean-algebra assumptions.
 
 ## Descriptions, attributes and comments
 
@@ -118,7 +118,7 @@ Attributes( Hidden ) Sub InternalMethod()
 Attributes ( PrimaryKeyName = "ID", Version = 123 ) Protected Class TestClass
 ```
 
-This declaration-line form is ordinary Xojo source syntax. Controlled samples show commas and equals signs unescaped inside quoted attribute values, doubled double-quotes inside strings, and non-ASCII characters stored directly as UTF-8. Preserve the source text rather than applying tag-metadata escaping.
+This declaration-line form is ordinary Xojo source syntax. Commas and equals signs remain unescaped inside quoted attribute values, double quotes inside strings are doubled, and non-ASCII characters are stored directly as UTF-8. Preserve the source text rather than applying tag-metadata escaping.
 
 Structure-specific attributes can instead appear in tag metadata, encoded as a quoted escaped string:
 
@@ -126,7 +126,7 @@ Structure-specific attributes can instead appear in tag metadata, encoded as a q
 #tag Structure, Name = GtkRequisition, Flags = &h21, Attributes = "StructureAlignment \x3D 1"
 ```
 
-In a controlled structure attribute containing punctuation, the metadata form escaped equals as `\x3D` and comma as `\x2C`, while retaining UTF-8 characters. It is therefore governed by metadata escaping, unlike class, module, method, property, and event-definition attribute declarations.
+In the metadata form, equals is escaped as `\x3D` and comma as `\x2C`, while UTF-8 characters are retained. It is therefore governed by metadata escaping, unlike class, module, method, property, and event-definition attribute declarations.
 
 Code comments are ordinary Xojo source (`//` or `'`) inside source-bearing tags. Navigator Notes use `#tag Note` and contain unescaped, indented text.
 

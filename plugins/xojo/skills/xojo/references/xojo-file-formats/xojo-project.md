@@ -14,7 +14,7 @@ Three line categories, in order: header, item references, settings.
 - **Duplicate keys are legal** for item references (`iOSLayout` appears twice in the iOS project). A parser must accumulate, not overwrite.
 - **Values are never quoted or escaped**, including JSON blobs and values containing spaces. A value runs to end-of-line.
 - **Empty value ≠ absent.** `InfoVersion=` is a present key with an empty string.
-- **An omitted key means "the default"**—but which keys omit, and at which value, is inconsistent. See [Defaults and omission](#defaults-and-omission).
+- **An omitted key means "the default"** — but which keys omit, and at which value, is inconsistent. See [Defaults and omission](#defaults-and-omission).
 
 ### Header
 
@@ -27,8 +27,8 @@ OrigIDEVersion=20260201
 
 | Key | Meaning |
 |-----|---------|
-| `Type` | `Desktop`, `Console`, `Web2`, `iOS`, `Mobile` (Android) |
-| `RBProjectVersion` | Format version—"RB" is vestigial *REALbasic* |
+| `Type` | `Desktop`, `Console`, `Web2`, `iOS`, `Mobile` (Android). Binary `prTp` and XML `ProjectType` store the same choice as a number, pairing Desktop `0`, Console `1`, Web2 `3`, iOS `4`, Mobile `5` (`2` is unattested across all 446 example binaries) |
+| `RBProjectVersion` | Format version — "RB" is vestigial *REALbasic* |
 | `MinIDEVersion` | Oldest IDE that can open it, `YYYYRRVV` |
 | `OrigIDEVersion` | IDE that created it (`20260201` = 2026r2.1) |
 
@@ -54,9 +54,17 @@ DesktopWindow=Main;UI/Main.xojo_window;&h0000000015DA9FFF;&h0000000031BB07FF;fal
 | `RelativePath` | Companion or external file, relative to the project file |
 | `ID` | Opaque 64-bit hexadecimal item identity |
 | `ParentID` | Zero for a top-level item; otherwise another item's ID |
-| Boolean | `false` in known files; purpose unknown |
+| Boolean | `true` when the companion is an encrypted class, `false` otherwise |
 
 Do not split unrelated setting values merely because they contain semicolons. For example, `AppIcon=Project.xojo_resources;&h0` is a two-field setting, not an item row.
+
+### Encrypted classes
+
+A class saved with encryption has a `.xojo_binary_code` companion instead of `.xojo_code`, and its item row is the one case where the trailing boolean is `true`. Across the example corpus, every `true` row has such a companion and every other row is `false`.
+
+The companion is its own `RbBF` container rather than tagged text: a 20-byte header of magic, format version `1`, two reserved integers, and the header size, followed by a single `Blok` whose block type and item ID match the manifest row, and closing with `EOF!`. This is the earlier container revision; the 28-byte version `2` header used by Xojo Binary Project adds two further fields. See [xojo-binary-project.md](xojo-binary-project.md).
+
+The block's records are enciphered, so the class contents cannot be read, projected into another format, or round-tripped. A conversion cannot represent such an item and must say so rather than treating the file as damaged text.
 
 ### Item kinds
 
@@ -151,7 +159,7 @@ The delimiter and escaping for multiple coordinates remain unknown. No separate 
 
 ## `BuildFlags`
 
-A hex bitmask written `&hNNNN`. It mixes **two unrelated concerns**—which targets to build, and one Shared build option. This is the most misleading thing in the format.
+A hex bitmask written `&hNNNN`. It mixes **two unrelated concerns** — which targets to build, and one Shared build option. This is the most misleading thing in the format.
 
 Do not confuse it with source-item `CompatibilityFlags` expressions, which control whether a class or member is included for particular project types, 32/64-bit targets, and API generation. Those expressions are documented in [shared-text-grammar.md](shared-text-grammar.md).
 
@@ -188,7 +196,7 @@ This bit is present in Desktop projects and absent from Console, Web, iOS, and A
 
 ### The run-target bit in iOS and Android
 
-Both ship `&h4100`, so `&h4000` is set—but neither shows any target checkboxes; Build Settings contains only *Shared* and one platform row with no checkbox.
+Both ship `&h4100`, so `&h4000` is set — but neither shows any target checkboxes; Build Settings contains only *Shared* and one platform row with no checkbox.
 
 `Build Automation.xojo_code` also carries Linux, Mac OS X, and Windows step lists in iOS, Android, and Web projects. Whether the manifest stores a hidden target superset is unknown.
 
@@ -226,7 +234,7 @@ Setting a platform to **x86 32-bit** deletes its `*BuildArchitecture` key rather
 
 ### Popup order is not numeric order
 
-Linux lists `ARM 32-bit, x86 32-bit, x86 64-bit, ARM 64-bit`—that is, `2, 0, 1, 3`. Identical in all three types. Never infer the enum from menu position.
+Linux lists `ARM 32-bit, x86 32-bit, x86 64-bit, ARM 64-bit` — i.e. `2, 0, 1, 3`. Identical in all three types. Never infer the enum from menu position.
 
 ### iOS and Android
 
@@ -281,7 +289,7 @@ Guessing from key names gets all three wrong. `SubVersion` is likewise the **Bug
 
 ## Defaults and omission
 
-Some booleans vanish from the file at their default; others are always written. There is **no general rule**—a parser must know each key.
+Some booleans vanish from the file at their default; others are always written. There is **no general rule** — a parser must know each key.
 
 | Omitted when off | Always written |
 |------------------|----------------|
@@ -310,7 +318,7 @@ The polarity differs too: `DarkMode` and `HiDPI` write `True` and omit `False`, 
 | File Description | `WinFileDescription` | string |
 | Company Name | `WinCompanyName` | ships `Example` |
 | Minimum Version → mac OS | `MacOSMinimumVersion` | blank = IDE default (`11.0` placeholder) |
-| UI Compatibility Mode | `MacUICompatibilityMode` | `True`/`False`, Desktop only |
+| UI Compatibility Mode | `MacUICompatibilityMode` | `True`/`False`, Desktop only; binary `MUIC` and XML `MacUICompatibilityMode` exist only when `True`. The iOS equivalent is `iOSUICompatibilityMode` with binary `iUIC`. |
 | Normalize Control Sizes | `LinuxNormalizeControlSizes` | omitted when off, Desktop only |
 | MDI | `MDI` | **integer `0`/`1`**, not a boolean |
 | MDI Caption | `MDICaption` | string |
@@ -327,7 +335,7 @@ The polarity differs too: `DarkMode` and `HiDPI` write `True` and omit `False`, 
 |-----------------|-----|----------|
 | iOS App Name | `iOSName` | string |
 | Bundle Identifier | `OSXBundleID` | string |
-| UI Compatibility Mode | `iOSUICompatibilityMode` | `True`/`False` |
+| UI Compatibility Mode | `iOSUICompatibilityMode` | `True`/`False`; binary `iUIC` and XML `iOSUICompatibilityMode` exist only when `True` |
 | Minimum Version → iOS | `iOSMinimumVersion` | blank = default (`15.0` placeholder) |
 | Build For | `BuildForAppStore` | `False`=Development `True`=App Store |
 | Capabilities (gear tab) | `Capabilities` | JSON; see below |
@@ -363,9 +371,9 @@ The polarity differs too: `DarkMode` and `HiDPI` write `True` and omit `False`, 
 
 iOS stores capabilities as one unquoted JSON value:
 
-- The default object carries **14 always-present entries**, each `{"Enabled":false,"<SubKey>":{}}`—for example `"AppGroups":{"Enabled":false,"Groups":{}}`.
+- The default object carries **14 always-present entries**, each `{"Enabled":false,"<SubKey>":{}}` — e.g. `"AppGroups":{"Enabled":false,"Groups":{}}`.
 - Enabling one of those 14 flips `Enabled` **in place**, keeping its sub-object.
-- Enabling a capability *outside* the 14 **prepends** a bare `{"Enabled":true}` entry at the front—no sub-object.
+- Enabling a capability *outside* the 14 **prepends** a bare `{"Enabled":true}` entry at the front — no sub-object.
 - Disabling **removes** a prepended entry entirely.
 
 **UI labels do not always match JSON keys.** Known mappings include:
@@ -373,7 +381,9 @@ iOS stores capabilities as one unquoted JSON value:
 - **Push Notifications** → `RemoteNotifications`
 - **Wallet** → `Passbook`
 
-The structures and semantics of `PrivacyManifest={}`, `PlistEntries={"root":""}`, and `macOSEntitlements` inside `Build Automation.xojo_code` remain unknown.
+`PlistEntries` is an unquoted JSON object whose `root` string contains the complete macOS property-list XML. The JSON quoting is a tagged-text wrapper only: XML and RbBF store the decoded property-list bytes directly. Preserve line breaks, tabs, declaration, doctype, and key order inside the `root` string.
+
+`macOSEntitlements` inside a `SignProjectStep` is an unquoted JSON object stored directly as XML `macOSEntitlements` / RbBF `McTl`. Observed keys include `App Sandbox`, `Hardened Runtime`, `Notarize`, `UserEntitlements`, `App SandboxEntitlements`, and `Hardened RuntimeEntitlements`. Preserve the complete JSON value because the field can survive an IDE binary resave even when another save of the same text project omits it. The structure and semantics of `PrivacyManifest={}` remain incomplete.
 
 ---
 
@@ -409,7 +419,7 @@ Build *steps* live here, not in `.xojo_project`:
 #tag EndBuildAutomation
 ```
 
-**Every project type carries `Linux`, `Mac OS X` and `Windows` step lists**—including iOS, Android and Web—with the type-specific target appended (`iOS`, `Android`, `Xojo Cloud`). The `SignProjectStep` body varies: Desktop and Console carry `DeveloperID` + `macOSEntitlements`, Web and Android only `DeveloperID`, iOS neither.
+**Every project type carries `Linux`, `Mac OS X` and `Windows` step lists** — including iOS, Android and Web — with the type-specific target appended (`iOS`, `Android`, `Xojo Cloud`). The `SignProjectStep` body varies: Desktop and Console carry `DeveloperID` + `macOSEntitlements`, Web and Android only `DeveloperID`, iOS neither.
 
 ---
 
@@ -425,7 +435,7 @@ AppMenuBar           DefaultWindow   MacUICompatibilityMode       PlistEntries
 AppSpecificPassword  DesktopWindow   HiDPI
 ```
 
-**Android is the outlier**—the only type that drops the desktop-target block entirely (`WindowsName`, `MacCarbonMachName`, `LinuxX86Name`, `MacCreator`, `MDI`, `UseGDIPlus`, `WindowsVersions`, `WindowsRunAs`, `MacOSMinimumVersion`, `IsWebProject`, and the four `Win*` metadata fields). iOS keeps all of them despite having no desktop targets in its UI.
+**Android is the outlier** — the only type that drops the desktop-target block entirely (`WindowsName`, `MacCarbonMachName`, `LinuxX86Name`, `MacCreator`, `MDI`, `UseGDIPlus`, `WindowsVersions`, `WindowsRunAs`, `MacOSMinimumVersion`, `IsWebProject`, and the four `Win*` metadata fields). iOS keeps all of them despite having no desktop targets in its UI.
 
 ---
 
@@ -466,11 +476,11 @@ AppSpecificPassword  DesktopWindow   HiDPI
 The following mappings or value structures are incomplete:
 
 - iOS **Team** (`iOSProvisioningProfile` presumed), **Property List**, **App Store Connect**, and **Privacy** (`PrivacyManifest`);
-- macOS **Property List** (`PlistEntries`), **Category** (`AppCategory`), and **App Store Connect** (`AppSpecificPassword`);
+- macOS **Category** (`AppCategory`) and **App Store Connect** (`AppSpecificPassword`);
 - `WebProtocol`, `WebHTMLHeader`, `WebHostingIdentifier`, `WebHostingAppName`, and `WebHostingDomain`;
 - `WindowsVersions`, `MacCreator`, `Region`, `DefaultEncoding`, `AppIcon`, and `IsWebProject`;
 - `BuildLanguage` values beyond Default and English, and the exact status of `Release=1` as Alpha;
-- `Build Automation.xojo_code` fields, including `macOSEntitlements`;
+- unassigned option meanings inside the preserved `macOSEntitlements` JSON dictionaries;
 - multiple `ProjectDependencies` coordinates and their delimiter or escaping.
 
 ### Keys without a known IDE control
@@ -480,6 +490,5 @@ The following mappings or value structures are incomplete:
 ### Open questions
 
 - **`BuildFlags &h0800`** is specific to Desktop projects, but its meaning is unknown.
-- **The trailing item-row boolean** is `false` in known files; its meaning and valid `true` behavior are unknown.
 - **The item-ID generator** is unknown. Recent IDs often fit `(value << 11) | 0x7FF`, but older IDs do not.
 - **The iOS/Android target model** is unclear. Both store the This Computer bit and desktop build-step lists despite not exposing desktop targets.

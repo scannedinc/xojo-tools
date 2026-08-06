@@ -40,7 +40,7 @@ Band start lines intentionally have two spaces after `Begin`: the class position
 
 ## Bands
 
-Observed names include `PageHeader`, `Body`, `PageFooter`, `GroupHeader1`, `GroupHeader2`, `GroupFooter1`, and `GroupFooter2`. The corpus correlates band `Type` values as follows:
+Observed names include `PageHeader`, `Body`, `PageFooter`, `GroupHeader1`, `GroupHeader2`, `GroupFooter1`, and `GroupFooter2`. Band `Type` values correlate as follows:
 
 | Type | Observed band role |
 | --- | --- |
@@ -50,7 +50,7 @@ Observed names include `PageHeader`, `Body`, `PageFooter`, `GroupHeader1`, `Grou
 | `5` | Page footer |
 | `6` | Group footer |
 
-No controlled example establishes values `0` or `4`, or all band-ordering and grouping rules. Preserve the IDE's order, names, type values, and long decimal layout values.
+Values `0` and `4` and some band-ordering and grouping rules remain unassigned. Preserve the IDE's order, names, type values, and long decimal layout values.
 
 ## Report controls
 
@@ -60,4 +60,4 @@ The control property set is extensible across Xojo versions. Copy an IDE-produce
 
 ## Report code
 
-The trailing `ReportCode` region is the source container for report methods, properties, events, constants, and related class members. The supplied reports do not provide broad nonempty code coverage; use the member grammar in [xojo-code-language.md](xojo-code-language.md) and an IDE-created report event as the template for executable report code.
+The trailing `ReportCode` region is the source container for report methods, properties, events, constants, and related class members. Executable report code uses the member grammar in [xojo-code-language.md](xojo-code-language.md).

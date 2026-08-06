@@ -1,8 +1,14 @@
 # `.xojo_uistate`
 
-This is a binary, IDE-owned editor-state sidecar. It records open editors, selection, window geometry, warnings, breakpoints, and similar transient state; it is not required project source and should normally be ignored by version control.
+This is a binary, IDE-owned editor-state sidecar. It records open editors, selection, window geometry, warnings, breakpoints, bookmarks, and similar transient state; it is not required project source and should normally be ignored by version control.
 
-The following framing was derived from hundreds of supplied files. Meanings of many four-character prefixes remain unknown, so use the structure primarily for inspection and recovery, not generation.
+Meanings of many four-character prefixes remain unknown, so use the structure primarily for inspection and recovery, not generation.
+
+## Location and project-format mapping
+
+For `Example.xojo_project`, Xojo stores UI state as `.Example.xojo_uistate` beside the manifest. The manifest does not list this file; its location follows this naming convention. A reader can derive this specific path without scanning for or consuming arbitrary unreferenced siblings.
+
+The complete sidecar is a sequence of the typed records described below, without an `RbBF` file header, `Blok` wrapper, padding, or `EOF!` marker. Those records correspond to the contents of the Xojo Binary Project `pUIs` block and the Xojo XML Project `UIState` block. A direct text-to-binary conversion can retain record order, string padding, and group IDs exactly. Conversion through XML preserves represented values but may assign different group IDs because XML does not serialize them.
 
 ## Typed records
 
@@ -22,7 +28,7 @@ Signedness depends on the field. Geometry/count-like fields may be interpreted a
 8-byte tag + four signed big-endian 32-bit values
 ```
 
-`rEdtRect` occurs in every corpus file and stores editor/window geometry.
+`rEdtRect` stores editor/window geometry.
 
 ### String (`Strn`)
 
@@ -31,6 +37,8 @@ Signedness depends on the field. Geometry/count-like fields may be interpreted a
 ```
 
 The payload is text in the observed cases. Padding uses ASCII spaces until the next four-byte boundary and is not included in the string length. Examples are `SELnStrn`, `SEPtStrn`, `iDDvStrn`, and `nameStrn`.
+
+`MoMk` (`MobileGoogleMapsAPIKey`) is a UI-state record despite naming a build setting: it appears in the sidecar, the `pUIs` block, and the XML `UIState` block, and never in the project block or the `.xojo_project` manifest. An Android project that sets the key therefore carries it only in the sidecar.
 
 ### Group (`Grup`)
 
@@ -45,7 +53,7 @@ big-endian uint32 matching group ID
 
 The payload length spans the group ID and nested records, but excludes the 12-byte `EndGInt ` plus matching-ID terminator. Thus, after reading the length at offset 8, the terminator tag begins at `12 + payload_length`, and the next record begins 12 bytes after that. Groups nest. Validate the declared boundary and matching ID instead of searching blindly for terminator bytes inside strings.
 
-Observed group tags include `SwStGrup`, `SEdsGrup`, `SEdrGrup`, `WrnPGrup`, and `brkGGrup`. Treat all tags as extensible.
+Observed group tags include `SwStGrup`, `SEdsGrup`, `SEdrGrup`, `WrnPGrup`, `brkGGrup`, and `bkGPGrup`. Treat all tags as extensible.
 
 ## Project item and editor references
 
@@ -53,19 +61,35 @@ Several integers are project item IDs written as raw 32-bit values. For example,
 
 ## Breakpoints
 
-The observed breakpoint group is:
+The breakpoint group is:
 
 ```text
 brkGGrup
   PtIDInt   project item ID
   nameStrn  control/item name
-  unTYStrn  "Event Handler"
-  unIDStrn  source signature such as "Sub Pressed()"
+  unTYStrn  source-unit kind
+  unIDStrn  source signature
   lnNMInt   source line number
 EndGInt
 ```
 
-The corpus establishes only event-handler breakpoints. It contains no recognizable bookmark record and no examples of breakpoints in every possible source-member kind.
+Established `unTY` values are `Event Handler`, `Method`, and `Computed Property`. `unID` carries signatures such as `Sub Pressed()`, `Sub Untitled()`, and `Get As Integer`. `name` is the placed-control or computed-property name when that context is needed and is empty for an ordinary method or class event handler. `lnNM` is one-based within the source unit. IDE scripts do not support breakpoints. The current IDE has no conditional-breakpoint feature, so there is no conditional variant to serialize.
+
+## Bookmarks
+
+Bookmarks use `bkGPGrup` and contain the same five records in the same order as `brkGGrup`:
+
+```text
+bkGPGrup
+  PtIDInt   project item ID
+  nameStrn  control/item name or empty
+  unTYStrn  source-unit kind
+  unIDStrn  source signature
+  lnNMInt   one-based source line number
+EndGInt
+```
+
+Bookmarks are established for methods, computed-property accessors, class event handlers, and control event handlers. A source line may have both a `bkGP` bookmark group and a `brkG` breakpoint group; neither replaces the other.
 
 ## Source-control policy
 

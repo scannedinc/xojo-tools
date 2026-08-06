@@ -39,7 +39,7 @@ An empty app-icon or launch-image slot omits the path/bookmark fields but keeps 
 
 The image container terminates with `End Image`, not a bare `End`. `ImageSpecification` has observed fields `Comment`, `Device`, `HSize`, `VSize`, `Orientation`, `Platform`, and `PPI`. Values are not uniformly numeric—`Orientation = Any` is common. In an ordinary three-scale image, `PPI` values `72`, `144`, and `216` correspond to 1x, 2x, and 3x resources while `HSize`/`VSize` retain the logical design size. One 16-point example therefore uses source files with 2x/4x/6x naming while keeping sizes at 16 and assigning those three PPI values.
 
-Do not infer pixel dimensions solely from filenames. Slot comments and the device/platform/orientation enums are IDE metadata. The corpus contains many app-icon slots, but it does not establish a future-proof meaning for every numeric enum value.
+Do not infer pixel dimensions solely from filenames. Slot comments and the device/platform/orientation enums are IDE metadata. Not every numeric enum value has a future-proof assigned meaning.
 
 ## Ordinary images, app icons, and launch images
 

@@ -4,7 +4,7 @@ A compiled Xojo library is a ZIP archive. It is generated from a `Library` proje
 
 ## Observed archive layout
 
-The controlled Desktop library has this structure:
+A Desktop library has this structure:
 
 ```text
 Library1/
@@ -27,7 +27,7 @@ Library1/
       Module1.o
 ```
 
-The root directory is the library name. Immediately below it, a target-family directory contains `API/` and the object-code directories. Controlled builds establish these layouts:
+The root directory is the library name. Immediately below it, a target-family directory contains `API/` and the object-code directories. These layouts are established:
 
 | Project type | Target-family directory | Object-code directories |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ The root directory is the library name. Immediately below it, a target-family di
 | Web | `Web/` | `OSX_x86_64`, `OSX_ARM64`, `Linux_x86_64`, `Windows_x86_64` |
 | iOS | `iOS/` | `iOS_ARM64` |
 
-Each controlled archive has one `API/` directory under its target-family directory. Platform and architecture directory names are format data and should not be normalized. Xojo does not support libraries in Android projects, so there is no Android target-family layout. Debug, simulator, and additional architecture layouts have not been observed in a controlled archive.
+Each target-family archive has one `API/` directory under its target-family directory. Platform and architecture directory names are format data and should not be normalized. Xojo does not support libraries in Android projects, so there is no Android target-family layout. Debug, simulator, and additional architecture layouts remain unassigned.
 
 ## `LibraryInfo.json`
 
@@ -53,7 +53,7 @@ The root metadata file is pretty-printed JSON. Observed keys are:
 }
 ```
 
-The three user-entered values come from the project settings serialized as `ShortVersion`, `LongVersion`, and `InfoVersion`, respectively. A populated Windows `WinFileDescription` does not replace `Description` and is not copied to another observed JSON key. All four controlled target families use the same metadata keys. Preserve unknown keys. `BuildDate` is local-looking text with no serialized timezone in the samples.
+The three user-entered values come from the project settings serialized as `ShortVersion`, `LongVersion`, and `InfoVersion`, respectively. A populated Windows `WinFileDescription` does not replace `Description` and is not copied to another observed JSON key. All four documented target families use the same metadata keys. Preserve unknown keys. `BuildDate` is local-looking text with no serialized timezone.
 
 ## API source
 
@@ -68,4 +68,4 @@ Consumers should read these files for signatures only. They must not be used to 
 
 ## Consumer project behavior
 
-A `.xojo_library` is discovered when it is either beside the project or in the IDE's plugins folder. It is not added as a project item. Compilation resolves types and modules against the libraries available in those locations, so the `.xojo_project` manifest contains no library-file row or search-path reference. The controlled consumer confirms the same-folder case. Do not invent a manifest reference for a consumed library.
+A `.xojo_library` is discovered when it is either beside the project or in the IDE's plugins folder. It is not added as a project item. Compilation resolves types and modules against the libraries available in those locations, so the `.xojo_project` manifest contains no library-file row or search-path reference. Do not invent a manifest reference for a consumed library.
