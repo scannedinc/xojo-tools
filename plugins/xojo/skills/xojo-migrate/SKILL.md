@@ -232,6 +232,16 @@ A rule can *produce* a name that a later category's regex then matches, so that 
 
 **This ordering is also the commit plan.** Each category in step 5 becomes one commit, in that order. Show the user the list up front ("roughly 9 commits, in this order, and here is what each will contain") so they know what they are agreeing to review. Categories with no hits are dropped from the plan; say which, so a missing commit does not read as a missed step.
 
+#### What the analyzer already settled, and what it did not
+
+Phases 4 and 5 ask three questions per match that exist because a regex cannot answer them. On the **IDE path** the compiler has already answered them, and knowing which is which prevents two opposite mistakes—re-deriving what is known, and trusting what is not.
+
+**Settled, for every site the analyzer reported.** It is real code: the analyzer compiles, so a match inside a comment or a string literal cannot appear (phase 4's first question). The receiver is that type, and the member really is deprecated on it: the compiler resolved the receiver in order to raise the warning at all (phase 5's whole job). And phase 5's warning that most matches in the tier are wrong describes *regex* matching—an analyzer finding does not carry that false-positive rate, so do not dismiss one as scanner noise.
+
+**Not settled, and still yours.** Whether the replacement the IDE named is the API 2 destination: it is sometimes another member of the deprecated class, which compiles and gets flagged again next pass, so `worklist.py` prints the conflict and `ide-vs-source.md` documents the shape. Whether the rename is *semantically* safe: index bases, `InStr`'s sentinel and `Date`'s epoch are invisible to the compiler, and the rule's caveat governs exactly as it would for a scanner hit. Which matrix row a bare member warning belongs to, when the replacement does not settle it—that is what an AMBIGUOUS group means, and it wants the receiver confirmed by hand. And anything outside the analyzed platform: `#If` branches for other targets were never looked at (phase 8).
+
+Stated as one line: **the analyzer is authoritative about where a deprecation is, and merely helpful about what to replace it with.** The scanner path settles none of this and phases 4 and 5 apply to it unchanged.
+
 ### 4. Fast pass (`high` rules): one glance per match
 
 For each `high` rule with hits, fetch it (`$SKILL/scripts/lookup.py rule <id>`) and walk its matches. Per match, three questions, all answerable from the one line you are looking at:
