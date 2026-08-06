@@ -1,4 +1,4 @@
-# xojoctl
+# Agent Skill: xojo-ide
 
 Control a running [Xojo](https://www.xojo.com/) IDE from the command line.
 
@@ -27,6 +27,7 @@ fail 1 error, 2 warnings
 
 - Python 3.9 or later.
 - A running Xojo IDE on the same machine.
+- An IDE that speaks IDE Communicator protocol v2. `xojoctl` does not speak the older protocol v1, so IDEs that predate v2 cannot be driven. See [Protocol reference](references/protocol.md).
 - macOS or Linux. Windows works but is less tested. See [Platform support](references/platforms.md).
 
 `xojoctl` uses only the Python standard library. There is nothing to install.
@@ -171,13 +172,15 @@ Run `xojoctl <command> --help` for the flags of any command.
 ## Documentation
 
 - [JSON output](references/json-output.md) — the full schema, field by field, and how it changes between versions.
+
 - [IDE behavior](references/ide-behavior.md) — how the IDE really answers, and the surprises `xojoctl` handles for you. Read this when a result confuses you.
+
 - [Build targets](references/build-targets.md) — the target table, where its numbers come from, and the sort order.
+
 - [Platform support](references/platforms.md) — transports, Windows port discovery, and running several IDEs.
+
 - [Security](references/security.md) — what an IDE Script can do, and why you must not pass it untrusted input.
+
 - [Protocol reference](references/protocol.md) — IDE Communicator v2 on the wire.
+
 - [Development](references/development.md) — running the tests and how the source is laid out.
-
-## License
-
-MIT. See [LICENSE](../../../../LICENSE) at the repository root.
