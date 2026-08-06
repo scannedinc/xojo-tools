@@ -9,7 +9,9 @@
 #      documentation-reserved domains (example.com/.org/.net, *.example,
 #      *.invalid, *.test) are allowed.
 #   2. The identical copies of helptext.py stay identical.
-#   3. Every staged .json file parses as JSON.
+#   3. Every skill folder under plugins/*/skills carries a LICENSE file
+#      (that exact name, no extension) identical to the repository LICENSE.
+#   4. Every staged .json file parses as JSON.
 
 set -u
 
@@ -57,7 +59,34 @@ if [ -n "$canon_sha" ]; then
     done
 fi
 
-# --- 3. JSON validity -------------------------------------------------------
+# --- 3. LICENSE copies ------------------------------------------------------
+# Skill folders are found by glob, not listed, so a new skill is checked the
+# moment it exists. Unlike the helptext check, a missing copy is an error: a
+# skill copied out of the repository must carry its own license.
+canon="LICENSE"
+canon_sha=$(git ls-files -s "$canon" | awk '{print $2}')
+if [ -n "$canon_sha" ]; then
+    for dir in plugins/*/skills/*/; do
+        [ -d "$dir" ] || continue
+        copy="${dir}LICENSE"
+        copy_sha=$(git ls-files -s "$copy" | awk '{print $2}')
+        if [ -z "$copy_sha" ]; then
+            echo "pre-commit: $copy is missing" >&2
+            echo "Every skill carries a copy of the repository LICENSE: cp $canon $copy && git add $copy" >&2
+            fail=1
+        elif [ "$copy_sha" != "$canon_sha" ]; then
+            echo "pre-commit: $copy differs from $canon" >&2
+            echo "These are maintained as identical copies; apply the same edit to every copy." >&2
+            fail=1
+        fi
+        if [ -n "$(git ls-files -s "${dir}LICENSE.txt")" ]; then
+            echo "pre-commit: ${dir}LICENSE.txt: the license file is named LICENSE, with no extension" >&2
+            fail=1
+        fi
+    done
+fi
+
+# --- 4. JSON validity -------------------------------------------------------
 if command -v python3 >/dev/null 2>&1; then
     while IFS= read -r f; do
         [ -n "$f" ] || continue

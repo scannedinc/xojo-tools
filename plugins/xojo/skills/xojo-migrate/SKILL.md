@@ -34,7 +34,7 @@ The mindset that matters: **the dangerous bugs here are runtime bugs, not compil
 
 **Provenance, and what that means for trusting it.** The deprecation matrix is *derived* from Xojo's own published documentation—the deprecated-symbol indexes and the per-release deprecation tables—so its coverage is a property of those sources rather than of anyone's memory. The conversion rules, caveats and traps are hand-written on top of it and reviewed against real migrations; they are the opinionated part. Where a mapping could not be verified against a documentation page, the row says so in its `note`. Treat a row's note as part of the answer, not decoration.
 
-Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo" is their trademark. No Xojo documentation is redistributed here; the **References** section links to it. This skill is MIT-licensed (`LICENSE.txt`, beside this file) and comes with no warranty—it will happily hand you a wrong rename if you skip the receiver checks it keeps insisting on.
+Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo" is their trademark. No Xojo documentation is redistributed here; the **References** section links to it. This skill is MIT-licensed (`LICENSE`, beside this file) and comes with no warranty—it will happily hand you a wrong rename if you skip the receiver checks it keeps insisting on.
 
 ## Hard rules
 

@@ -78,7 +78,7 @@ The skill covers desktop projects. It marks the iOS, Web, and Android surface as
 | File | What it does |
 | --- | --- |
 | `SKILL.md` | Holds the instructions Claude follows. Claude loads this file automatically and reads the others on demand. |
-| `LICENSE.txt` | Holds the MIT license and the Xojo attribution notice. |
+| `LICENSE` | Holds the MIT license and the Xojo attribution notice. |
 | `README.md` | This file. Claude does not need it. |
 
 ### The `references` directory
@@ -149,7 +149,3 @@ Some mappings could not be checked against a documentation page. Each of those r
 - A member match does not give the receiver type. A rule can match ninety lines and be correct on twenty of them. One line of source does not hold enough to decide.
 - No rule matches across a line continuation. No member rule matches a call without a receiver. Phase 8 requires `sweep.py` for that reason.
 - The skill reads text-format projects only.
-
-## License
-
-MIT. See `LICENSE.txt`. Xojo, Inc. does not endorse or review this skill, and this skill has no affiliation with Xojo, Inc. It redistributes no Xojo documentation. It links to <https://documentation.xojo.com/> instead.
