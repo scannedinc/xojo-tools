@@ -12,7 +12,7 @@ The skill contains three parts:
 
 - A deprecation matrix of more than a thousand symbols, derived from Xojo's documentation.
 - Hundreds of conversion rules with find and replace patterns, caveats, and examples.
-- Three Python scripts that inventory a project, look up a symbol, and sweep for missed conversions.
+- Python scripts that inventory a project, look up a symbol, sweep for missed conversions, join the IDE's own analysis to the conversion rules, and turn on the per-project deprecation warnings.
 
 The skill is not a codemod. It does not convert a project on one command. The reason is in the next section.
 
@@ -101,6 +101,10 @@ Two fields need a word of their own. `live_on` names the receivers where a depre
 | `scan.py` | Inventories the project. Reports every deprecated symbol, by bucket. Segments each file first, so the counts show code and not layout metadata, notes, comments, or string literals. That gap is often 3 to 4 times. |
 | `sweep.py` | Sweeps for what the rules cannot match. Every member rule needs a dot, so no rule sees `Invalidate` where the code means `Self.Invalidate`. The script also removes the identifiers that your project declares, and prints which names it removed. |
 | `lookup.py` | Queries the data: one symbol, one rule, one category, or one confidence tier. |
+| `worklist.py` | Joins the output of Analyze Project to the rules. Reads the JSON from `xojoctl analyze` and sorts each warning into a group: hand conversion required, read the caveat first, mechanical rename, or the IDE converter handles it. |
+| `analysis_warnings.py` | Reports or enables the per-project deprecation warnings that Analyze Project needs. |
+
+The directory also holds maintenance scripts. `enrich_from_ide_db.py` imports rows from the deprecation database inside the Xojo IDE, and `refresh_from_docs.py` cross-checks the matrix against the generated indexes of the sibling `xojo` skill and backfills release dates. Both are maintainer tools, not migration steps.
 
 Run them like this:
 
@@ -120,23 +124,23 @@ Substitute the real location of the skill. With the plugin installed in Claude C
 
 ## Coverage
 
-The matrix holds more than a thousand symbols. The bucket tells you what each symbol costs you:
+The matrix holds more than a thousand symbols. The bucket tells you what each symbol costs you. `scan.py` reports what your project holds in each bucket:
 
-| Bucket | Count | What it means |
-| --- | ---: | --- |
-| `Source — member` | ~730 | Deprecated member calls. The name alone does not give the type, so treat these as leads. |
-| `Source — global` | ~110 | Deprecated global functions. |
-| `Out of scope` | ~90 | The iOS, Web, Android, and PDF surface. |
-| `Removed` | ~90 | Does not compile. These are build errors before the conversion starts. |
-| `IDE handles` | ~50 | Control renames. The IDE converter does these. |
-| `Source — type` | ~50 | Type names that the converter never touches, such as `Date` and `HTTPSocket`. |
-| `No replacement` | ~40 | Still compiles. Xojo documents no successor, so the feature needs a redesign. |
+| Bucket | What it means |
+| --- | --- |
+| `Source — member` | Deprecated member calls. The name alone does not give the type, so treat these as leads. |
+| `Source — global` | Deprecated global functions. |
+| `Out of scope` | The iOS, Web, Android, and PDF surface. |
+| `Removed` | Does not compile. These are build errors before the conversion starts. |
+| `IDE handles` | Control renames. The IDE converter does these. |
+| `Source — type` | Type names that the converter never touches, such as `Date` and `HTTPSocket`. |
+| `No replacement` | Still compiles. Xojo documents no successor, so the feature needs a redesign. |
 
 The skill holds hundreds of rules in eleven categories. Most are high or medium confidence, and a smaller set is low confidence or manual-only. No rule is approved for a project-wide replace. The tier tells you how hard to look, not whether to look.
 
 ## Where the data comes from
 
-The matrix is derived from Xojo's documentation. The sources are the deprecated-symbol indexes and the per-release deprecation tables. Its coverage is therefore a property of those sources. The build also recovers the symbols that Xojo lists by name with no detail page. Several hundred rows on `Window`, `MenuItem`, `TextEdit`, `PopupMenu`, and `Serial` come from that recovery.
+Most of the matrix is derived from Xojo's documentation. The sources are the deprecated-symbol indexes and the per-release deprecation tables. Its coverage is therefore a property of those sources. The build also recovers the symbols that Xojo lists by name with no detail page. Several hundred rows on `Window`, `MenuItem`, `TextEdit`, `PopupMenu`, and `Serial` come from that recovery. A further set of rows comes from the deprecation database inside the Xojo IDE. Each of those rows is marked `"src": "xojo-ide-db"`, and its replacement was verified against the documentation's member index before import.
 
 The rules, the tiers, the caveats, and the traps are written by hand on top of the matrix. They are the part with an opinion in it. A build step checks every rule against its own examples, so the documented pattern dialect is tested and not asserted.
 

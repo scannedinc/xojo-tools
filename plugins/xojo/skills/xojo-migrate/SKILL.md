@@ -22,7 +22,7 @@ disable-model-invocation: true
 
 **The two names for the old API.** This skill calls it API 1.0. Xojo's own documentation almost never names it at all, and where it does the term is "pre-API 2.0". The two mean the same generation, so search for either.
 
-Rule-driven, confidence-tiered conversion of Xojo source code. This skill bundles the complete deprecation matrix (more than a thousand symbols, generated from Xojo's own deprecation docs) and hundreds of reviewed conversion rules with find/replace regexes, caveats, and before/after examples, each one machine-checked against the rule that carries it.
+Rule-driven, confidence-tiered conversion of Xojo source code. This skill bundles a deprecation matrix (more than a thousand symbols, generated from Xojo's own deprecation docs and the IDE's deprecation database) and hundreds of reviewed conversion rules with find/replace regexes, caveats, and before/after examples, each one machine-checked against the rule that carries it.
 
 Detection is IDE-first: when the sibling **xojo-ide** skill can reach a running IDE, the worklist comes from Xojo's own Analyze Project, which resolves receivers and types the way no regex can. The bundled scanner remains as the fallback—no IDE reachable, project will not open, or the user asks for it—and as the closing cross-platform check either way (phase 2 explains the split). The conversion rules, caveats and traps apply identically whichever path located the work.
 
@@ -32,7 +32,7 @@ The mindset that matters: **the dangerous bugs here are runtime bugs, not compil
 
 **Requirements.** Desktop Xojo projects saved in **text format**, built with **Xojo 2021r3 or later** (when the `Desktop*` classes arrived), in a **git repository**, with **python3** on PATH for the bundled scripts. The **Xojo IDE is required**—this skill never compiles anything itself, so every checkpoint is an IDE compile: run through the xojo-ide skill when it can reach a running IDE, performed by the user otherwise. iOS, Web and Android surfaces are out of scope.
 
-**Provenance, and what that means for trusting it.** The deprecation matrix is *derived* from Xojo's own published documentation—the deprecated-symbol indexes and the per-release deprecation tables—so its coverage is a property of those sources rather than of anyone's memory. The conversion rules, caveats and traps are hand-written on top of it and reviewed against real migrations; they are the opinionated part. Where a mapping could not be verified against a documentation page, the row says so in its `note`. Treat a row's note as part of the answer, not decoration.
+**Provenance, and what that means for trusting it.** The deprecation matrix is *derived* from Xojo's own published documentation—the deprecated-symbol indexes and the per-release deprecation tables—and from the deprecation database inside the Xojo IDE, so its coverage is a property of those sources rather than of anyone's memory. The conversion rules, caveats and traps are hand-written on top of it and reviewed against real migrations; they are the opinionated part. Where a mapping could not be verified against a documentation page, the row says so in its `note`. Treat a row's note as part of the answer, not decoration.
 
 Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo" is their trademark. No Xojo documentation is redistributed here; the **References** section links to it. This skill is MIT-licensed (`LICENSE`, beside this file) and comes with no warranty—it will happily hand you a wrong rename if you skip the receiver checks it keeps insisting on.
 
@@ -214,7 +214,7 @@ The rule being enforced is *the deferral is discoverable from the code*, not *th
 
 The three deferral categories that recur, all of which need this: compound receivers left as deprecated globals (hard rule 3), calls whose replacement takes a different *kind* of argument (`DrawPolygon`/`FillPolygon` → `DrawPath`/`FillPath`), and anything awaiting a design decision from the user.
 
-**Not everything old is deprecated.** Some globals that look like obvious API 1.0 holdovers are still current, and the matrix's silence about them is the answer, not a gap: `Asc`, `Chr`, `Val`, `Str`, `Format`, `Abs`, `Min`, `Max`, `Round`, `CStr`. Do not convert them, and do not go hunting for a replacement when a user asks. Note the trap in the pair, though—the **byte variants `AscB` and `ChrB` *are* deprecated** (→ `String.AscByte` / `String.ChrByte`) even though their base names are fine. If `lookup.py symbol <Name>` returns nothing, the symbol is not deprecated; check before answering.
+**Not everything old is deprecated.** Some globals that look like obvious API 1.0 holdovers are still current, and the matrix's silence about them is the answer, not a gap: `Asc`, `Chr`, `Val`, `Str`, `Format`, `Abs`, `Min`, `Max`, `Round`, `CStr`. Do not convert them, and do not go hunting for a replacement when a user asks. Note the trap in the pair, though—the **byte variants `AscB` and `ChrB` *are* deprecated** (→ `String.AscByte` / `String.ChrByte`) even though their base names are fine. If `lookup.py symbol <Name>` returns nothing, the matrix does not cover the symbol; confirm against the xojo skill's deprecation indexes before declaring it current.
 
 ### 3. Plan the pass order
 
@@ -400,7 +400,7 @@ python3 $SKILL/scripts/worklist.py [analyze.json] [--format json]  # join `xojoc
 
 **python3 is a requirement, not a convenience.** The scripts are stdlib-only, but `scan.py` and `sweep.py` have no hand equivalent—segmenting a Xojo file into code and metadata, and censusing a project's declared identifiers, are not things to do by eye. If python3 is genuinely unavailable, say so and stop rather than half-running the workflow.
 
-The two datasets are readable directly if you need to check one symbol without running anything: `coverage.json` is a JSON array of rows (`old`, `new`, `cat`, `status`, `since`, `note`, and where relevant `live_on` / `chains_to` / `src`), and `rules.json` holds full rule detail. A row carrying `"src": "xojo-ide-db"` was filled from the Xojo IDE's own deprecation database rather than from a documentation page, and its replacement was confirmed against the API 2 class page before import—see `ide-vs-source.md`, which also covers why the IDE's own suggestion is sometimes not the API 2 destination. **Do not read either whole**—they are ~390 KB and ~520 KB. Grep for the symbol, or use `lookup.py`, which is what it is for.
+The two datasets are readable directly if you need to check one symbol without running anything: `coverage.json` is a JSON array of rows (`old`, `new`, `cat`, `status`, `since`, `note`, and where relevant `live_on` / `chains_to` / `src`), and `rules.json` holds full rule detail. A row carrying `"src": "xojo-ide-db"` was filled from the Xojo IDE's own deprecation database rather than from a documentation page, and its replacement was verified against the documentation's member index before import—see `ide-vs-source.md`, which also covers why the IDE's own suggestion is sometimes not the API 2 destination. **Do not read either whole**—they are large. Grep for the symbol, or use `lookup.py`, which is what it is for.
 
 ## References
 
@@ -412,7 +412,7 @@ Bundled with the skill:
 - `$SKILL/references/ide-vs-source.md` — what the IDE converter does and does not touch, how to read its silence, deprecated-vs-removed, and enabling the analyzer's deprecation warnings programmatically.
 - `$SKILL/references/coverage.json` / `$SKILL/references/rules.json` — the datasets behind the scripts.
 
-Fetched from Xojo when you need them. **The bundled matrix is the authority on what is deprecated**; these are for understanding an API you are converting *to*, or for anything the matrix does not cover:
+Fetched from Xojo when you need them. **The bundled matrix is the primary reference for what is deprecated during a migration, and the xojo skill's indexes are the cross-check**; these are for understanding an API you are converting *to*, or for anything the matrix does not cover:
 
 - <https://documentation.xojo.com/topics/api_design/moving_to_api_2.0.html> — Xojo's own "Moving To API 2.0" overview. Background for API 2.0 idioms (`Var`, iterators, enumerations). Read it once at the start if the codebase is unfamiliar; it is not a per-symbol reference.
 - <https://documentation.xojo.com/llms.txt> — an index of links to every documentation page, in a form built for agents. Use it to find the canonical page for a class, then fetch that page. This is the fastest way to answer "what does `DesktopSlider` actually expose in API 2.0?"

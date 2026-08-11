@@ -11,10 +11,10 @@ WHY THIS EXISTS, and why scan.py is not enough.
 
 Every member rule in this skill is anchored on a literal dot -- `\\.Member\\b`.
 In Xojo a call on your own instance needs no receiver at all: `Invalidate` and
-`Self.Invalidate` are the same call, and older code writes the first. 149 of
-the 263 rules are therefore structurally blind to a form that is common in
-exactly the code they target. On one real desktop project a `.Invalidate` rule
-saw roughly one occurrence in seven.
+`Self.Invalidate` are the same call, and older code writes the first. Most of
+the rules are therefore structurally blind to a form that is common in exactly
+the code they target. On one real desktop project most `Invalidate` calls had
+no receiver, so a `.Invalidate` rule saw only a small fraction of them.
 
 That is worse than a low hit rate, because a rule that cannot match a form
 still reports **zero remaining**, and zero reads as finished. This sweep exists
