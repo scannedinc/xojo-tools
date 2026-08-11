@@ -81,7 +81,7 @@ So `xojoctl close --save` runs `SaveFile` first and then closes with `prompt=Fal
 
 Through Xojo 2026r2.1 there is no revert or reload command. `OpenFile` on an already-open project does nothing. This is verified: edit a file on disk, send `OpenFile` again, and the stale diagnostics do not change.
 
-Run `xojoctl close --discard`, then `xojoctl open <path>`. Xojo 2026r3 adds Reload Project and its scripting commands (per its release notes; not yet verified against a shipping 2026r3), so there `xojoctl reload --discard` does it in one step.
+Run `xojoctl reload --discard`, which works on every release: through Xojo 2026r3's Reload Project scripting command where the IDE has it (per its release notes; not yet verified against a shipping 2026r3), and through an atomic close-and-reopen script on older IDEs. The manual pair—`xojoctl close --discard`, then `xojoctl open <path>`—remains equivalent.
 
 ## Script error line numbers are corrected
 

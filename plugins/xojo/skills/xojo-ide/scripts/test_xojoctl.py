@@ -472,6 +472,13 @@ class MockIDE:
             self._send(conn, {"tag": tag, "response": {"scriptError": [
                 {"type": "scriptCompilerWarning", "line": 1, "message": "w"}]}})
             return
+        if "CloseProject(False)" in script and "OpenFile(" in script:
+            # The atomic close-and-reopen: same project, closed and reopened,
+            # so the state is unchanged. A never-saved project has no path.
+            self._send(conn, {"tag": tag, "response":
+                              X.RELOAD_NO_PATH if self.front_path is None
+                              else "reloaded"})
+            return
         if "WindowCount" in script:
             self._send(conn, {"tag": tag, "response": str(self.window_count)})
             return
@@ -1309,6 +1316,14 @@ def test_reload_semantics() -> None:
           s.startswith('If ReloadProjectItem("My Window") Then'), True)
     check("--item prints a distinct marker for a missing item",
           X.RELOAD_ITEM_MISSING in s, True)
+    s = X.script_close_and_reopen()
+    check("fallback is atomic: close and reopen in one script",
+          "CloseProject(False)" in s and "OpenFile(p)" in s, True)
+    check("fallback never prompts", "CloseProject(True)" in s, False)
+    check("fallback never uses the modal DoCommand OpenFile",
+          'DoCommand("OpenFile")' in s, False)
+    check("fallback refuses a never-saved project instead of closing it",
+          X.RELOAD_NO_PATH in s, True)
 
 
 def test_analyze_session() -> None:
@@ -1715,14 +1730,25 @@ def test_command_flows() -> None:
         check_raises("reload: refused without --discard",
                      lambda: run(X.cmd_reload, item=None, discard=False),
                      X.XojoError)
-        check_raises("reload: refused on an IDE older than 2026r3",
-                     lambda: run(X.cmd_reload, item=None, discard=True),
+        ide.front_path = "/tmp/Mock.xojo_project"
+        res = run(X.cmd_reload, item=None, discard=True)
+        check("reload: pre-2026r3 falls back to close-and-reopen",
+              (res.exit_code, res.result["mechanism"], res.summary),
+              (0, "close_and_reopen",
+               "reloaded the front project from disk (close and reopen)"))
+        ide.version = "garbled"
+        res = run(X.cmd_reload, item=None, discard=True)
+        check("reload: an unreadable version takes the fallback",
+              res.result["mechanism"], "close_and_reopen")
+        ide.version = "2026.021"
+        check_raises("reload: --item still needs 2026r3",
+                     lambda: run(X.cmd_reload, item="Window1", discard=True),
                      X.XojoError)
         ide.version = "2026.03"    # what Str(XojoVersion) prints for 2026r3
         res = run(X.cmd_reload, item=None, discard=True)
-        check("reload: succeeds on 2026r3",
-              (res.exit_code, res.summary),
-              (0, "reloaded the front project from disk"))
+        check("reload: 2026r3 uses ReloadProject itself",
+              (res.exit_code, res.result["mechanism"], res.summary),
+              (0, "reload_project", "reloaded the front project from disk"))
         res = run(X.cmd_reload, item="Window1", discard=True)
         check("reload: item success records the item",
               (res.exit_code, res.result["item"], res.result["scope"]),
@@ -1731,6 +1757,10 @@ def test_command_flows() -> None:
                      lambda: run(X.cmd_reload, item="Nope", discard=True),
                      X.XojoError)
         ide.version = "2026.021"
+        ide.front_path = None
+        check_raises("reload: a never-saved project cannot be reloaded",
+                     lambda: run(X.cmd_reload, item=None, discard=True),
+                     X.XojoError)
     finally:
         set_global("open_client", old_open)
         set_global("script_analyze_project", old_analyze)

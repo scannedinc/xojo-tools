@@ -90,7 +90,7 @@ xojoctl close --save
 
 `close --discard` throws away unsaved changes. Typing `--discard` is the confirmation, like the `-f` in `rm -f`; the tool never prompts.
 
-Xojo 2026r3 adds a reload command, described in its release notes and not yet tested against a shipped 2026r3. There, `xojoctl reload --discard` re-reads the front project from disk in one step, and `--item NAME` reloads one project item. A reload discards unsaved changes like a revert, so it takes the same `--discard`. On an older IDE, `xojoctl reload` refuses and tells you to close and reopen instead.
+`xojoctl reload --discard` re-reads the front project from disk. On Xojo 2026r3 or later it runs the new Reload Project command, described in that release's notes and not yet tested against a shipped 2026r3. On an older IDE it closes the project without saving and reopens it, which lands in the same place; the JSON result names which mechanism ran. `--item NAME` reloads one project item and needs 2026r3. A reload discards unsaved changes like a revert, so it takes the same `--discard`.
 
 ### Analyze the project
 

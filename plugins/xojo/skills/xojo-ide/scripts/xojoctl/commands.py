@@ -8,7 +8,7 @@ import secrets
 import sys
 import time
 import unicodedata
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence
 
 from .constants import *  # noqa: F401,F403
 from .escaping import *  # noqa: F401,F403
@@ -563,42 +563,13 @@ def _session_close(client: Client) -> bool:
         return False
 
 
-def _require_ide_version(res: Result, minimum: float, name: str) -> None:
-    """Refuse a command the running IDE is too old to know.
-
-    Sending it anyway would come back as a scriptError -- exit 5, which
-    json-output.md defines as a bug in xojoctl -- so the refusal happens
-    here, with the remedy in the message. XojoVersion is a Double whose
-    numeric order matches the release order, so a float compare is enough.
-    """
-    raw = (res.ide or {}).get("version") or ""
-    try:
-        seen = float(raw)
-    except ValueError:
-        raise XojoError(
-            "%s needs Xojo %s or later, and the IDE's version reply %r is "
-            "unreadable.\nTry '%s version'." % (res.command, name, raw, INVOCATION))
-    if not seen >= minimum:
-        # NOT `seen < minimum`: float() accepts "nan", whose every comparison
-        # is False, and the gate must fail closed on a nonsense reply.
-        raise XojoError(
-            "%s needs Xojo %s or later; this IDE is %s.\n"
-            "Close and reopen instead: %s close --discard, then "
-            "%s open <path>." % (res.command, name, raw, INVOCATION, INVOCATION))
-
-
 def _simple(args: argparse.Namespace, res: Result, script: str, ok_summary: str,
             needs_project: Optional[str] = None,
-            ceiling: Optional[float] = None,
-            min_version: Optional[Tuple[float, str]] = None) -> None:
+            ceiling: Optional[float] = None) -> None:
     started = time.monotonic()
     wall = time.time()
     with connected(args, res, wall) as client:
         health_check(client, res)
-        if min_version:
-            # After health_check, which is what learns the version -- and
-            # before the exchange, so an unsupported script is never sent.
-            _require_ide_version(res, *min_version)
         if needs_project:
             require_project(client, res, needs_project)
         ex = client.exchange(script, ceiling=ceiling)
@@ -767,22 +738,79 @@ def cmd_reload(args: argparse.Namespace, res: Result) -> None:
         # The same confirmation as a discarding close, on purpose: the flag
         # that names the data loss is the acknowledgment of it.
         raise XojoError(
-            "reload runs Reload Project, which re-reads the project from disk "
-            "and discards unsaved changes in the IDE without prompting.\n"
+            "reload re-reads the project from disk and discards unsaved "
+            "changes in the IDE without prompting.\n"
             "Pass --discard to confirm.")
-    _simple(args, res,
-            script_reload_item(item) if item else script_reload_project(),
-            ("reloaded %s from disk" % item) if item
-            else "reloaded the front project from disk",
-            "reload",
-            min_version=(RELOAD_MIN_XOJO_VERSION, RELOAD_MIN_XOJO_NAME))
+    started = time.monotonic()
+    wall = time.time()
+    path = None
+    with connected(args, res, wall) as client:
+        health_check(client, res)
+        raw = (res.ide or {}).get("version") or ""
+        try:
+            # ReloadProject arrived in 2026r3. An older IDE would reject the
+            # script as a compile error, and an unreadable version reply
+            # takes the fallback too -- it works on every release.
+            supported = float(raw) >= RELOAD_MIN_XOJO_VERSION
+        except ValueError:
+            supported = False
+        if item and not supported:
+            raise XojoError(
+                "reload --item needs Xojo %s or later; this IDE is %s.\n"
+                "A whole-project 'reload --discard' works here: it closes "
+                "the project without saving and reopens it."
+                % (RELOAD_MIN_XOJO_NAME, raw or "unreadable"))
+        require_project(client, res, "reload")
+        if supported:
+            ex = client.exchange(script_reload_item(item) if item
+                                 else script_reload_project())
+            parts = _judged_parts(client, ex)
+            mechanism = "reload_project"
+        else:
+            path = _front_project_path(client)
+            if not path:
+                raise XojoError(
+                    "the front project has no saved path to reload from; "
+                    "save it once in the IDE first.")
+            ex = client.exchange(script_close_and_reopen())
+            parts = _judged_parts(client, ex)
+            if any(c.verdict is Verdict.OK and c.text == RELOAD_NO_PATH
+                   for c in parts):
+                raise XojoError(
+                    "the front project has no saved path to reload from; "
+                    "save it once in the IDE first.")
+            front = _front_project_path(client)
+            if not _same_project_path(front, path):
+                raise XojoError(
+                    "after the close and reopen the front project is %s, "
+                    "not %s; check the IDE before editing anything."
+                    % (front or "unknown", path))
+            mechanism = "close_and_reopen"
+    if len(parts) > 1:
+        res.notes.append(note(Note.SPLIT_REPLY, count=len(parts) - 1))
+    res.timing = {"started_at": _iso_utc(wall),
+                  "elapsed_ms": int((time.monotonic() - started) * 1000)}
+    res.result = {"output": next(
+        (c.text for c in parts
+         if c.verdict is Verdict.OK and c.text is not None), ex.result.text),
+        "scope": "item" if item else "project",
+        "item": item, "mechanism": mechanism}
+    if path:
+        res.result["path"] = path
+    apply_classification(res, worst_of(parts) or ex.result, False)
     if item and res.result.get("output") == RELOAD_ITEM_MISSING:
         raise XojoError(
             "no project item matching %r in the front project, so nothing "
             "was reloaded. ReloadProjectItem takes the item's path, per the "
             "2026r3 release notes." % item)
-    res.result["scope"] = "item" if item else "project"
-    res.result["item"] = item
+    if res.outcome == "success":
+        if item:
+            res.summary = "reloaded %s from disk" % item
+        elif mechanism == "close_and_reopen":
+            res.summary = ("reloaded the front project from disk "
+                           "(close and reopen)")
+        else:
+            res.summary = "reloaded the front project from disk"
 
 
 def cmd_capture(args: argparse.Namespace, res: Result) -> None:
@@ -868,7 +896,6 @@ __all__ = [
     "_VERDICT_SEVERITY",
     "_front_project_path",
     "_judged_parts",
-    "_require_ide_version",
     "_same_project_path",
     "_session_close",
     "_session_open",

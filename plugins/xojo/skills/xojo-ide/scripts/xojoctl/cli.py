@@ -63,7 +63,7 @@ COMMAND_BLURBS = {
     "open": "Open a project in the IDE",
     "save": "Save the front project (no prompt)",
     "close": "Close the front project",
-    "reload": "Reload the front project from disk (Xojo 2026r3+)",
+    "reload": "Reload the front project from disk",
     "status": "Check that the IDE is reachable and speaking v2",
     "projects": "List open workspaces and which one is frontmost",
     "version": "Report the running IDE's version",
@@ -418,16 +418,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "reload", parents=[conn, out],
-        help="reload the front project from disk (Xojo 2026r3+)",
-        description="Runs Reload Project, which needs Xojo 2026r3 or later "
-                    "(the release that renamed Revert to Saved). It re-reads "
-                    "the front project from disk, discarding unsaved IDE "
-                    "changes without prompting, so it requires --discard, "
-                    "exactly like a discarding close. On an older IDE %s "
-                    "refuses and names the close/open pair to use "
-                    "instead." % INVOCATION)
+        help="reload the front project from disk",
+        description="Re-reads the front project from disk. On Xojo 2026r3 or "
+                    "later this runs Reload Project (the renamed Revert to "
+                    "Saved); on older IDEs it closes without saving and "
+                    "reopens, which lands in the same place. Either way "
+                    "unsaved IDE changes are discarded without prompting, so "
+                    "it requires --discard, exactly like a discarding close.")
     s.add_argument("--item", metavar="NAME",
-                   help="reload one project item instead of the whole project")
+                   help="reload one project item instead of the whole "
+                        "project (needs Xojo 2026r3 or later)")
     s.add_argument("--discard", action="store_true",
                    help="discard unsaved changes and reload")
     s.set_defaults(func=cmd_reload)

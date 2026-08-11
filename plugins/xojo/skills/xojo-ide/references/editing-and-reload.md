@@ -17,9 +17,9 @@ For an analyze checkpoint there is one command that does the whole bracket: `xoj
 
 ## The reload recipe
 
-On Xojo 2026r3 or later, `xojoctl reload --discard` reloads the front project from disk in one step, and `--item NAME` reloads a single project item. `--discard` is required for the same reason `close` has it: Reload Project is 2026r3's rename of Revert to Saved, and it discards the IDE's unsaved in-memory changes without prompting—typing the flag is the confirmation. The command is written from the 2026r3 release notes and is not yet verified against a shipping 2026r3; `xojoctl` refuses to send it to an older IDE.
+`xojoctl reload --discard` reloads the front project from disk on any IDE release. On Xojo 2026r3 or later it runs Reload Project—2026r3's rename of Revert to Saved, written from that release's notes and not yet verified against a shipping 2026r3. On older IDEs it falls back to the atomic close-and-reopen script below, which lands in the same place. `--item NAME` reloads a single project item and does need 2026r3. `--discard` is required for the same reason `close` has it: a reload discards the IDE's unsaved in-memory changes without prompting—typing the flag is the confirmation.
 
-Through Xojo 2026r2.1 there is no reload command, and `OpenFile` on an already-open project does nothing (see [IDE behavior](ide-behavior.md)). Close, then reopen:
+Through Xojo 2026r2.1 the IDE itself has no reload command, and `OpenFile` on an already-open project does nothing (see [IDE behavior](ide-behavior.md)); on those releases `reload --discard` closes and reopens for you. By hand:
 
 ```sh
 xojoctl close --discard
@@ -36,7 +36,7 @@ CloseProject(False)
 OpenFile(path)
 ```
 
-`ProjectShellPath` returns the path shell-escaped (`My\ Desktop\ App.xojo_project`); pass it to `OpenFile` unchanged. `CloseProject(False)` discards unsaved changes without a prompt.
+`ProjectShellPath` returns the path shell-escaped (`My\ Desktop\ App.xojo_project`); pass it to `OpenFile` unchanged. `CloseProject(False)` discards unsaved changes without a prompt. This atomic script is what `reload --discard` itself sends on pre-2026r3 IDEs—one script, so no window exists in which the user could bring another project frontmost between the path fetch and the close.
 
 ## Editing through IDE Script instead
 

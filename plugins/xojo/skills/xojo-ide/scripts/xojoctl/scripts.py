@@ -195,6 +195,30 @@ def script_reload_item(item: str) -> str:
                xojo_string_literal(RELOAD_ITEM_MISSING)))
 
 
+def script_close_and_reopen() -> str:
+    """Reload the front project by closing and reopening it, atomically.
+
+    This is the pre-2026r3 fallback for ReloadProject, and it is ONE
+    script on purpose: fetching the path and closing in separate exchanges
+    leaves a window where the user brings another project frontmost and
+    the wrong project gets closed. ProjectShellPath returns the path
+    shell-escaped and OpenFile takes it unchanged -- the atomic recipe
+    editing-and-reload.md documents, verified on 2026r2.1. A never-saved
+    project has no path to reopen from; that prints a marker instead of
+    closing, so nothing is destroyed.
+    """
+    return ("Dim p As String = ProjectShellPath\n"
+            'If p = "" Then\n'
+            "Print %s\n"
+            "Else\n"
+            "CloseProject(False)\n"
+            "OpenFile(p)\n"
+            "Print %s\n"
+            "End If"
+            % (xojo_string_literal(RELOAD_NO_PATH),
+               xojo_string_literal("reloaded")))
+
+
 def script_run() -> str:
     return 'DoCommand("RunApp")\nPrint %s' % xojo_string_literal("running")
 
@@ -208,6 +232,7 @@ __all__ = [
     "script_analyze_item",
     "script_analyze_project",
     "script_build",
+    "script_close_and_reopen",
     "script_close_project",
     "script_front_path",
     "script_list_windows",

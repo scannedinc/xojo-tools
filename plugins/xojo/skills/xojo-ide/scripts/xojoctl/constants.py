@@ -112,6 +112,7 @@ ANALYZE_SENTINEL = "__xojoctl_analyze_complete__"
 ANALYZE_ITEM_MISSING = "__xojoctl_item_not_found__"
 BUILD_SENTINEL = "__xojoctl_build_complete__"
 RELOAD_ITEM_MISSING = "__xojoctl_reload_item_not_found__"
+RELOAD_NO_PATH = "__xojoctl_reload_no_path__"
 
 # ReloadProject arrived in Xojo 2026r3. XojoVersion is a Double whose numeric
 # order matches the release order -- 2026r2.1 prints as "2026.021" -- so the
@@ -197,6 +198,7 @@ __all__ = [
     "RELOAD_ITEM_MISSING",
     "RELOAD_MIN_XOJO_NAME",
     "RELOAD_MIN_XOJO_VERSION",
+    "RELOAD_NO_PATH",
     "REPLY_CEILING",
     "ReplyTimeout",
     "SCHEMA_VERSION",
