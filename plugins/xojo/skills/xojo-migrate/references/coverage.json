@@ -3656,7 +3656,7 @@
   "covered": false,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "",
+  "note": "The paired READER matters as much as the rename: stored save-info data read back through GetRelative, GetFolderItem or a FolderItem constructor must become FolderItem.FromSaveInfo -- save-info bytes are not a native path, and New FolderItem(data, PathModes.Native) compiles but breaks at runtime. See conversion-traps.md section 7.",
   "origin": "member"
  },
  {

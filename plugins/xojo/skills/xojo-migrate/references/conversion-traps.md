@@ -49,6 +49,8 @@ Next
 
 Audit every converted `Mid` whose start is a variable rather than a literal: find where that variable originates and confirm it is `>= 1` in API 1.0 terms. A loop that already started at 1 converts cleanly; one that started at 0 was relying on the clamp.
 
+At real-project scale this audit is scriptable, and should be: for each site, walk outward to the enclosing `For` statements, take the bound (or origin) that feeds the start variable, and group the sites by that bound. Three hundred sites collapse to a dozen distinct bounds, "any bound below 1?" becomes a one-screen read, and the only shape left for a human is a bound fed by a parameter, which is answered at its call sites.
+
 ## 2. The not-found sentinel (`InStr` -> `IndexOf`)
 
 `InStr` returns `0` when the substring is absent. `IndexOf` returns `-1` when absent, and a hit at the **first character** returns `0`, which the old `> 0` test would wrongly reject. This is the single most dangerous trap in the whole migration because the broken code still compiles and only fails on first-character matches.
@@ -60,6 +62,7 @@ Fix every comparison **before** renaming the function:
 | `InStr(s, x) > 0` (found) | `s.IndexOf(x) >= 0` (also written `> -1`) |
 | `InStr(s, x) = 0` (not found) | `s.IndexOf(x) = -1` (or `< 0`) |
 | `InStr(s, x) >= 1` | `s.IndexOf(x) >= 0` |
+| `InStr(s, x) = 1` (starts with) | `s.IndexOf(x) = 0` |
 
 Recommended order per occurrence: (1) inventory every `InStr` call; (2) decide how each result is consumed; (3) fix the consumer; (4) only then rename.
 
@@ -118,6 +121,8 @@ result = Trim("  " + name)
 **Which to choose.** Default to **Option B** during the mechanical passes, and say so in the commit message. Option A is correct code, but each instance adds a variable and a line to a diff that is otherwise pure renames; done at scale it stops being a migration and becomes a refactor the reviewer cannot skim. The threshold that matters is *density*: a handful of locals in a method reads fine, but a character-set idiom like `InStr("0123456789", c)` repeated across dozens of methods will introduce a local in every one of them. Convert those in their own commit, after the renames, or leave them deprecated—marked at the site with a `#Pragma Warning` and listed in the final report. The marker is not optional and the report does not replace it; when a method repeats the same deferral, one marker at the top of that method covering all of its sites is enough. See "Anything left unconverted gets a marker at the site" in `SKILL.md` phase 2.
 
 Prefer **Option A** when the expression is already assigned to something nearby (reuse the existing variable, no new line), or when the deprecated global is in the `Removed` bucket and therefore does not compile anyway.
+
+**Check the name before introducing the local.** The natural name for the new variable is often already taken in exactly the methods that need it—the same concept, named twice: a method testing membership in a character set plausibly already has a counter named for that very concept, and the new local then collides with it. Before declaring, check the method's parameters, every `Dim`/`Var`/`Static`, and every `For` counter. On a real migration the first automated pass silently retargeted an existing counter's increment in three methods; the compiler said nothing, and only reading the diff caught it.
 
 **A member call may have no receiver at all.** This is the other half of the receiver rule, and it is the one that gets missed. In Xojo, calling your own instance's member needs no receiver: `Invalidate` and `Self.Invalidate` are the same call, and older code writes the first.
 
@@ -259,6 +264,8 @@ The trap: **path-mode defaults and relative paths.** `GetFolderItem` with a rela
   | `FolderItem.PathTypeAbsolute` | **nothing** — see below |
 
   `PathTypeAbsolute` is the trap, and it is both the API 1.0 **default** and therefore the one most code passes. `PathModes` has `Native`, `Shell` and `URL` only: there is no `Absolute`, because the HFS `AbsolutePath` it selected is itself Removed. Do not map it to `PathModes.Native` reflexively—on macOS those are different paths. Decide per call site what the path actually was.
+
+**Stored save-info data is none of the above.** The classic persistence idiom saves `GetSaveInfo` bytes (often base64-encoded) and reads them back with `GetRelative`—or, off-book but common, by feeding the decoded bytes to `GetFolderItem`. Save-info data is opaque alias data, not a path of any mode, so when a constructor argument traces back to stored data the API 2.0 reader is `FolderItem.FromSaveInfo` (shared; returns Nil when the data cannot be resolved), never `New FolderItem(data, PathModes.Native)`. The wrong version compiles and fails only at runtime, on the user's saved documents.
 
 Also note `FolderItem.LastErrorCode` checks become `Try/Catch ... As IOException` (same structural pattern as section 6).
 

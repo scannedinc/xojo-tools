@@ -95,7 +95,7 @@ Before editing anything, confirm with the user:
 
 ## Commit discipline
 
-**One commit per category.** Arrays, then ListBox, then Database, then Date, and so on, each its own commit, so the reviewer reads "what happened to the arrays" rather than 4,000 renamed lines. Within a category, `high` and `medium`/`low` work can share a commit; across categories, never.
+**One commit per category.** Arrays, then ListBox, then Database, then Date, and so on, each its own commit, so the reviewer reads "what happened to the arrays" rather than 4,000 renamed lines. Within a category, `high` and `medium`/`low` work can share a commit; across categories, never. Splitting one category into several commits by hazard class is allowed and sometimes better—byte variants, sentinel rewrites and compound-receiver deferrals each read cleanest alone. The rule is a ceiling on commit scope, not a floor.
 
 **Commit only after the checkpoint is confirmed.** The order is always: make the edits → Analyze Project (run it yourself through xojoctl when the IDE is reachable, per hard rule 6; ask the user otherwise) → read the result → commit. Never commit changes whose compile status nobody has checked.
 
@@ -170,7 +170,7 @@ Report the analyze counts now: they are the baseline every later checkpoint's nu
 
 **Compile errors are input, not failure.** A freshly converted project routinely fails to build—the phase-1 converter renames control types and leaves member calls behind—so `analyze` exiting 1 with `outcome: project_errors` is the normal phase-2a state, and `worklist.py` accepts it: those errors are the `Removed` bucket and the converter's leftovers locating themselves. What `worklist.py` refuses is a document whose analysis never ran—a failed connection, a timeout, no project open—which carries an error object and an empty diagnostics list. Its refusal message is the one to act on: nothing has been learned about this project's deprecations, so fix the IDE connection and re-run, or take the scanner path in 2b. Also refuse to proceed on exit 4 with `session.closed: false`—the analysis ran but the project is still open in the IDE, and editing now is how disk edits get overwritten. What you must not do is record a failed analyze as "no deprecations found".
 
-Each deprecation warning is a compiler-verified work site with method, line and the replacement named in the message ("Left is deprecated. You should use String.Left instead"). No receiver check is needed to trust the *finding*—the compiler resolved the receiver to produce it. Errors in the same output are the `Removed` bucket locating itself.
+Each deprecation warning is a compiler-verified work site with method, line and the replacement named in the message ("Left is deprecated. You should use String.Left instead"). No receiver check is needed to trust the *finding*—the compiler resolved the receiver to produce it. Errors in the same output are the `Removed` bucket locating itself. One mechanical fact about those line numbers: they count within the named method's body, not within the file, so driving edits from a diagnostic means mapping owner + method + line to a file line yourself.
 
 **Do not work from the raw warnings.** The IDE's message reads like a complete instruction, and for a handful of symbols the rename it proposes is the part that compiles and is still wrong: `InStr`'s not-found sentinel moves from 0 to -1, several functions change index base, and `Date.TotalSeconds` → `SecondsFrom1970` shifts the epoch by 66 years. The IDE never mentions any of it. `worklist.py` joins every warning to the matrix and leads with the sites that need more than a rename, in four groups: **hand conversion required**, **read the caveat before renaming**, **mechanical rename**, and **the IDE converter handles this** (control type renames, phase 1). It reports rule ids for `lookup.py rule <id>`; it decides nothing, and where the join is ambiguous it says so instead of picking.
 
@@ -234,6 +234,8 @@ A line in a commit message is not a durable record: three months later the quest
 
 The rule being enforced is *the deferral is discoverable from the code*, not *the marker count equals the site count*. What is never enough is recording it only in the final report: the report is not in the IDE and not in the file. Where `conversion-traps.md` §4 says to "list them in the final report", that is in addition to the marker, never instead of it.
 
+**Parked is not a fourth state.** Cross-category dependencies create sites that are "not due yet"—an `InStr` comparison waiting for the Mid commit's arithmetic, say. Give such a site its marker (or a written worklist entry) the moment you pass over it, and reconcile in phase 8: the marker count must equal the deferral count the report claims. On one real migration two parked sites fell out of every tracked state and surfaced only in a closing dry-run—the report claimed two more deferrals than sites carried markers.
+
 The three deferral categories that recur, all of which need this: compound receivers left as deprecated globals (hard rule 3), calls whose replacement takes a different *kind* of argument (`DrawPolygon`/`FillPolygon` → `DrawPath`/`FillPath`), and anything awaiting a design decision from the user.
 
 **Not everything old is deprecated.** Some globals that look like obvious API 1.0 holdovers are still current, and the matrix's silence about them is the answer, not a gap: `Asc`, `Chr`, `Val`, `Str`, `Format`, `Hex`, `Abs`, `Min`, `Max`, `Round`, `CStr`. Do not convert them, and do not go hunting for a replacement when a user asks. Note the trap in the pair, though—the **byte variants `AscB` and `ChrB` *are* deprecated** (→ `String.AscByte` / `String.ChrByte`) even though their base names are fine. If `lookup.py symbol <Name>` returns nothing, the matrix does not cover the symbol; confirm against the xojo skill's deprecation indexes before declaring it current.
@@ -247,6 +249,10 @@ From the inventory, build the worklist honoring the ordering pitfalls:
 3. `InStr`/`IdxField` comparison and index fixes before the renames (hard rule 4).
 4. Method-form rules before global-form where both exist.
 5. Category order roughly: strings → arrays → ListBox → Database → Date → error handling → globals → files → graphics → misc.
+
+#### When the baseline has build errors, the errors come first
+
+A freshly converted project usually does not compile (phase 2a: compile errors are input), and a tree that does not compile can confirm nothing—every category checkpoint would run against a broken build. So when the baseline analyze reports errors, burn the error surface down to zero first, in its own commits: the errors are compiler-located work, mostly member renames the phase-1 converter leaves behind plus the `Removed` bucket. Running those control-member categories first also side-steps the arrays→`.LastIndex` interaction in `pass-hazards.md` §3 instead of creating it. The step-5 category order resumes once analyze reports zero errors.
 
 #### One pass creates what the next pass matches
 
@@ -262,7 +268,7 @@ Phases 4 and 5 ask three questions per match that exist because a regex cannot a
 
 **Not settled, and still yours.** Whether the replacement the IDE named is the API 2 destination: it is sometimes another member of the deprecated class, which compiles and gets flagged again next pass, so `worklist.py` prints the conflict and `ide-vs-source.md` documents the shape. Whether the rename is *semantically* safe: index bases, `InStr`'s sentinel and `Date`'s epoch are invisible to the compiler, and the rule's caveat governs exactly as it would for a scanner hit. Which matrix row a bare member warning belongs to, when the replacement does not settle it—that is what an AMBIGUOUS group means, and it wants the receiver confirmed by hand. And anything outside the analyzed platform: `#If` branches for other targets were never looked at (phase 8).
 
-Stated as one line: **the analyzer is authoritative about where a deprecation is, and merely helpful about what to replace it with.** The scanner path settles none of this and phases 4 and 5 apply to it unchanged.
+Stated as one line: **the analyzer is authoritative about where a deprecation is—among the symbols its deprecation database knows—and merely helpful about what to replace it with.** The scanner path settles none of this and phases 4 and 5 apply to it unchanged.
 
 ### 4. Fast pass (`high` rules): one glance per match
 
@@ -340,11 +346,11 @@ Commit 7a and 7b separately. A type rename touches both code and layout metadata
 
 ### 8. Validation and report
 
-Run **Analyze Project** until it is clean of deprecations—`analyze --project <path> --discard` sessions (**IDE session discipline**) when the IDE is reachable, through the user otherwise, reporting the counts on every pass—and ask the user for a full runtime pass (the traps are runtime bugs; no analyze result speaks to them).
+Run **Analyze Project** until it is clean of deprecations—`analyze --project <path> --discard` sessions (**IDE session discipline**) when the IDE is reachable, through the user otherwise, reporting the counts on every pass—and ask the user for a full runtime pass (the traps are runtime bugs; no analyze result speaks to them). On a cross-platform project, also state plainly that the other platforms' `#If` branches were converted by text passes no compiler has checked, and ask the user to run Analyze/build per target.
 
 **Both scripts run here, whichever path built the inventory, and neither is optional.** They fail in opposite directions, which is why one cannot stand in for the other.
 
-A clean analyze does not retire either of them, because its authority stops at the platform the IDE compiled. Inside another platform's `#If` branch, *nothing* has looked yet—and that untouched region contains both of the shapes these scripts split between them: `scan.py` finds the ordinary dot-anchored and global hits there, `sweep.py` finds the receiverless and paren-less calls that no rule can match anywhere. Skipping the sweep on an IDE-driven migration therefore leaves the one class of site that neither the analyzer nor `scan.py` can see. Treat any in-code hit inside such a branch as unfinished work, not scanner noise.
+A clean analyze does not retire either of them, because the analyzer's authority has three holes. *Platform:* inside another platform's `#If` branch, nothing has looked yet—and that untouched region contains both of the shapes these scripts split between them: `scan.py` finds the ordinary dot-anchored and global hits there (both scripts tag such hits "inside #if Target*"), `sweep.py` finds the receiverless and paren-less calls that no rule can match anywhere. On one real migration, 29 of 53 `.Directory` sites sat inside `#if TargetWindows` after the IDE reported the symbol cleared to zero. *Database:* a symbol missing from the IDE's own deprecation data never warns at all—`CDbl` is deprecated in the documentation and the matrix, and twenty compiled sites drew zero warnings—so the scanners are the only inventory such symbols get. *Vocabulary:* constructs that are not member or global calls, such as the `TargetCocoa` compiler constant, produce no deprecation warning by nature. Skipping the sweep on an IDE-driven migration therefore leaves the one class of site that neither the analyzer nor `scan.py` can see. Treat any in-code hit inside a platform branch as unfinished work, not scanner noise.
 
 ```
 python3 $SKILL/scripts/scan.py  <project-dir>
@@ -382,12 +388,13 @@ Then the checklist:
 - [ ] `InStr` comparisons converted
 - [ ] Date → DateTime constructions, mutations, epoch, formatting, parsing
 - [ ] Error handling in Try/Catch; Error event signatures updated
-- [ ] `Nil`-returning calls that now raise: guard deleted, `Try`/`Catch` added
+- [ ] `Nil`-returning calls that now raise: guard deleted, `Try`/`Catch` added (grep for `Nil` near `BinaryStream.Create`, `TextOutputStream.Create`, `.Remove`, `.CreateFolder`—a surviving guard marks a missed conversion)
 - [ ] `scan.py` re-run; every remaining in-code hit accounted for in writing
 - [ ] Every symbol's method-form rule applied, not just its global-form rule
 - [ ] `sweep.py` run; every receiverless hit accounted for in writing
 - [ ] `sweep.py`'s SUPPRESSED names reviewed by hand
 - [ ] Every deliberate deferral carries a `#Pragma Warning` at the site
+- [ ] Other-platform `#If` branches named as compiler-unverified; per-target Analyze/build requested
 - [ ] Analyze Project clean of deprecations; full app run-through done
 - [ ] No commit left in a known-broken state
 
