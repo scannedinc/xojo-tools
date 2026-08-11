@@ -35,7 +35,7 @@ Ask Claude to migrate your project. Claude works through nine phases:
 
 1. **Preconditions.** Check the project format, the git tree, and the branch.
 2. **IDE converter.** You run **Project ▸ Update Controls to API 2.0** in the IDE. It renames the placed controls.
-3. **Inventory.** Run `scan.py` and report what the project contains.
+3. **Inventory.** Analyze the project in the IDE, or run `scan.py`, and report what the project contains.
 4. **Plan.** Order the categories so that one pass does not undo another.
 5. **Fast pass.** Apply the high-confidence rules. Read each match once.
 6. **Receiver pass.** Apply the medium and low rules. Resolve each receiver type first.
@@ -43,11 +43,15 @@ Ask Claude to migrate your project. Claude works through nine phases:
 8. **Type renames.** Rename the types that the IDE converter leaves.
 9. **Validation.** Run `sweep.py`. Then compile and run the application.
 
-Two behaviors are deliberate. Read them before you start.
+Four behaviors are deliberate. Read them before you start.
 
-**You compile, not Claude.** Xojo has no command-line compiler. Each category ends when you run Analyze Project and report the result. The skill never claims that a conversion works.
+**The Xojo IDE is the only compiler.** Xojo has no command-line compiler. Each category ends with an Analyze Project checkpoint. Claude runs it through the sibling `xojo-ide` skill when a running IDE is reachable. When it is not, you run it and report the result. The runtime check is always yours. The skill never claims that a conversion works.
 
-**Claude commits one category at a time.** Nothing is committed until you confirm that checkpoint. If a rule matches too much, you revert one commit.
+**The project stays closed while Claude edits.** Claude opens the project in the IDE only to analyze it, and closes it before it changes any file. The IDE holds a project in memory and does not watch the disk, so an open project runs stale code and can overwrite fresh edits when it saves. Do not open the project or edit its files on your own while the migration runs. The steps that are yours stay yours: the converter in phase 2, the checkpoints when Claude cannot reach the IDE, and the final run of the application. Claude asks for each one.
+
+**Claude reports the analyze counts.** Every checkpoint reports the error count and the warning count beside the numbers from the checkpoint before. You watch the warning count fall as Claude commits each category.
+
+**Claude commits one category at a time.** Claude commits a category only after its checkpoint passes. If a rule matches too much, you revert one commit.
 
 CAUTION: This skill edits your source files. Start from a clean git tree on a migration branch. The recovery plan is `git revert`, and it needs those commits.
 
@@ -67,7 +71,7 @@ The mark shows in the IDE on every build. A report shows it once.
 
 - **Xojo 2021r3 or later.** The `Desktop*` classes start in that release.
 - **A project in text format.** Use File ▸ Save As and choose "Xojo Project". Binary and XML projects cannot be scanned.
-- **The Xojo IDE.** You compile every checkpoint there. You also run **Project ▸ Update Controls to API 2.0** there. That converter is a prerequisite of this skill, not an alternative to it.
+- **The Xojo IDE.** Every checkpoint compiles there. Claude drives it through the `xojo-ide` skill when it can reach a running IDE. You run it otherwise. You also run **Project ▸ Update Controls to API 2.0** there. That converter is a prerequisite of this skill, not an alternative to it.
 - **git**, with a clean tree.
 - **python3** on the PATH. The scripts use the standard library only.
 
@@ -149,7 +153,7 @@ Some mappings could not be checked against a documentation page. Each of those r
 ## Limits
 
 - The skill covers desktop projects only.
-- Claude cannot compile or run Xojo. You are the build step.
+- Only the Xojo IDE compiles Xojo. Claude drives it when it can reach a running IDE. Otherwise you are the build step. You always run the application.
 - A member match does not give the receiver type. A rule can match ninety lines and be correct on twenty of them. One line of source does not hold enough to decide.
 - No rule matches across a line continuation. No member rule matches a call without a receiver. Phase 8 requires `sweep.py` for that reason.
 - The skill reads text-format projects only.

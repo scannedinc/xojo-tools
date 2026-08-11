@@ -11,6 +11,8 @@ The IDE loads the whole project into memory and never watches the disk. Two mist
 
 The rule that prevents both: **after disk edits, reload before anything else touches the project.**
 
+The stronger rule, when the timing is yours to choose: **close the project before you edit on disk.** A closed project has no in-memory copy to go stale or to save over your work, and since picking up disk edits costs a close and a reopen anyway, closing first is the same number of operations with no window in which the two copies disagree—and no open IDE inviting the user to edit a project you are rewriting underneath. Default to it for any planned batch of disk edits; the recipe below is for edits that have already happened while the project was open.
+
 ## The reload recipe
 
 There is no reload command, and `OpenFile` on an already-open project does nothing (see [IDE behavior](ide-behavior.md)). Close, then reopen:
@@ -47,7 +49,7 @@ The safety rules of [Security](security.md) apply doubly here: a generated scrip
 
 ## What only disk edits can do
 
-Window structure is not script-editable: no command places or removes a control, `SubLocations` does not list a window's controls, and `Text` returns nothing for a window itself. To add or rearrange controls, edit the `.xojo_window` file on disk following the `xojo` skill's `references/xojo-file-formats/`, then reload. Never invent or renumber the `&h` item IDs in project files; other files reference them. The `xojo-lint` skill validates the result before the IDE sees it.
+Window structure is not script-editable: no command places or removes a control, `SubLocations` does not list a window's controls, and `Text` returns nothing for a window itself. To add or rearrange controls, close the project, edit the `.xojo_window` file on disk following the `xojo` skill's `references/xojo-file-formats/`, then reopen—or reload, if the edits already happened while the project was open. Never invent or renumber the `&h` item IDs in project files; other files reference them. The `xojo-lint` skill validates the result before the IDE sees it.
 
 ## Verifying a save
 

@@ -65,7 +65,7 @@ Xojo, Inc. is not affiliated with this skill and has not reviewed it, and "Xojo"
 
    "Before" means *within the same edit*, not in an earlier commit. Splitting them leaves a tree where `InStr(...) >= 0` is API 1.0 code read with an API 2.0 sentinel—always true, compiles, wrong—which **Commit discipline** below forbids. Convert each site atomically, comparison and rename together, and commit the sites as one batch.
 5. **Byte-variants before base names**: `LenB/MidB/InStrB/ReplaceB/SplitB` before `Len/Mid/InStr/Replace/Split`, or the base-name pass mangles the byte variants.
-6. **Nothing compiles Xojo except the Xojo IDE.** There is no standalone compiler. When the xojo-ide skill can reach a running IDE, run the checkpoints yourself—`analyze` compiles the project's front end and reports errors and warnings with file, method and line. When it cannot, every phase ends with the user compiling / running Analyze Project and reporting back. Either way an analyze pass is not a runtime pass: never claim a conversion "works"; say it analyzed clean and awaits the runtime check, which is always the user's—the dangerous bugs here are runtime bugs.
+6. **Nothing compiles Xojo except the Xojo IDE.** There is no standalone compiler. When the xojo-ide skill can reach a running IDE, run the checkpoints yourself—`analyze` compiles the project's front end and reports errors and warnings with file, method and line. Run each checkpoint as a bracketed session—open, analyze, close—per **IDE session discipline**: the project never sits open in the IDE while you edit. When it cannot, every phase ends with the user compiling / running Analyze Project and reporting back the error and warning counts. Either way an analyze pass is not a runtime pass: never claim a conversion "works"; say it analyzed clean and awaits the runtime check, which is always the user's—the dangerous bugs here are runtime bugs.
 7. **Match rule casing exactly** in replacements (Xojo identifiers are case-insensitive, but canonical casing keeps the code readable and consistent with the docs).
 8. **Git is not optional, and one commit is not enough.** Do not begin editing outside a git repository. Commit at every checkpoint, one commit per category, so each batch can be reviewed and reverted on its own. A single commit at the end is a wall of renames nobody can review; a rule that over-matched is then indistinguishable from one that worked. See **Commit discipline** below.
 
@@ -91,6 +91,7 @@ Before editing anything, confirm with the user:
 - **Text-format project.** Source must be `.xojo_code` / `.xojo_window` etc. If the project is binary (`.xojo_binary_project`) or XML, ask the user to File ▸ Save As... in "Xojo Project" (text) format first. `$SKILL/scripts/scan.py` detects this and prints the instruction.
 - **Xojo version.** Desktop* control classes need Xojo 2021r3+. Ask which release they build with.
 - **Deprecation warnings on.** They are off by default, stored **per project**, and Analyze Project says nothing about deprecations until they are on. With the IDE reachable, do it yourself, in this order: close the project (`python3 -m xojoctl close --save`), run `python3 $SKILL/scripts/analysis_warnings.py <project-dir> --enable`, reopen. The ordering is mandatory—the IDE rewrites the settings file when the project closes, so a patch made while it is open is silently undone. Otherwise ask the user: Project ▸ Analysis Warnings → check both "Item1 is deprecated" warnings and "Show API 2 Desktop control deprecations". Mechanism and caveats in `$SKILL/references/ide-vs-source.md`.
+- **The project is hands-off while the migration runs.** Say this to the user up front: outside the steps the workflow explicitly hands them—the phase 1 converter run, plus the checkpoints and the runtime pass when you cannot reach the IDE—the project is not theirs to touch until the branch is handed back. On the IDE path the workflow opens and closes the project repeatedly (see **IDE session discipline**), so any IDE window it leaves open is transient and about to be closed without saving; edits the user makes in the IDE mid-run are silently discarded by the next cycle, and edits they make on disk land inside conversion commits where they do not belong. If they need to change something mid-migration, they say so; you stop at a clean checkpoint and hand the tree back.
 
 ## Commit discipline
 
@@ -117,12 +118,29 @@ Xojo API 2.0: <category>, <what changed>
 Skipped: <what and why>
 Still manual: <what remains>
 
-Compiles: analyze clean via xojoctl / confirmed by <user> / expected errors, fixed in the next commit
+Compiles: analyze <e> errors, <w> warnings via xojoctl / analyze <e> errors, <w> warnings reported by <user> / expected errors, fixed in the next commit
 ```
 
 Listing the rule ids matters: when a rename turns out wrong three commits later, the id is how you find every other place that rule touched.
 
 **Never push, and never commit outside the migration branch.** Pushing is the user's call. At the end, hand them the branch and the commit list.
+
+## IDE session discipline
+
+**The project is open in the IDE only while the IDE is doing something for you, and closed before you edit anything on disk.** The IDE loads the whole project into memory and never watches the disk: while a project sits open, disk edits are invisible to its analyze, a single IDE-side save silently overwrites them, and the open window reads as an invitation for the user to keep working in an IDE whose in-memory state the workflow is about to discard. Closing before you edit makes all three impossible instead of merely unlikely.
+
+Every IDE interaction is therefore a bracketed session, and edits happen only between sessions:
+
+```
+open → analyze → close → edit on disk → open → analyze → close → commit → next category
+```
+
+- **This costs nothing.** With the commands this workflow uses, making an open IDE see disk edits is already a close and a reopen (the xojo-ide skill's editing-and-reload reference), so the close/open pair is being paid at every checkpoint regardless. The discipline only moves the close to *before* the edits, so no moment exists in which an open IDE and newer disk files disagree—a reasoning a cheaper reload, where an IDE version offers one, would not change, because a reload happens after the edits and the hazard is the window during them.
+- **A session may begin with the project already open.** `open` on an already-open project is a documented no-op, so after phase 0's reopen or the user's phase 1 converter run, the session simply picks up at the analyze. What the discipline forbids is *editing* while the project sits open, not finding it open.
+- **End an analyze session with `close --discard --yes`.** The session made nothing worth saving, and the disk—where git is—is the migration's only source of truth; a `--save` here would let the IDE write its in-memory copy over it. The one deliberate `--save` in this workflow is phase 0's analysis-warnings step, which needs the IDE to write the settings record as the project closes.
+- **Confirm the frontmost project first.** Xojo is single-instance and `xojoctl` acts on the frontmost open project. If anything else may be open in the IDE, run `projects` before `analyze` or `close`—an unchecked session can report on, or close, a project that is not yours.
+
+**Report the counts, every time.** Each analyze returns an error count and a warning count; report both to the user at every session, beside the previous session's numbers—"analyze: 0 errors, 210 warnings (was 260: the ListBox category cleared 50)". The falling warning count is the migration's only live progress meter, and a checkpoint where it does not fall—or where errors appear outside the two categories expected to break the build—is a stop-and-look signal, not a footnote. Two caveats keep the numbers honest: analyze counts every warning type the project's settings enable, not only deprecations, so the finish line is *zero deprecation warnings* (phase 8), not zero warnings; and when the IDE is unreachable and the user runs Analyze Project, ask for both counts and track them the same way.
 
 ## Workflow
 
@@ -130,7 +148,7 @@ Read `$SKILL/references/ide-vs-source.md` before phase 1, and `$SKILL/references
 
 ### 1. IDE converter first
 
-Ask the user to run **Project ▸ Update Controls to API 2.0** in the IDE, then commit the result as the **first commit on the migration branch**. It is a large, entirely IDE-generated diff; keeping it separate is what makes every later commit readable as your work rather than the converter's. If they can't or won't, note it; type renames move to phase 7.
+Ask the user to run **Project ▸ Update Controls to API 2.0** in the IDE, then commit the result as the **first commit on the migration branch**. Have them save in the IDE and confirm the converter's diff is on disk (`git status` shows it) before any bracketed session runs—a `close --discard --yes` after an unsaved converter run would destroy its output. It is a large, entirely IDE-generated diff; keeping it separate is what makes every later commit readable as your work rather than the converter's. If they can't or won't, note it; type renames move to phase 7.
 
 ### 2. Inventory
 
@@ -140,11 +158,15 @@ Two ways to build the worklist, and the preference between them is not a coin fl
 
 #### 2a. IDE analyze (preferred)
 
-With the deprecation warnings on (phase 0) and the project open in the IDE:
+With the deprecation warnings on (phase 0), run one bracketed IDE session (**IDE session discipline**):
 
 ```
+python3 -m xojoctl open /path/to/Project.xojo_project
 python3 -m xojoctl analyze --json | python3 $SKILL/scripts/worklist.py
+python3 -m xojoctl close --discard --yes
 ```
+
+Report the analyze counts now: they are the baseline every later checkpoint's numbers fall from.
 
 **A non-zero exit from either half means you have no inventory.** `xojoctl` writes a JSON document for every outcome, a failed connection and a timeout included, and those documents carry an empty diagnostics list. `worklist.py` refuses them rather than summarizing one as a clean project, but the reason it gives is the one to act on: the analysis did not run, so nothing has been learned about this project's deprecations. Fix the IDE connection and re-run, or take the scanner path in 2b. What you must not do is record a failed analyze as "no deprecations found".
 
@@ -268,7 +290,7 @@ python3 $SKILL/scripts/sweep.py <project-dir> --only Invalidate,MsgBox,ReplaceAl
 
 The leftovers are the receiverless calls, the continued calls, and anything a lookahead declined. This is a per-category step, not an end-of-run one: done at the end, you can no longer tell which pass should have caught them.
 
-**Category checkpoint, then commit:** run Analyze Project—`python3 -m xojoctl analyze` yourself when the IDE is reachable, the user otherwise—confirm the result, then commit that category alone. The Date and error-handling categories are *expected* to produce compile errors; the compiler is locating the manual work, so handle those two per **Commit discipline** rather than committing a broken tree as if it were done.
+**Category checkpoint, then commit:** run Analyze Project—a bracketed open → analyze → close session (**IDE session discipline**) when the IDE is reachable, the user otherwise—report the error and warning counts against the previous checkpoint's, then commit that category alone. The Date and error-handling categories are *expected* to produce compile errors; the compiler is locating the manual work, so handle those two per **Commit discipline** rather than committing a broken tree as if it were done.
 
 ### 5. Receiver pass (`medium` / `low`)
 
@@ -318,7 +340,7 @@ Commit 7a and 7b separately. A type rename touches both code and layout metadata
 
 ### 8. Validation and report
 
-Run **Analyze Project** until it is clean of deprecations—`python3 -m xojoctl analyze` yourself when the IDE is reachable, through the user otherwise—and ask the user for a full runtime pass (the traps are runtime bugs; no analyze result speaks to them).
+Run **Analyze Project** until it is clean of deprecations—bracketed open → analyze → close sessions (**IDE session discipline**) when the IDE is reachable, through the user otherwise, reporting the counts on every pass—and ask the user for a full runtime pass (the traps are runtime bugs; no analyze result speaks to them).
 
 **Both scripts run here, whichever path built the inventory, and neither is optional.** They fail in opposite directions, which is why one cannot stand in for the other.
 
@@ -394,7 +416,7 @@ python3 $SKILL/scripts/analysis_warnings.py <project> [--enable]  # report / ena
 python3 $SKILL/scripts/worklist.py [analyze.json] [--format json]  # join `xojoctl analyze --json` to the rules (phase 2a); reads stdin
 ```
 
-`xojoctl` is not this skill's script: it belongs to the sibling **xojo-ide** skill (`$SKILL/../xojo-ide` in this plugin), whose own SKILL.md covers connecting to the IDE. The commands this workflow uses are `open`, `close --save`, `analyze [--json]` and `projects`; run them from that skill's `scripts` directory (`python3 -m xojoctl ...`). When that skill or a running IDE is unavailable, the whole workflow still runs through the user and the scanner path—the IDE preference is a preference, not a dependency.
+`xojoctl` is not this skill's script: it belongs to the sibling **xojo-ide** skill (`$SKILL/../xojo-ide` in this plugin), whose own SKILL.md covers connecting to the IDE. The commands this workflow uses are `open`, `close` (`--discard --yes` to end an analyze session; `--save` only in phase 0's warnings step), `analyze [--json]` and `projects`; run them from that skill's `scripts` directory (`python3 -m xojoctl ...`), in the bracketed sessions **IDE session discipline** prescribes. When that skill or a running IDE is unavailable, the whole workflow still runs through the user and the scanner path—the IDE preference is a preference, not a dependency.
 
 `scan.py` and `sweep.py` answer different questions and both are required. `scan.py` opens the migration: what is here, per bucket, as a plan. `sweep.py` closes it: what did every rule structurally fail to see. Its main section is **receiverless member calls**—`Invalidate` where the code means `Self.Invalidate`—which no dot-anchored rule can match, and which therefore never appear as a remaining match anywhere else.
 
