@@ -487,30 +487,51 @@ def main(argv=None, stdin=None):
     if not isinstance(doc, dict) or "diagnostics" not in doc:
         sys.exit("this is not an `xojoctl analyze --json` document: no "
                  "`diagnostics` key.")
-    # xojoctl emits a document for every outcome. A failed connection, a
-    # timeout and no-project-open carry an error object and an EMPTY
-    # diagnostics list -- nothing ran, and summarizing that as "no
-    # deprecation warnings" would report an analysis that never happened
-    # as a finished migration. But `ok: false` alone is not that state:
-    # outcome project_errors is an analysis that RAN, on a project that
-    # does not compile -- the normal condition of a freshly converted
-    # tree -- and its diagnostics are the worklist, errors included.
-    if doc.get("error") or (doc.get("ok") is False
-                            and not doc.get("diagnostics")):
+    # xojoctl emits a document for every outcome. Refused here: documents
+    # whose ANALYSIS never ran -- command failures (an error object), a
+    # project that would not load (outcome open_errors, whose diagnostics
+    # are load errors, not analysis), and ok:false with nothing in it.
+    # Accepted: outcome project_errors, an analysis that RAN on a project
+    # that does not compile -- the normal condition of a freshly converted
+    # tree -- whose diagnostics are the worklist, errors included.
+    outcome = doc.get("outcome") or "unknown"
+    session = (doc.get("result") or {}).get("session") or {}
+    bracket_broken = session.get("closed") is False
+    if (doc.get("error") or outcome == "open_errors"
+            or (doc.get("ok") is False and not doc.get("diagnostics"))):
         err = doc.get("error") or {}
         detail = err.get("message") or doc.get("summary") or ""
-        sys.exit(f"the analysis did not run: outcome "
-                 f"{doc.get('outcome') or 'unknown'}"
+        if bracket_broken and not doc.get("error") and outcome != "open_errors":
+            sys.exit("the analysis ran, but the session could not close the "
+                     "project -- it is still open in the IDE. Close it "
+                     "(xojoctl close --discard) before editing anything, "
+                     "then re-run the checkpoint.")
+        if outcome == "open_errors":
+            sys.exit(f"the project would not load, so nothing was analyzed"
+                     f"{': ' + detail if detail else ''}.\n"
+                     f"Fix the load errors (open the project by hand to see "
+                     f"them), or take the scanner path (workflow phase 2b): "
+                     f"python3 scan.py <project-dir>")
+        sys.exit(f"the analysis did not run: outcome {outcome}"
                  f"{': ' + detail if detail else ''}.\n"
                  f"Nothing here says anything about deprecations. Fix the "
                  f"IDE connection and re-run, or take the scanner path "
                  f"(workflow phase 2b): python3 scan.py <project-dir>")
     if doc.get("ok") is False:
-        print(f"note: analyze exited nonzero (outcome "
-              f"{doc.get('outcome') or 'unknown'}) -- the project does not "
-              f"compile, which is normal after the phase-1 converter. The "
-              f"diagnostics below are the worklist, errors included.",
-              file=sys.stderr)
+        if bracket_broken:
+            print("warning: the session could not close the project -- it "
+                  "is still open in the IDE. Close it (xojoctl close "
+                  "--discard) before editing anything. The diagnostics "
+                  "below are still the worklist.", file=sys.stderr)
+        elif outcome == "project_errors":
+            print("note: analyze exited nonzero (outcome project_errors) -- "
+                  "the project does not compile, which is normal after the "
+                  "phase-1 converter. The diagnostics below are the "
+                  "worklist, errors included.", file=sys.stderr)
+        else:
+            print(f"note: analyze exited nonzero (outcome {outcome}); the "
+                  f"diagnostics below are still the worklist.",
+                  file=sys.stderr)
 
     wl = build(doc)
     if args.format == "json":

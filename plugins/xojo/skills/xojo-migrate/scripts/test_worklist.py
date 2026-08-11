@@ -379,6 +379,33 @@ class CliTests(unittest.TestCase):
         self.assertIn("project_errors", err)
         self.assertIn("worklist", err)
 
+    def test_rejects_a_project_that_would_not_load(self):
+        # outcome open_errors carries LOAD errors, not an analysis; a
+        # summary would report a project the IDE never analyzed.
+        failed = dict(LIVE, ok=False, outcome="open_errors", exit_code=1,
+                      error=None)
+        code, out, err = self.run_cli(failed)
+        self.assertNotEqual(code, 0)
+        self.assertIn("would not load", err)
+
+    def test_broken_bracket_with_diagnostics_warns_but_summarizes(self):
+        doc = dict(LIVE, ok=False, outcome="incomplete", exit_code=4,
+                   error=None,
+                   result={"session": {"project": "/p", "was_open": False,
+                                       "closed": False}})
+        code, out, err = self.run_cli(doc)
+        self.assertEqual(code, 0)
+        self.assertIn("still open in the IDE", err)
+
+    def test_broken_bracket_with_clean_analysis_is_refused(self):
+        doc = dict(LIVE, ok=False, outcome="incomplete", exit_code=4,
+                   diagnostics=[], error=None,
+                   result={"session": {"project": "/p", "was_open": False,
+                                       "closed": False}})
+        code, out, err = self.run_cli(doc)
+        self.assertNotEqual(code, 0)
+        self.assertIn("could not close", err)
+
     def test_truncated_row_list_says_how_many_were_hidden(self):
         code, out, _ = self.run_cli(dict(LIVE, diagnostics=[
             diag("DataField is deprecated")]))

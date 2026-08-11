@@ -97,4 +97,4 @@ The same check, run across the whole database against the documentation's member
 | `IPCSocket.DataAvailable` → `DataReceived` | `DataAvailable`, still current—not renamed at all |
 | `HTMLViewer.DocumentComplete` → `DocumentCompleted` | `DocumentComplete`, still current |
 
-None of those suggestions was imported into the matrix, and none should be applied on the IDE's word. The rule to carry away is narrow and worth stating plainly: **the IDE is authoritative about *where* a deprecation is—it resolved the receiver to raise the warning—and merely helpful about what to replace it with.** Trust the location; verify the replacement on the API 2 class page.
+None of those suggestions was imported into the matrix, and none should be applied on the IDE's word. The rule to carry away is narrow and worth stating plainly: **the IDE is authoritative about *where* a deprecation is—it resolved the receiver to raise the warning, though only among the symbols its deprecation database knows—and merely helpful about what to replace it with.** Trust the location; verify the replacement on the API 2 class page.

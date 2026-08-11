@@ -1404,6 +1404,15 @@ def test_analyze_session() -> None:
               (X.EX_INCOMPLETE, "incomplete", False))
         check("session: the broken bracket carries its note",
               any(n["code"] == "session_not_closed" for n in res.notes), True)
+        ide.window_count, ide.front_path = 0, None
+        old_analyze = X.script_analyze_project
+        set_global("script_analyze_project", lambda: "Print DIRTY")
+        res = run(project=proj, discard=True)
+        check("session: a failing analyze keeps its exit but carries the note",
+              (res.exit_code, res.outcome,
+               any(n["code"] == "session_not_closed" for n in res.notes)),
+              (X.EX_PROJECT_ERRORS, "project_errors", True))
+        set_global("script_analyze_project", old_analyze)
         ide.close_fails = False
     finally:
         set_global("open_client", old_open)

@@ -59,6 +59,11 @@ The IDE's own shapes are awkward, so `xojoctl` normalizes them.
 - **`line` comes from the human `position` string.** It is null when `xojoctl` cannot establish it. It is never 0 and never a guess. `line_source` records where the number came from.
 - **`source_is_span` marks `source` as the exact region the IDE highlights.** That region can be incomplete on purpose. Note the unclosed parenthesis in the example above. Use it to draw a caret. Do not parse it.
 
+## Two `result` fields commands add
+
+- **`analyze --project` adds `result.session`**: `{project, was_open, closed}`, plus `open_issues: true` when the project loaded with non-fatal complaints. `closed: false` means the bracketed session left the project open in the IDE — every such document also carries a `session_not_closed` note, and a clean analyze is promoted to exit 4. Do not edit project files on disk while `closed` is `false`.
+- **`reload` adds `result.mechanism`**: `"reload_project"` (Xojo 2026r3's Reload Project ran) or `"close_and_reopen"` (the pre-2026r3 fallback), with `result.path` recording the reopened path on the fallback.
+
 ## What `error` means
 
 `error` stays null when your project has errors. `error` means `xojoctl` failed to get an answer at all. Project diagnostics **are** an answer.
@@ -71,7 +76,7 @@ The IDE's own shapes are awkward, so `xojoctl` normalizes them.
 | 1 | The project failed. Errors were reported, or warnings under `-W`, or a `missingFiles` configuration problem, or an empty response that did nothing |
 | 2 | Could not connect, or the connection or protocol failed part way through |
 | 3 | Timed out waiting for a reply |
-| 4 | The result is incomplete. The reply could not be interpreted, or a build's completion went unconfirmed |
+| 4 | The result is incomplete. The reply could not be interpreted, a build's completion went unconfirmed, or a bracketed `analyze --project` session could not close the project after an otherwise clean analyze — in that case the diagnostics are complete and `result.session.closed` is `false` |
 | 5 | The IDE rejected the script `xojoctl` sent. This is a bug in `xojoctl` |
 | 6 | No project is open. The IDE answered, but there is nothing to act on |
 | 64 | You used a flag or value the tool does not accept, or asked this IDE for something its version cannot do |

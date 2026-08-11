@@ -142,8 +142,12 @@ def cmd_analyze(args: argparse.Namespace, res: Result) -> None:
         opened = False
         if path:
             session = {"project": path, "was_open": False, "closed": False}
+            # Attached NOW so the record survives every raise: a timeout
+            # document must still say the session left the project open.
+            res.result["session"] = session
             if not _session_open(client, res, path, session):
-                res.result["session"] = session
+                res.timing = {"started_at": _iso_utc(wall),
+                              "elapsed_ms": int((time.monotonic() - started) * 1000)}
                 return          # a fatal load classified itself
             opened = True
         require_project(client, res, "analyze")
@@ -216,13 +220,19 @@ def cmd_analyze(args: argparse.Namespace, res: Result) -> None:
     elif sev == "warnings":
         res.diagnostics = [d for d in res.diagnostics if d["severity"] == "warning"]
 
-    if session is not None and res.exit_code == EX_OK and not session["closed"]:
-        # The bracket broke: the analysis ran but the project stayed open,
-        # which must not read as safe-to-edit. A nonzero analyze verdict is
-        # never overridden.
-        res.ok = False
-        res.outcome, res.exit_code = "incomplete", EX_INCOMPLETE
+    if session is not None and not session["closed"]:
+        # The bracket broke: the project stayed open, which must not read
+        # as safe-to-edit. The note goes on EVERY such document; the exit
+        # promotion only where the analyze itself was clean -- a nonzero
+        # analyze verdict is never overridden. The exit-0 advisory is
+        # dropped the way cmd_build drops it: its text is false once the
+        # exit code flips.
+        res.notes = [n for n in res.notes
+                     if n.get("code") != Note.WARNINGS_ONLY_EXIT_ZERO[0]]
         res.notes.append(note(Note.SESSION_NOT_CLOSED))
+        if res.exit_code == EX_OK:
+            res.ok = False
+            res.outcome, res.exit_code = "incomplete", EX_INCOMPLETE
 
 
 def cmd_build(args: argparse.Namespace, res: Result) -> None:
@@ -531,11 +541,14 @@ def _session_open(client: Client, res: Result, path: str,
                                 "this session cannot prove what it analyzed")
         ex = client.exchange(script_open_project(path))
         worst = worst_of(_judged_parts(client, ex))
-        if (worst is not None and worst.verdict is Verdict.OPEN_ERRORS
-                and worst.fatal):
-            # The project would not load; that verdict IS the result.
-            apply_classification(res, worst, False)
-            return False
+        if worst is not None and worst.verdict is Verdict.OPEN_ERRORS:
+            if worst.fatal:
+                # The project would not load; that verdict IS the result.
+                apply_classification(res, worst, False)
+                return False
+            # A partially loaded project can under-report deprecations;
+            # the session must not read cleaner than a manual open would.
+            session["open_issues"] = True
         after = project_window_count(client)
         front = _front_project_path(client)
         if after == before + 1 and _same_project_path(front, path):

@@ -266,6 +266,25 @@ class ConditionalOnlyTests(unittest.TestCase):
         code = "#if TargetCocoa\nx = 1\n#endif\n"
         self.assertIn("TargetCocoa", scan.conditional_only(code))
 
+    def test_single_line_if_does_not_touch_the_stack(self):
+        # Xojo's one-line form (`#If cond Then code`) has no #EndIf, so
+        # pushing it would poison the tagging for the rest of the file --
+        # and a one-line `#If DebugBuild Then Break` inside a block would
+        # steal the block's #EndIf.
+        code = ("#If TargetWindows Then DoWindowsThing\n"
+                "a = Left(s, 1)\n"
+                "#if TargetMacOS\n"
+                "#If DebugBuild Then Break\n"
+                "b = Left(s, 2)\n"
+                "#endif\n"
+                "c = Left(s, 3)\n")
+        lines = scan.conditional_only(code).splitlines()
+        self.assertIn("TargetWindows", lines[0])   # the one-liner itself
+        self.assertEqual(lines[1].strip(), "")     # next line is NOT tagged
+        self.assertIn("Break", lines[3])           # inside a Target block
+        self.assertIn("Left(s, 2)", lines[4])
+        self.assertEqual(lines[6].strip(), "")     # the #endif still closed
+
     def test_scan_text_counts_conditional_hits(self):
         pats = shipped_patterns()
         pre = scan.build_prefilter(pats)

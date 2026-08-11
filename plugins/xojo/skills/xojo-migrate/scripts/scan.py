@@ -173,6 +173,10 @@ def code_only(text):
 COND_IF = re.compile(r"^\s*#if\b(.*)$", re.IGNORECASE)
 COND_ELSEIF = re.compile(r"^\s*#elseif\b(.*)$", re.IGNORECASE)
 COND_ENDIF = re.compile(r"^\s*#endif\b", re.IGNORECASE)
+# Xojo's documented single-line form, `#If cond Then code`, has no #EndIf:
+# it must not touch the nesting stack, or one `#If DebugBuild Then Break`
+# poisons the tagging for the rest of the file.
+COND_ONE_LINE = re.compile(r"^\s*#(?:else)?if\b.*?\bthen\b\s*\S", re.IGNORECASE)
 
 
 def conditional_only(code):
@@ -196,6 +200,14 @@ def conditional_only(code):
         before = any(stack)
         m_elif = COND_ELSEIF.match(line)
         m_if = COND_IF.match(line)
+        if (m_elif or m_if) and COND_ONE_LINE.match(line):
+            # Self-contained single-line directive: keep it when it names a
+            # Target (its code is one of the analyzer's blind spots) or when
+            # an enclosing construct already does; never push or pop.
+            cond = (m_elif or m_if).group(1).lower()
+            keep = before or "target" in cond
+            out.append((line if keep else " " * len(line)) + nl)
+            continue
         if m_elif:
             if stack and "target" in m_elif.group(1).lower():
                 stack[-1] = True
