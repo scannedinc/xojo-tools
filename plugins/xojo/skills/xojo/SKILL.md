@@ -155,7 +155,7 @@ A few hundred deprecated members have no recorded replacement. Either the docs s
 
 A few rows are maintained by hand in `scripts/deprecation-overrides.tsv`, because the documentation cannot state them deterministically:
 
-- deprecations whose page title never matches the identifier in code: the global function `Screen` lives on a page titled "Screen Method"
+- replacements the docs get wrong: the `Window` function's page suggests `Application.Window`, which is itself deprecated
 - calls the current docs no longer describe, like the removed `FolderItem.CreateBinaryFile` family
 - the hazard notes in the `note` column: the INDEX BASE, EPOCH, and ERROR MODEL warnings
 - advice on a symbol that is not deprecated at all: `Redim` still compiles and carries no `deprecated` flag, but its row points at `ResizeTo`, which the docs prefer

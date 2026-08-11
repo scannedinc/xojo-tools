@@ -68,11 +68,18 @@ def project_release(start: Path) -> tuple[str, tuple[int, int]] | None:
 
 
 def load_index() -> dict[str, tuple[str, str, str, str]]:
-    """Two lookups: bare type names, and member names.
+    """Three lookups: bare type names, global functions, and member names.
 
-    They cannot share one table. `Text` is a deprecated *type*, but `.Text` is a
-    current property on most controls, so a type name may only be matched where
-    the syntax demands a type -- `As Text`, `New Text` -- and never after a dot.
+    Types and members cannot share one table. `Text` is a deprecated *type*,
+    but `.Text` is a current property on most controls, so a type name may
+    only be matched where the syntax demands a type -- `As Text`, `New Text`
+    -- and never after a dot.
+
+    Functions get their own table because the docs title a deprecated global
+    function's page "<Name> Method" when the bare name also names a class:
+    `Window(0)` is the deprecated 2019r2 *function* while `As Window` is the
+    deprecated 2021r3 *class*, with different replacements. A call position
+    consults the function table first.
 
     Member names are keyed by the qualified form, plus the bare member name when
     it is unambiguous. Code says `myList.ListCount`, not `ListBox.ListCount`, so
@@ -80,6 +87,7 @@ def load_index() -> dict[str, tuple[str, str, str, str]]:
     it is only safe when no current API uses the same name.
     """
     types: dict[str, tuple[str, str, str, str]] = {}
+    functions: dict[str, tuple[str, str, str, str]] = {}
     members: dict[str, tuple[str, str, str, str]] = {}
     deprecated_leaves: dict[str, tuple[str, str, str, str]] = {}
     current_leaves: set[str] = set()
@@ -116,6 +124,14 @@ def load_index() -> dict[str, tuple[str, str, str, str]]:
                 if "." in symbol:
                     members.setdefault(symbol.lower(), entry)
                     deprecated_leaves.setdefault(leaf, entry)
+                elif symbol.lower().endswith(" method"):
+                    bare = symbol[: -len(" method")].strip()
+                    entry = (bare, c[ver], c[rep], c[note])
+                    functions.setdefault(bare.lower(), entry)
+                    # The As/New form keeps the class row when one exists;
+                    # for a function with no same-named class (Screen), this
+                    # also catches the old `As Screen` declarations.
+                    types.setdefault(bare.lower(), entry)
                 else:
                     types.setdefault(symbol.lower(), entry)
             else:
@@ -124,7 +140,7 @@ def load_index() -> dict[str, tuple[str, str, str, str]]:
     for leaf, entry in deprecated_leaves.items():
         if leaf not in current_leaves:
             members.setdefault(leaf, entry)
-    return {"types": types, "members": members}
+    return {"types": types, "functions": functions, "members": members}
 
 
 def code_lines(text: str) -> list[tuple[int, str]]:
@@ -150,6 +166,7 @@ def code_lines(text: str) -> list[tuple[int, str]]:
 def find_uses(text: str, index: dict) -> list[tuple[int, str, tuple]]:
     """Deprecated symbols used as APIs, not as words."""
     types, members = index["types"], index["members"]
+    functions = index.get("functions", {})
     hits: list[tuple[int, str, tuple]] = []
     for number, line in code_lines(text):
         # Member access: anything after a dot. The member is captured in a
@@ -161,14 +178,16 @@ def find_uses(text: str, index: dict) -> list[tuple[int, str, tuple]]:
             entry = members.get(f"{receiver}.{name}".lower()) or members.get(name.lower())
             if entry:
                 hits.append((number, f"{receiver}.{name}", entry))
-        # Type position: As X, New X. Never a bare word on its own.
-        for m in re.finditer(r"\b(?:As|New)\s+([A-Za-z_]\w*)", line, re.I):
+        # Type position: As X, New X, and the compound As New X.
+        for m in re.finditer(r"\b(?:As|New)\s+(?:New\s+)?([A-Za-z_]\w*)", line, re.I):
             entry = types.get(m.group(1).lower())
             if entry:
                 hits.append((number, m.group(1), entry))
-        # Global function call: X(...), not preceded by a dot.
+        # Global function call: X(...), not preceded by a dot. A name that is
+        # both a deprecated function and a deprecated class (Window) reports
+        # the function here; the As/New position reports the class.
         for m in re.finditer(r"(?<![.\w])([A-Za-z_]\w*)\s*\(", line):
-            entry = types.get(m.group(1).lower())
+            entry = functions.get(m.group(1).lower()) or types.get(m.group(1).lower())
             if entry:
                 hits.append((number, m.group(1), entry))
     return hits
