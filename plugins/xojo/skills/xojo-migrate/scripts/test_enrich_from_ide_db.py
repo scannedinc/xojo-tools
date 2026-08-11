@@ -53,6 +53,37 @@ def row(old, new, cat="Source — member"):
             "since": "", "status": "Deprecated", "note": "", "origin": "member"}
 
 
+class DocsTests(unittest.TestCase):
+    """The real members.tsv parser, which FakeDocs bypasses."""
+
+    def setUp(self):
+        self.dir = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir)
+        (self.dir / "members.tsv").write_text(
+            "name\tkind\tsignature\tflags\tdeprecated_in\treplacement\tnote\tpath\n"
+            "DesktopListBox.GridLineStyle\tproperty\t\t\t\t\t\t\n"
+            "DesktopListBox.RowCount(index As Integer)\tmethod\t\t\t\t\t\t\n"
+            "Redim\tkeyword\t\t\t\t\t\t\n",
+            encoding="utf-8",
+        )
+        self.docs = E.Docs(self.dir)
+
+    def test_listed_member_is_found(self):
+        self.assertTrue(self.docs.has("DesktopListBox", "GridLineStyle"))
+
+    def test_signature_on_the_index_row_is_stripped(self):
+        self.assertTrue(self.docs.has("DesktopListBox", "RowCount()"))
+
+    def test_missing_member_on_a_known_class_is_false(self):
+        self.assertFalse(self.docs.has("DesktopListBox", "GridLinesHorizontalStyle"))
+
+    def test_unknown_class_is_none_not_false(self):
+        self.assertIsNone(self.docs.has("Mystery", "Foo"))
+
+    def test_dotless_rows_do_not_become_classes(self):
+        self.assertIsNone(self.docs.has("Redim", "anything"))
+
+
 class BareNameTests(unittest.TestCase):
     def test_strips_signatures_and_return_types(self):
         for text, want in (

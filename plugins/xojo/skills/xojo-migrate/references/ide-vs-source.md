@@ -87,7 +87,7 @@ DesktopListBox.GridLineStyle.
 
 That example is verified against Xojo 2026.2.1: the IDE really does say `GridLinesHorizontal is deprecated.  You should use GridLinesHorizontalStyle instead`. `ListBox.GridLinesHorizontalStyle` exists—on the deprecated `ListBox`. `DesktopListBox` has no such property; it has `GridLineStyle`, and the two old Booleans merge into that one enum.
 
-The same check, run across the whole database against the API 2 class pages, rejected 35 of its entries. A few of the clearer ones:
+The same check, run across the whole database against the documentation's member index, rejected dozens of its entries. (The original import checked the class pages as running text, which a prose mention could satisfy; the index lookup that replaced it is member-level, and it caught a handful of wrong imports the first pass let through.) A few of the clearer ones:
 
 | The IDE suggests | The API 2 class actually has |
 |---|---|

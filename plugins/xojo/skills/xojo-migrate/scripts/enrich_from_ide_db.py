@@ -17,14 +17,20 @@ framework functions at all: no Left, InStr, GetFolderItem) and it is not
 always right about where a migration should land, so nothing is imported
 on its say-so alone.
 
-**Every replacement is checked against the API 2 destination class's own
-documentation page before it is imported.** The IDE will tell you
+**Every replacement is checked against the documentation's member index
+before it is imported.** The IDE will tell you
 `GridLinesHorizontal is deprecated.  You should use GridLinesHorizontalStyle
 instead`, and that property does exist -- on the deprecated `ListBox`
 class. `DesktopListBox` has no such member; its property is
 `GridLineStyle`. Following that suggestion moves you from one deprecated
 member to another on the class you are trying to leave. A replacement
-that does not exist on the destination class is reported and skipped.
+that the index does not list on the destination class is reported and
+skipped. The check reads members.tsv, the index the xojo skill's docs.py
+generates, which lists exactly the members the documentation declares. An
+earlier version of this tool tokenized the destination class's page as a
+bag of words, and a prose mention could satisfy it: "Value" appears in
+running text on pages whose control has no Value property, and several
+wrong rows were imported that way before the check was tightened.
 
 Two more rules keep the import conservative:
 
@@ -35,8 +41,9 @@ Two more rules keep the import conservative:
   reader can tell which rows came from Xojo's table rather than their
   prose, and a row's note names the IDE release it came from.
 
-Requires: a local Xojo installation (or --db) and the documentation mirror
-the xojo skill builds (or --docs). Neither ships in this repository.
+Requires: a local Xojo installation (or --db) and the documentation
+indexes the xojo skill builds (or --docs). Neither ships in this
+repository.
 """
 import argparse
 import json
@@ -47,8 +54,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 COVERAGE = HERE.parent / "references" / "coverage.json"
-DOCS = (HERE.parent.parent / "xojo" / "assets" / "documentation.xojo.com"
-        / "_sources")
+DOCS = HERE.parent.parent / "xojo" / "references" / "documentation"
 XOJO_APPS = pathlib.Path("/Applications/Xojo")
 SRC = "xojo-ide-db"
 
@@ -121,33 +127,29 @@ def bare_name(text):
     return match.group(0).lower() if match else ""
 
 
-def doc_pages(docs):
-    return {p.name[:-len(".rst.txt")].lower(): p
-            for p in pathlib.Path(docs).rglob("*.rst.txt")}
-
-
 class Docs:
-    """Membership test: does <Class> document a member called <name>?"""
+    """Membership test: does <Class> document a member called <name>?
+
+    Reads members.tsv, which has one row per member the documentation
+    declares, so the test is exact: the qualified name either is a
+    documented member or it is not. No prose mention can satisfy it.
+    """
 
     def __init__(self, docs):
-        self.pages = doc_pages(docs)
-        self._cache = {}
-
-    def members(self, cls):
-        key = cls.lower()
-        if key not in self._cache:
-            page = self.pages.get(key)
-            self._cache[key] = None if page is None else {
-                m.lower() for m in re.findall(
-                    r"[A-Za-z_][A-Za-z0-9_]*",
-                    page.read_text(encoding="utf-8", errors="replace"))}
-        return self._cache[key]
+        self.members = set()
+        self.classes = set()
+        path = pathlib.Path(docs) / "members.tsv"
+        for line in path.read_text(encoding="utf-8").splitlines()[1:]:
+            name = line.split("\t", 1)[0].split("(")[0].strip().lower()
+            if "." in name:
+                self.members.add(name)
+                self.classes.add(name.split(".", 1)[0])
 
     def has(self, cls, member):
-        found = self.members(cls)
-        if found is None:
-            return None            # no page: cannot judge, so do not import
-        return bare_name(member) in found
+        key = cls.lower()
+        if key not in self.classes:
+            return None            # no rows: cannot judge, so do not import
+        return f"{key}.{bare_name(member)}" in self.members
 
 
 def api2_class(coverage):
@@ -225,10 +227,12 @@ def plan(coverage, rows, docs, release):
 
 def note_for(target, new_name, release, kind):
     what = "event" if kind == "event" else "member"
+    shown = (new_name or "").split("(")[0].split(".")[-1].strip()
     note = (f"Replacement from the Xojo IDE's own deprecation database "
-            f"({release}); confirmed against the {target} documentation "
-            f"page, which lists {new_name}. Imported because no "
-            f"documentation page stated the {what} rename in prose.")
+            f"({release}); checked against the documentation index, which "
+            f"lists {target}.{shown} as a documented {what}. Imported "
+            f"because no documentation page stated the {what} rename in "
+            f"prose.")
     if kind == "event":
         note += (" Event renames are the IDE converter's job (Project ▸ "
                  "Update Controls to API 2.0) on placed controls; rename by "
@@ -271,9 +275,9 @@ def main(argv=None):
     if db is None or not pathlib.Path(db).exists():
         sys.exit("no deprecation_cache.db found. Install Xojo, or pass --db "
                  "<path to Contents/Resources/deprecation_cache.db>.")
-    if not pathlib.Path(args.docs).is_dir():
-        sys.exit(f"no documentation mirror at {args.docs}. Build it with the "
-                 f"xojo skill's docs.py, or pass --docs.")
+    if not (pathlib.Path(args.docs) / "members.tsv").is_file():
+        sys.exit(f"no documentation indexes at {args.docs}. Build them with "
+                 f"the xojo skill's docs.py, or pass --docs.")
     release = pathlib.Path(db).parts[3] if len(
         pathlib.Path(db).parts) > 3 else str(db)
 
