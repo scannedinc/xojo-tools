@@ -35,7 +35,7 @@ cp scripts/pre-commit.sample /path/to/project/.git/hooks/pre-commit
 chmod +x /path/to/project/.git/hooks/pre-commit
 ```
 
-The `XOJO_LINT` default at the top of the hook finds `xojo_lint.py` inside the installed Claude Code plugin. For any other install, set the variable to the real path of the script.
+The `XOJO_LINT` default at the top of the hook finds `xojo_lint.py` where Claude Code installs the plugin. For any other install, Codex included, set the variable to the real path of the script.
 
 ## Tests
 

@@ -53,7 +53,7 @@ The tool understands the text-format extensions (`.xojo_project`, `.xojo_code`, 
 
 ## As a pre-commit hook
 
-`scripts/pre-commit.sample` is a ready-to-use git hook for a Xojo project. It lints the staged `.xojo_*` files and blocks the commit on errors, warnings, or files the formatter would change. To install it into a project, copy it to `.git/hooks/pre-commit` and make it executable. Its `XOJO_LINT` default finds `xojo_lint.py` inside the installed Claude Code plugin; for any other install, set the variable to the real path of the script.
+`scripts/pre-commit.sample` is a ready-to-use git hook for a Xojo project. It lints the staged `.xojo_*` files and blocks the commit on errors, warnings, or files the formatter would change. To install it into a project, copy it to `.git/hooks/pre-commit` and make it executable. Its `XOJO_LINT` default finds `xojo_lint.py` where Claude Code installs the plugin; for any other install, Codex included, set the variable to the real path of the script.
 
 ## Tests
 

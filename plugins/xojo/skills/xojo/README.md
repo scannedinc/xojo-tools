@@ -80,7 +80,7 @@ Window1.xojo_code: 4 deprecated API(s)
 
 It reads `OrigIDEVersion` from the enclosing `.xojo_project` to learn which release the project targets, and it marks anything deprecated after that release. To avoid false positives, it drops constant, note, and enum blocks whole, strips string literals and comments, and only matches a symbol where the syntax makes it an API reference.
 
-With `--hook` it reads a Claude Code hook payload on stdin and checks the edited file. Add it to a Xojo project's `.claude/settings.json`:
+The script works with any coding agent that supports Agent Skills. The `--hook` mode is for Claude Code, whose hooks feature runs a command after each edit: the script reads the hook payload on stdin and checks the edited file. Agents without that feature, Codex included, use the command-line form above. Add the hook to a Xojo project's `.claude/settings.json`:
 
 ```json
 {
