@@ -365,6 +365,20 @@ class CliTests(unittest.TestCase):
         # It must send the reader somewhere, not just stop.
         self.assertIn("scan.py", combined)
 
+    def test_accepts_a_project_with_compile_errors(self):
+        # outcome project_errors is an analysis that RAN -- the normal
+        # state of a freshly converted project, whose phase-1 converter
+        # renamed control types and left members behind. Refusing it
+        # demotes the whole migration to the type-blind scanner; one
+        # real migration had to forge ok:true past the old gate.
+        broken = dict(LIVE, ok=False, outcome="project_errors",
+                      exit_code=1, error=None)
+        code, out, err = self.run_cli(broken)
+        self.assertEqual(code, 0)
+        self.assertIn("InStr", out)
+        self.assertIn("project_errors", err)
+        self.assertIn("worklist", err)
+
     def test_truncated_row_list_says_how_many_were_hidden(self):
         code, out, _ = self.run_cli(dict(LIVE, diagnostics=[
             diag("DataField is deprecated")]))

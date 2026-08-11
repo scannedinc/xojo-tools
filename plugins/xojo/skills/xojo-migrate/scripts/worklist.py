@@ -487,12 +487,16 @@ def main(argv=None, stdin=None):
     if not isinstance(doc, dict) or "diagnostics" not in doc:
         sys.exit("this is not an `xojoctl analyze --json` document: no "
                  "`diagnostics` key.")
-    # xojoctl emits a document for every outcome, including a failed
-    # connection, a timeout and no-project-open -- each with an empty
-    # diagnostics list. Summarizing one of those as "no deprecation
-    # warnings" would report an analysis that never ran as a finished
-    # migration, which is the worst answer this script could give.
-    if doc.get("ok") is False or doc.get("error"):
+    # xojoctl emits a document for every outcome. A failed connection, a
+    # timeout and no-project-open carry an error object and an EMPTY
+    # diagnostics list -- nothing ran, and summarizing that as "no
+    # deprecation warnings" would report an analysis that never happened
+    # as a finished migration. But `ok: false` alone is not that state:
+    # outcome project_errors is an analysis that RAN, on a project that
+    # does not compile -- the normal condition of a freshly converted
+    # tree -- and its diagnostics are the worklist, errors included.
+    if doc.get("error") or (doc.get("ok") is False
+                            and not doc.get("diagnostics")):
         err = doc.get("error") or {}
         detail = err.get("message") or doc.get("summary") or ""
         sys.exit(f"the analysis did not run: outcome "
@@ -501,6 +505,12 @@ def main(argv=None, stdin=None):
                  f"Nothing here says anything about deprecations. Fix the "
                  f"IDE connection and re-run, or take the scanner path "
                  f"(workflow phase 2b): python3 scan.py <project-dir>")
+    if doc.get("ok") is False:
+        print(f"note: analyze exited nonzero (outcome "
+              f"{doc.get('outcome') or 'unknown'}) -- the project does not "
+              f"compile, which is normal after the phase-1 converter. The "
+              f"diagnostics below are the worklist, errors included.",
+              file=sys.stderr)
 
     wl = build(doc)
     if args.format == "json":
