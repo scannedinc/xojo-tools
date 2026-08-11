@@ -1,6 +1,6 @@
 # Editing project files while the IDE is open
 
-An agent has two edit paths: the disk (change the text-format project files, then make the IDE reload them) and IDE Script (change code and properties inside the running IDE). This page gives the rules for both, the failure modes, and which path each kind of change requires. Everything here was verified against Xojo 2026r2.1 on macOS. The script commands are Xojo's own, documented in the `xojo` skill's mirror under `references/documentation/topics/build_automation/ide_scripting/`; read `project_commands.md` there for the full vocabulary.
+An agent has two edit paths: the disk (change the text-format project files, then make the IDE reload them) and IDE Script (change code and properties inside the running IDE). This page gives the rules for both, the failure modes, and which path each kind of change requires. Everything here was verified against Xojo 2026r2.1 on macOS, except the 2026r3 reload command, which is written from that release's notes. The script commands are Xojo's own, documented in the `xojo` skill's mirror under `references/documentation/topics/build_automation/ide_scripting/`; read `project_commands.md` there for the full vocabulary.
 
 ## The two silent failure modes
 
@@ -15,7 +15,9 @@ The stronger rule, when the timing is yours to choose: **close the project befor
 
 ## The reload recipe
 
-There is no reload command, and `OpenFile` on an already-open project does nothing (see [IDE behavior](ide-behavior.md)). Close, then reopen:
+On Xojo 2026r3 or later, `xojoctl reload --yes` reloads the front project from disk in one step, and `--item NAME` reloads a single project item. `--yes` is required for the same reason `close --discard` requires it: Reload Project is 2026r3's rename of Revert to Saved, and it discards the IDE's unsaved in-memory changes without prompting. The command is written from the 2026r3 release notes and is not yet verified against a shipping 2026r3; `xojoctl` refuses to send it to an older IDE.
+
+Through Xojo 2026r2.1 there is no reload command, and `OpenFile` on an already-open project does nothing (see [IDE behavior](ide-behavior.md)). Close, then reopen:
 
 ```sh
 xojoctl close --discard --yes

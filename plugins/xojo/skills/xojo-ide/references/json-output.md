@@ -74,7 +74,7 @@ The IDE's own shapes are awkward, so `xojoctl` normalizes them.
 | 4 | The result is incomplete. The reply could not be interpreted, or a build's completion went unconfirmed |
 | 5 | The IDE rejected the script `xojoctl` sent. This is a bug in `xojoctl` |
 | 6 | No project is open. The IDE answered, but there is nothing to act on |
-| 64 | You used a flag or value the tool does not accept |
+| 64 | You used a flag or value the tool does not accept, or asked this IDE for something its version cannot do |
 | 130 | Interrupted (Ctrl-C) before the command finished; the IDE may still be working on it |
 
 Warnings alone exit 0. Pass `-W` or `--warnings-as-errors` to make them exit 1.

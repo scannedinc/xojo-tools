@@ -90,6 +90,8 @@ xojoctl close --save
 
 `close --discard` throws away unsaved changes, so it also needs `--yes`.
 
+Xojo 2026r3 adds a reload command, described in its release notes and not yet tested against a shipped 2026r3. There, `xojoctl reload --yes` re-reads the front project from disk in one step, and `--item NAME` reloads one project item. A reload discards unsaved changes like a revert, so it also needs `--yes`. On an older IDE, `xojoctl reload` refuses and tells you to close and reopen instead.
+
 ### Analyze the project
 
 ```console
@@ -143,7 +145,7 @@ Branch on `ok` and `exit_code`:
 | 4 | The result is incomplete and you should not trust it |
 | 5 | `xojoctl` sent a script the IDE rejected. This is a bug here |
 | 6 | No project is open |
-| 64 | You used a flag or value the tool does not accept |
+| 64 | You used a flag or value the tool does not accept, or asked this IDE for something its version cannot do |
 
 The full JSON schema is in [JSON output](references/json-output.md).
 
@@ -157,6 +159,7 @@ The full JSON schema is in [JSON output](references/json-output.md).
 | `open` | Open a project |
 | `save` | Save the front project without a prompt |
 | `close` | Close the front project |
+| `reload` | Reload the front project from disk (Xojo 2026r3 or later) |
 | `analyze` | Run Analyze Project and report errors and warnings |
 | `build` | Build for one or more targets |
 | `run` | Run the project in the IDE debugger |

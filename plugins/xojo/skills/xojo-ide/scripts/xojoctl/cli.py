@@ -50,7 +50,7 @@ def help_theme() -> Theme:
 # test suite asserts it, so a new command cannot silently vanish from help.
 COMMAND_GROUPS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("PROJECT COMMANDS", ("analyze", "build", "run", "stop")),
-    ("PROJECT STATE", ("open", "save", "close")),
+    ("PROJECT STATE", ("open", "save", "close", "reload")),
     ("INSPECTION", ("status", "projects", "version", "targets")),
     ("ADVANCED", ("script", "capture")),
 )
@@ -63,6 +63,7 @@ COMMAND_BLURBS = {
     "open": "Open a project in the IDE",
     "save": "Save the front project (no prompt)",
     "close": "Close the front project",
+    "reload": "Reload the front project from disk (Xojo 2026r3+)",
     "status": "Check that the IDE is reachable and speaking v2",
     "projects": "List open workspaces and which one is frontmost",
     "version": "Report the running IDE's version",
@@ -93,6 +94,7 @@ COMMAND_EXAMPLES = {
     "projects": ("projects", "projects --select 'Desktop App'"),
     "save": ("save",),
     "close": ("close --save", "close --discard --yes"),
+    "reload": ("reload --yes", "reload --item Window1 --yes"),
     "capture": ("capture --seconds 60 --json > capture.json",),
 }
 
@@ -406,6 +408,21 @@ def build_parser() -> argparse.ArgumentParser:
                    help="discard unsaved changes (requires --yes)")
     s.add_argument("--yes", action="store_true", help="confirm a discarding close")
     s.set_defaults(func=cmd_close)
+
+    s = sub.add_parser(
+        "reload", parents=[conn, out],
+        help="reload the front project from disk (Xojo 2026r3+)",
+        description="Runs Reload Project, which needs Xojo 2026r3 or later "
+                    "(the release that renamed Revert to Saved). It re-reads "
+                    "the front project from disk, discarding unsaved IDE "
+                    "changes without prompting, so it requires --yes. On an "
+                    "older IDE %s refuses and names the close/open pair to "
+                    "use instead." % INVOCATION)
+    s.add_argument("--item", metavar="NAME",
+                   help="reload one project item instead of the whole project")
+    s.add_argument("--yes", action="store_true",
+                   help="confirm a discarding reload")
+    s.set_defaults(func=cmd_reload)
 
     for canonical, sp in _subparsers(sub).items():
         sp.command_name = canonical

@@ -164,6 +164,37 @@ def script_close_project(save: bool) -> str:
     return "\n".join(steps)
 
 
+def script_reload_project() -> str:
+    """Reload the front project from disk (Xojo 2026r3+).
+
+    ReloadProject is 2026r3's rename of Revert to Saved: it re-reads the
+    project from disk and discards unsaved in-memory changes without
+    prompting. An older IDE rejects the script as a compile error, so
+    cmd_reload refuses to send it there. Written from the 2026r3 release
+    notes; not yet verified against a shipping 2026r3.
+    """
+    return "ReloadProject\nPrint %s" % xojo_string_literal("reloaded")
+
+
+def script_reload_item(item: str) -> str:
+    """Reload ONE project item from disk (Xojo 2026r3+).
+
+    ReloadProjectItem is a FUNCTION returning a Boolean, and (exactly like
+    SelectProjectItem above) that result is the only signal the item exists,
+    so it is branched on rather than discarded: a mistyped name prints a
+    distinct marker that the caller turns into an error. Written from the
+    2026r3 release notes; not yet verified against a shipping 2026r3.
+    """
+    return ("If ReloadProjectItem(%s) Then\n"
+            "Print %s\n"
+            "Else\n"
+            "Print %s\n"
+            "End If"
+            % (xojo_string_literal(item),
+               xojo_string_literal("reloaded"),
+               xojo_string_literal(RELOAD_ITEM_MISSING)))
+
+
 def script_run() -> str:
     return 'DoCommand("RunApp")\nPrint %s' % xojo_string_literal("running")
 
@@ -181,6 +212,8 @@ __all__ = [
     "script_front_path",
     "script_list_windows",
     "script_open_project",
+    "script_reload_item",
+    "script_reload_project",
     "script_run",
     "script_save_project",
     "script_select_window",

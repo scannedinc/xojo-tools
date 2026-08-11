@@ -8,7 +8,7 @@ import secrets
 import sys
 import time
 import unicodedata
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .constants import *  # noqa: F401,F403
 from .escaping import *  # noqa: F401,F403
@@ -412,13 +412,42 @@ def cmd_script(args: argparse.Namespace, res: Result) -> None:
         res.summary = "script completed"
 
 
+def _require_ide_version(res: Result, minimum: float, name: str) -> None:
+    """Refuse a command the running IDE is too old to know.
+
+    Sending it anyway would come back as a scriptError -- exit 5, which
+    json-output.md defines as a bug in xojoctl -- so the refusal happens
+    here, with the remedy in the message. XojoVersion is a Double whose
+    numeric order matches the release order, so a float compare is enough.
+    """
+    raw = (res.ide or {}).get("version") or ""
+    try:
+        seen = float(raw)
+    except ValueError:
+        raise XojoError(
+            "%s needs Xojo %s or later, and the IDE's version reply %r is "
+            "unreadable.\nTry '%s version'." % (res.command, name, raw, INVOCATION))
+    if not seen >= minimum:
+        # NOT `seen < minimum`: float() accepts "nan", whose every comparison
+        # is False, and the gate must fail closed on a nonsense reply.
+        raise XojoError(
+            "%s needs Xojo %s or later; this IDE is %s.\n"
+            "Close and reopen instead: %s close --discard --yes, then "
+            "%s open <path>." % (res.command, name, raw, INVOCATION, INVOCATION))
+
+
 def _simple(args: argparse.Namespace, res: Result, script: str, ok_summary: str,
             needs_project: Optional[str] = None,
-            ceiling: Optional[float] = None) -> None:
+            ceiling: Optional[float] = None,
+            min_version: Optional[Tuple[float, str]] = None) -> None:
     started = time.monotonic()
     wall = time.time()
     with connected(args, res, wall) as client:
         health_check(client, res)
+        if min_version:
+            # After health_check, which is what learns the version -- and
+            # before the exchange, so an unsupported script is never sent.
+            _require_ide_version(res, *min_version)
         if needs_project:
             require_project(client, res, needs_project)
         ex = client.exchange(script, ceiling=ceiling)
@@ -602,6 +631,32 @@ def cmd_close(args: argparse.Namespace, res: Result) -> None:
             "close")
 
 
+def cmd_reload(args: argparse.Namespace, res: Result) -> None:
+    item = getattr(args, "item", None)
+    if item is not None and not item.strip():
+        # Same trap as analyze --item: an unset shell variable would silently
+        # fall through to a whole-project reload.
+        raise XojoError("--item requires a non-empty item name")
+    if not args.yes:
+        raise XojoError(
+            "reload runs Reload Project, which re-reads the project from disk "
+            "and discards unsaved changes in the IDE without prompting.\n"
+            "Pass --yes to confirm.")
+    _simple(args, res,
+            script_reload_item(item) if item else script_reload_project(),
+            ("reloaded %s from disk" % item) if item
+            else "reloaded the front project from disk",
+            "reload",
+            min_version=(RELOAD_MIN_XOJO_VERSION, RELOAD_MIN_XOJO_NAME))
+    if item and res.result.get("output") == RELOAD_ITEM_MISSING:
+        raise XojoError(
+            "no project item matching %r in the front project, so nothing "
+            "was reloaded. ReloadProjectItem takes the item's path, per the "
+            "2026r3 release notes." % item)
+    res.result["scope"] = "item" if item else "project"
+    res.result["item"] = item
+
+
 def cmd_capture(args: argparse.Namespace, res: Result) -> None:
     started = time.monotonic()
     wall = time.time()
@@ -683,6 +738,7 @@ def render_targets(res: Result, st: Style, out: Any) -> None:
 
 __all__ = [
     "_VERDICT_SEVERITY",
+    "_require_ide_version",
     "_simple",
     "apply_classification",
     "cmd_analyze",
@@ -691,6 +747,7 @@ __all__ = [
     "cmd_close",
     "cmd_open",
     "cmd_projects",
+    "cmd_reload",
     "cmd_run",
     "cmd_save",
     "cmd_script",

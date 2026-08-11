@@ -335,6 +335,7 @@ class MockIDE:
 
     def __init__(self) -> None:
         self.handshakes = 0
+        self.version = "2026.021"    # what Str(XojoVersion) prints for 2026r2.1
         self._dir = None
         if X.IS_WINDOWS:
             self._srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -491,7 +492,12 @@ class MockIDE:
                  "location": {"column": 6, "line": 1}}]}})
             return
         if "XojoVersion" in script:
-            self._send(conn, {"tag": tag, "response": "2026.021"})
+            self._send(conn, {"tag": tag, "response": self.version})
+            return
+        if "ReloadProjectItem" in script:
+            found = '"Window1"' in script
+            self._send(conn, {"tag": tag, "response":
+                              "reloaded" if found else X.RELOAD_ITEM_MISSING})
             return
         if "EMPTY" in script:
             self._send(conn, {"tag": tag, "response": {}})
@@ -1259,6 +1265,23 @@ def test_close_semantics() -> None:
     check("--discard closes without prompting", "CloseProject(False)" in disc, True)
 
 
+def test_reload_semantics() -> None:
+    """Reload Project is 2026r3+ and discards unsaved changes, like a revert.
+
+    ReloadProjectItem is a FUNCTION, so its script must branch on the result
+    the way script_analyze_item does -- a mistyped name would otherwise
+    report success for an item that was never reloaded.
+    """
+    print("\nreload semantics")
+    check("reload is ReloadProject plus a completion Print",
+          X.script_reload_project(), 'ReloadProject\nPrint "reloaded"')
+    s = X.script_reload_item("My Window")
+    check("--item branches on ReloadProjectItem's result",
+          s.startswith('If ReloadProjectItem("My Window") Then'), True)
+    check("--item prints a distinct marker for a missing item",
+          X.RELOAD_ITEM_MISSING in s, True)
+
+
 def test_projects() -> None:
     """WindowTitle is 0-based and index 0 is frontmost, established live."""
     print("\nprojects / workspace enumeration")
@@ -1574,6 +1597,26 @@ def test_command_flows() -> None:
         res = run(X.cmd_script, source="WARNSLOW", file=None, stdin=False)
         check("script: late output recovered end-to-end",
               res.result["output"], "42")
+
+        check_raises("reload: refused without --yes",
+                     lambda: run(X.cmd_reload, item=None, yes=False),
+                     X.XojoError)
+        check_raises("reload: refused on an IDE older than 2026r3",
+                     lambda: run(X.cmd_reload, item=None, yes=True),
+                     X.XojoError)
+        ide.version = "2026.03"    # what Str(XojoVersion) prints for 2026r3
+        res = run(X.cmd_reload, item=None, yes=True)
+        check("reload: succeeds on 2026r3",
+              (res.exit_code, res.summary),
+              (0, "reloaded the front project from disk"))
+        res = run(X.cmd_reload, item="Window1", yes=True)
+        check("reload: item success records the item",
+              (res.exit_code, res.result["item"], res.result["scope"]),
+              (0, "Window1", "item"))
+        check_raises("reload: a missing item is an error, not a success",
+                     lambda: run(X.cmd_reload, item="Nope", yes=True),
+                     X.XojoError)
+        ide.version = "2026.021"
     finally:
         set_global("open_client", old_open)
         set_global("script_analyze_project", old_analyze)
@@ -1603,6 +1646,7 @@ def main() -> int:
     test_cli_guards()
     test_usage_json()
     test_close_semantics()
+    test_reload_semantics()
     test_projects()
     test_arg_validation()
     test_no_aliases()

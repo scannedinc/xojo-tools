@@ -77,11 +77,11 @@ Xojo's `CloseProject(prompt As Boolean = True)` shows a dialog when `prompt` is 
 
 So `xojoctl close --save` runs `SaveFile` first and then closes with `prompt=False`. `--discard` closes and loses your changes, which is why it needs `--yes`.
 
-## To pick up edits made outside the IDE, close and reopen
+## To pick up edits made outside the IDE, reload or close-and-reopen
 
-There is no revert or reload command. `OpenFile` on an already-open project does nothing. This is verified: edit a file on disk, send `OpenFile` again, and the stale diagnostics do not change.
+Through Xojo 2026r2.1 there is no revert or reload command. `OpenFile` on an already-open project does nothing. This is verified: edit a file on disk, send `OpenFile` again, and the stale diagnostics do not change.
 
-Run `xojoctl close --discard --yes`, then `xojoctl open <path>`.
+Run `xojoctl close --discard --yes`, then `xojoctl open <path>`. Xojo 2026r3 adds Reload Project and its scripting commands (per its release notes; not yet verified against a shipping 2026r3), so there `xojoctl reload --yes` does it in one step.
 
 ## Script error line numbers are corrected
 
