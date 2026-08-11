@@ -54,11 +54,12 @@ RELEASE = re.compile(r"^\d{4}r\d+(\.\d+)?$")
 STATUS_KNOWN = {"CLong", "POP3SecureSocket.MessageCount",
                 "StyledTextPrinter.EOF"}
 
-# The docs name Application.Window as the Window function's replacement, but
-# that member is itself deprecated on the deprecated Application class; the
-# matrix deliberately routes past it to DesktopApplication's WindowAt,
-# WindowCount and Windows.
-REPLACEMENT_KNOWN = {"Window"}
+# No known replacement divergences remain: the one case where the docs'
+# own suggestion was rejected (the Window function's page names
+# Application.Window, itself deprecated) is corrected on the xojo side by a
+# hand override, so both datasets now point at DesktopApplication's
+# WindowAt, WindowCount and Windows.
+REPLACEMENT_KNOWN = set()
 
 # Deprecations the indexes carry that the matrix deliberately omits:
 # self-named overload deprecations on mobile-only surfaces (a bare-name row
