@@ -228,7 +228,7 @@ The Xojo IDE writes and reads `.xojo_code`, `.xojo_window`, and the other files 
 - Preserve unknown tags, keys, and values. Never invent or renumber project item IDs; other files reference them.
 - Comments with `//` inside method bodies are acceptable. Use them for clarity. Xojo has no multi-line comment.
 - Do not reference raw file line numbers. The developer views this code in the IDE, where the numbering of the text file has no meaning. Count within the method instead: "lines 5-7 of the MyFunction function".
-- An open IDE does not see disk edits. The IDE keeps the whole project in memory and does not watch the disk, so edits you make while the user has the project open are invisible to it, and an IDE-side save destroys them. The sibling `xojo-ide` skill makes the IDE pick them up: `xojoctl reload --yes` on Xojo 2026r3 or later, a close-and-reopen on older releases. Reload after every batch of disk edits, also so the user sees your changes as you work.
+- An open IDE does not see disk edits. The IDE keeps the whole project in memory and does not watch the disk, so edits you make while the user has the project open are invisible to it, and an IDE-side save destroys them. The sibling `xojo-ide` skill makes the IDE pick them up: `xojoctl reload --discard` on Xojo 2026r3 or later, a close-and-reopen on older releases. Reload after every batch of disk edits, also so the user sees your changes as you work.
 
 ## Validating project changes
 

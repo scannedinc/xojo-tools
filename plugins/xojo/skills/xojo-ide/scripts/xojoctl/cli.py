@@ -93,8 +93,8 @@ COMMAND_EXAMPLES = {
     "open": ('open ~/Projects/MyApp.xojo_project',),
     "projects": ("projects", "projects --select 'Desktop App'"),
     "save": ("save",),
-    "close": ("close --save", "close --discard --yes"),
-    "reload": ("reload --yes", "reload --item Window1 --yes"),
+    "close": ("close --save", "close --discard"),
+    "reload": ("reload --discard", "reload --item Window1 --discard"),
     "capture": ("capture --seconds 60 --json > capture.json",),
 }
 
@@ -400,13 +400,13 @@ def build_parser() -> argparse.ArgumentParser:
         description="Xojo's CloseProject takes a PROMPT flag, not a save flag, "
                     "and prompting would park a modal dialog in front of nobody. "
                     "xojoctl therefore never prompts: --save runs SaveFile first, "
-                    "--discard closes and loses changes, and so requires --yes.")
+                    "and --discard closes and loses changes -- typing --discard "
+                    "IS the confirmation.")
     g = s.add_mutually_exclusive_group(required=True)
     g.add_argument("--save", action="store_true",
                    help="save the project, then close it")
     g.add_argument("--discard", action="store_true",
-                   help="discard unsaved changes (requires --yes)")
-    s.add_argument("--yes", action="store_true", help="confirm a discarding close")
+                   help="discard unsaved changes and close")
     s.set_defaults(func=cmd_close)
 
     s = sub.add_parser(
@@ -415,13 +415,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="Runs Reload Project, which needs Xojo 2026r3 or later "
                     "(the release that renamed Revert to Saved). It re-reads "
                     "the front project from disk, discarding unsaved IDE "
-                    "changes without prompting, so it requires --yes. On an "
-                    "older IDE %s refuses and names the close/open pair to "
-                    "use instead." % INVOCATION)
+                    "changes without prompting, so it requires --discard, "
+                    "exactly like a discarding close. On an older IDE %s "
+                    "refuses and names the close/open pair to use "
+                    "instead." % INVOCATION)
     s.add_argument("--item", metavar="NAME",
                    help="reload one project item instead of the whole project")
-    s.add_argument("--yes", action="store_true",
-                   help="confirm a discarding reload")
+    s.add_argument("--discard", action="store_true",
+                   help="discard unsaved changes and reload")
     s.set_defaults(func=cmd_reload)
 
     for canonical, sp in _subparsers(sub).items():

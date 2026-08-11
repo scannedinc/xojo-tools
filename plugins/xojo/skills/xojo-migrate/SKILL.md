@@ -137,7 +137,7 @@ open → analyze → close → edit on disk → open → analyze → close → c
 
 - **This costs nothing.** With the commands this workflow uses, making an open IDE see disk edits is already a close and a reopen (the xojo-ide skill's editing-and-reload reference), so the close/open pair is being paid at every checkpoint regardless. The discipline only moves the close to *before* the edits, so no moment exists in which an open IDE and newer disk files disagree—a reasoning even a cheaper reload would not change (`xojoctl reload` exists on Xojo 2026r3 or later, and this workflow deliberately does not use it): a reload happens after the edits, and the hazard is the open window during them.
 - **A session may begin with the project already open.** `open` on an already-open project is a documented no-op, so after phase 0's reopen or the user's phase 1 converter run, the session simply picks up at the analyze. What the discipline forbids is *editing* while the project sits open, not finding it open.
-- **End an analyze session with `close --discard --yes`.** The session made nothing worth saving, and the disk—where git is—is the migration's only source of truth; a `--save` here would let the IDE write its in-memory copy over it. The one deliberate `--save` in this workflow is phase 0's analysis-warnings step, which needs the IDE to write the settings record as the project closes.
+- **End an analyze session with `close --discard`.** The session made nothing worth saving, and the disk—where git is—is the migration's only source of truth; a `--save` here would let the IDE write its in-memory copy over it. The one deliberate `--save` in this workflow is phase 0's analysis-warnings step, which needs the IDE to write the settings record as the project closes.
 - **Confirm the frontmost project first.** Xojo is single-instance and `xojoctl` acts on the frontmost open project. If anything else may be open in the IDE, run `projects` before `analyze` or `close`—an unchecked session can report on, or close, a project that is not yours.
 
 **Report the counts, every time.** Each analyze returns an error count and a warning count; report both to the user at every session, beside the previous session's numbers—"analyze: 0 errors, 210 warnings (was 260: the ListBox category cleared 50)". The falling warning count is the migration's only live progress meter, and a checkpoint where it does not fall—or where errors appear outside the two categories expected to break the build—is a stop-and-look signal, not a footnote. Two caveats keep the numbers honest: analyze counts every warning type the project's settings enable, not only deprecations, so the finish line is *zero deprecation warnings* (phase 8), not zero warnings; and when the IDE is unreachable and the user runs Analyze Project, ask for both counts and track them the same way.
@@ -148,7 +148,7 @@ Read `$SKILL/references/ide-vs-source.md` before phase 1, and `$SKILL/references
 
 ### 1. IDE converter first
 
-Ask the user to run **Project ▸ Update Controls to API 2.0** in the IDE, then commit the result as the **first commit on the migration branch**. Have them save in the IDE and confirm the converter's diff is on disk (`git status` shows it) before any bracketed session runs—a `close --discard --yes` after an unsaved converter run would destroy its output. It is a large, entirely IDE-generated diff; keeping it separate is what makes every later commit readable as your work rather than the converter's. If they can't or won't, note it; type renames move to phase 7.
+Ask the user to run **Project ▸ Update Controls to API 2.0** in the IDE, then commit the result as the **first commit on the migration branch**. Have them save in the IDE and confirm the converter's diff is on disk (`git status` shows it) before any bracketed session runs—a `close --discard` after an unsaved converter run would destroy its output. It is a large, entirely IDE-generated diff; keeping it separate is what makes every later commit readable as your work rather than the converter's. If they can't or won't, note it; type renames move to phase 7.
 
 ### 2. Inventory
 
@@ -163,7 +163,7 @@ With the deprecation warnings on (phase 0), run one bracketed IDE session (**IDE
 ```
 python3 -m xojoctl open /path/to/Project.xojo_project
 python3 -m xojoctl analyze --json | python3 $SKILL/scripts/worklist.py
-python3 -m xojoctl close --discard --yes
+python3 -m xojoctl close --discard
 ```
 
 Report the analyze counts now: they are the baseline every later checkpoint's numbers fall from.
@@ -416,7 +416,7 @@ python3 $SKILL/scripts/analysis_warnings.py <project> [--enable]  # report / ena
 python3 $SKILL/scripts/worklist.py [analyze.json] [--format json]  # join `xojoctl analyze --json` to the rules (phase 2a); reads stdin
 ```
 
-`xojoctl` is not this skill's script: it belongs to the sibling **xojo-ide** skill (`$SKILL/../xojo-ide` in this plugin), whose own SKILL.md covers connecting to the IDE. The commands this workflow uses are `open`, `close` (`--discard --yes` to end an analyze session; `--save` only in phase 0's warnings step), `analyze [--json]` and `projects`; run them from that skill's `scripts` directory (`python3 -m xojoctl ...`), in the bracketed sessions **IDE session discipline** prescribes. When that skill or a running IDE is unavailable, the whole workflow still runs through the user and the scanner path—the IDE preference is a preference, not a dependency.
+`xojoctl` is not this skill's script: it belongs to the sibling **xojo-ide** skill (`$SKILL/../xojo-ide` in this plugin), whose own SKILL.md covers connecting to the IDE. The commands this workflow uses are `open`, `close` (`--discard` to end an analyze session; `--save` only in phase 0's warnings step), `analyze [--json]` and `projects`; run them from that skill's `scripts` directory (`python3 -m xojoctl ...`), in the bracketed sessions **IDE session discipline** prescribes. When that skill or a running IDE is unavailable, the whole workflow still runs through the user and the scanner path—the IDE preference is a preference, not a dependency.
 
 `scan.py` and `sweep.py` answer different questions and both are required. `scan.py` opens the migration: what is here, per bucket, as a plan. `sweep.py` closes it: what did every rule structurally fail to see. Its main section is **receiverless member calls**—`Invalidate` where the code means `Self.Invalidate`—which no dot-anchored rule can match, and which therefore never appear as a remaining match anywhere else.
 

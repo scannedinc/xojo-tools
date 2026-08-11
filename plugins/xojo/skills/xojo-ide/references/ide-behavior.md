@@ -75,13 +75,13 @@ Xojo runs as a single instance, so several open projects share one connection. `
 
 Xojo's `CloseProject(prompt As Boolean = True)` shows a dialog when `prompt` is true. During automation that parks a modal dialog in front of nobody. `CloseProject` can never save.
 
-So `xojoctl close --save` runs `SaveFile` first and then closes with `prompt=False`. `--discard` closes and loses your changes, which is why it needs `--yes`.
+So `xojoctl close --save` runs `SaveFile` first and then closes with `prompt=False`. `--discard` closes and loses your changes; typing it is the confirmation.
 
 ## To pick up edits made outside the IDE, reload or close-and-reopen
 
 Through Xojo 2026r2.1 there is no revert or reload command. `OpenFile` on an already-open project does nothing. This is verified: edit a file on disk, send `OpenFile` again, and the stale diagnostics do not change.
 
-Run `xojoctl close --discard --yes`, then `xojoctl open <path>`. Xojo 2026r3 adds Reload Project and its scripting commands (per its release notes; not yet verified against a shipping 2026r3), so there `xojoctl reload --yes` does it in one step.
+Run `xojoctl close --discard`, then `xojoctl open <path>`. Xojo 2026r3 adds Reload Project and its scripting commands (per its release notes; not yet verified against a shipping 2026r3), so there `xojoctl reload --discard` does it in one step.
 
 ## Script error line numbers are corrected
 

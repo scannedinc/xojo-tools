@@ -432,7 +432,7 @@ def _require_ide_version(res: Result, minimum: float, name: str) -> None:
         # is False, and the gate must fail closed on a nonsense reply.
         raise XojoError(
             "%s needs Xojo %s or later; this IDE is %s.\n"
-            "Close and reopen instead: %s close --discard --yes, then "
+            "Close and reopen instead: %s close --discard, then "
             "%s open <path>." % (res.command, name, raw, INVOCATION, INVOCATION))
 
 
@@ -622,10 +622,6 @@ def cmd_save(args: argparse.Namespace, res: Result) -> None:
 
 
 def cmd_close(args: argparse.Namespace, res: Result) -> None:
-    if args.discard and not args.yes:
-        raise XojoError(
-            "close --discard runs CloseProject(False), which discards unsaved "
-            "changes in the IDE without prompting.\nPass --yes to confirm.")
     _simple(args, res, script_close_project(save=args.save),
             "closed the front project (%s)" % ("saving" if args.save else "discarding"),
             "close")
@@ -637,11 +633,13 @@ def cmd_reload(args: argparse.Namespace, res: Result) -> None:
         # Same trap as analyze --item: an unset shell variable would silently
         # fall through to a whole-project reload.
         raise XojoError("--item requires a non-empty item name")
-    if not args.yes:
+    if not args.discard:
+        # The same confirmation as a discarding close, on purpose: the flag
+        # that names the data loss is the acknowledgment of it.
         raise XojoError(
             "reload runs Reload Project, which re-reads the project from disk "
             "and discards unsaved changes in the IDE without prompting.\n"
-            "Pass --yes to confirm.")
+            "Pass --discard to confirm.")
     _simple(args, res,
             script_reload_item(item) if item else script_reload_project(),
             ("reloaded %s from disk" % item) if item

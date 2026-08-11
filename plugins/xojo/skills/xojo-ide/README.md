@@ -88,9 +88,9 @@ xojoctl open ~/Projects/MyApp.xojo_project
 xojoctl close --save
 ```
 
-`close --discard` throws away unsaved changes, so it also needs `--yes`.
+`close --discard` throws away unsaved changes. Typing `--discard` is the confirmation, like the `-f` in `rm -f`; the tool never prompts.
 
-Xojo 2026r3 adds a reload command, described in its release notes and not yet tested against a shipped 2026r3. There, `xojoctl reload --yes` re-reads the front project from disk in one step, and `--item NAME` reloads one project item. A reload discards unsaved changes like a revert, so it also needs `--yes`. On an older IDE, `xojoctl reload` refuses and tells you to close and reopen instead.
+Xojo 2026r3 adds a reload command, described in its release notes and not yet tested against a shipped 2026r3. There, `xojoctl reload --discard` re-reads the front project from disk in one step, and `--item NAME` reloads one project item. A reload discards unsaved changes like a revert, so it takes the same `--discard`. On an older IDE, `xojoctl reload` refuses and tells you to close and reopen instead.
 
 ### Analyze the project
 

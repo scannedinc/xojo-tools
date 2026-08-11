@@ -1598,23 +1598,23 @@ def test_command_flows() -> None:
         check("script: late output recovered end-to-end",
               res.result["output"], "42")
 
-        check_raises("reload: refused without --yes",
-                     lambda: run(X.cmd_reload, item=None, yes=False),
+        check_raises("reload: refused without --discard",
+                     lambda: run(X.cmd_reload, item=None, discard=False),
                      X.XojoError)
         check_raises("reload: refused on an IDE older than 2026r3",
-                     lambda: run(X.cmd_reload, item=None, yes=True),
+                     lambda: run(X.cmd_reload, item=None, discard=True),
                      X.XojoError)
         ide.version = "2026.03"    # what Str(XojoVersion) prints for 2026r3
-        res = run(X.cmd_reload, item=None, yes=True)
+        res = run(X.cmd_reload, item=None, discard=True)
         check("reload: succeeds on 2026r3",
               (res.exit_code, res.summary),
               (0, "reloaded the front project from disk"))
-        res = run(X.cmd_reload, item="Window1", yes=True)
+        res = run(X.cmd_reload, item="Window1", discard=True)
         check("reload: item success records the item",
               (res.exit_code, res.result["item"], res.result["scope"]),
               (0, "Window1", "item"))
         check_raises("reload: a missing item is an error, not a success",
-                     lambda: run(X.cmd_reload, item="Nope", yes=True),
+                     lambda: run(X.cmd_reload, item="Nope", discard=True),
                      X.XojoError)
         ide.version = "2026.021"
     finally:

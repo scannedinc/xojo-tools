@@ -15,12 +15,12 @@ The stronger rule, when the timing is yours to choose: **close the project befor
 
 ## The reload recipe
 
-On Xojo 2026r3 or later, `xojoctl reload --yes` reloads the front project from disk in one step, and `--item NAME` reloads a single project item. `--yes` is required for the same reason `close --discard` requires it: Reload Project is 2026r3's rename of Revert to Saved, and it discards the IDE's unsaved in-memory changes without prompting. The command is written from the 2026r3 release notes and is not yet verified against a shipping 2026r3; `xojoctl` refuses to send it to an older IDE.
+On Xojo 2026r3 or later, `xojoctl reload --discard` reloads the front project from disk in one step, and `--item NAME` reloads a single project item. `--discard` is required for the same reason `close` has it: Reload Project is 2026r3's rename of Revert to Saved, and it discards the IDE's unsaved in-memory changes without prompting—typing the flag is the confirmation. The command is written from the 2026r3 release notes and is not yet verified against a shipping 2026r3; `xojoctl` refuses to send it to an older IDE.
 
 Through Xojo 2026r2.1 there is no reload command, and `OpenFile` on an already-open project does nothing (see [IDE behavior](ide-behavior.md)). Close, then reopen:
 
 ```sh
-xojoctl close --discard --yes
+xojoctl close --discard
 xojoctl open /path/to/Project.xojo_project
 ```
 

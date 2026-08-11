@@ -33,8 +33,8 @@ Run `status` first: it confirms the IDE is reachable before you spend a long com
 | `projects` | List open projects; show and change the frontmost |
 | `open` | Open a project |
 | `save` | Save the front project without a prompt |
-| `close` | Close the front project (`--save` or `--discard --yes`) |
-| `reload` | Reload the front project from disk (Xojo 2026r3 or later; `--yes` required) |
+| `close` | Close the front project (`--save` or `--discard`) |
+| `reload` | Reload the front project from disk (Xojo 2026r3 or later; `--discard` required) |
 | `analyze` | Run Analyze Project and report errors and warnings |
 | `build` | Build for one or more targets |
 | `run` | Run the project in the IDE debugger |
@@ -45,7 +45,7 @@ Run `status` first: it confirms the IDE is reachable before you spend a long com
 
 ## Rules that keep you out of trouble
 
-- **The IDE's in-memory project wins.** The IDE does not watch the disk. After you edit project files on disk, the IDE keeps running its stale in-memory copy, and an IDE-side save overwrites your disk edits without a word. Reload after every batch of disk edits, and never run `save` between your disk edits and the reload; the reload is `reload --yes` on Xojo 2026r3 or later, and a close-and-reopen on every older release. Better, close the project before a planned batch and reopen after it—a closed project has nothing to go stale and nothing to save over you. See [Editing and reload](references/editing-and-reload.md) for the recipe and the failure modes.
+- **The IDE's in-memory project wins.** The IDE does not watch the disk. After you edit project files on disk, the IDE keeps running its stale in-memory copy, and an IDE-side save overwrites your disk edits without a word. Reload after every batch of disk edits, and never run `save` between your disk edits and the reload; the reload is `reload --discard` on Xojo 2026r3 or later, and a close-and-reopen on every older release. Better, close the project before a planned batch and reopen after it—a closed project has nothing to go stale and nothing to save over you. See [Editing and reload](references/editing-and-reload.md) for the recipe and the failure modes.
 - **Analyze, do not guess.** After a reload, run `analyze`. Errors exit 1; warnings alone exit 0; add `-W` to fail on warnings. `build` never reports warnings; only `analyze` does.
 - **Do not lower the timeouts.** A cold IDE unpacks plugins for minutes before it answers, and a real build takes far longer than a demo. A ceiling that fires too early abandons work the IDE is still doing. See [IDE behavior](references/ide-behavior.md).
 - **`run` runs the project in the debugger. `script` runs an IDE Script.** They are different commands.
