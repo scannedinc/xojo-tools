@@ -50,7 +50,7 @@ RELEASE = re.compile(r"^\d{4}r\d+(\.\d+)?$")
 # presents it as current with no replacement and no deprecated page exists.
 # The matrix follows the table; the indexes follow the pages. Both are
 # faithful readings, so the conflict stands until Xojo's docs agree with
-# themselves.
+# themselves. Each row's note now says all of this at the row itself.
 STATUS_KNOWN = {"CLong", "POP3SecureSocket.MessageCount",
                 "StyledTextPrinter.EOF"}
 
@@ -154,6 +154,23 @@ class DriftTests(unittest.TestCase):
     def test_new_docs_deprecations_reach_the_matrix_or_this_list(self):
         candidates = R.report_candidates(self.coverage, self.indexes)
         self.assertEqual({name for name, _, _ in candidates}, CANDIDATES_KNOWN)
+
+    def test_live_on_entries_resolve_in_the_current_index(self):
+        # A live_on entry is a claim that the deprecated member's NAME is
+        # still correct API 2.0 somewhere. Each entry must resolve: a bare
+        # class name C means the index lists C.<member> as current (or C is
+        # itself a current class, for name-collision cases like Graphics);
+        # a dotted name must be an exact current member.
+        for row in self.coverage:
+            leaf = R.norm_name(row["old"]).split(".")[-1].lower()
+            for entry in row.get("live_on", []):
+                name = entry.strip().lower()
+                if "." in name:
+                    ok = name in self.indexes.current_members
+                else:
+                    ok = (f"{name}.{leaf}" in self.indexes.current_members
+                          or name in self.indexes.current_classes)
+                self.assertTrue(ok, (row["old"], entry))
 
 
 if __name__ == "__main__":

@@ -77,11 +77,11 @@ One scope caveat carried from the analyzer itself: Analyze Project checks code f
 
 A deprecation warning ends with a suggestion—"You should use `X` instead"—and it reads as the answer. Usually it is. Sometimes it names another member of the *deprecated* class, so following it moves you off one deprecated member and onto another, on the class you are supposed to be leaving. It compiles, and the next analyze pass flags the new member too.
 
-The IDE draws these suggestions from `deprecation_cache.db`, a small database inside its own application bundle. The bundled matrix draws them from the API 2 class pages. Where the two disagree, **the matrix is the one to follow**, and `worklist.py` prints the disagreement rather than quietly preferring one:
+The IDE draws these suggestions from `deprecation_cache.db`, a small database inside its own application bundle. The bundled matrix draws them from the documentation. Where the two disagree, **the matrix is the one to follow**, and `worklist.py` prints the disagreement rather than quietly preferring one:
 
 ```
 THE IDE'S SUGGESTION DISAGREES WITH THE MATRIX. It proposes
-GridLinesHorizontalStyle; the matrix, read off the API 2 class pages, says
+GridLinesHorizontalStyle; the matrix, read off the documentation, says
 DesktopListBox.GridLineStyle.
 ```
 

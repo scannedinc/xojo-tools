@@ -79,15 +79,18 @@ DEPRECATED_VERSION = re.compile(
     r"(?:was|is|has been) (?:deprecated|removed)(?: in)?(?: version| Xojo)?\s+([0-9][0-9r.]*?)\.?(?:\s|$)"
 )
 # The replacement comes from the deprecation notice and only from it: the
-# "Please use"/"Use" must follow the word deprecated/removed inside the same
-# paragraph, or ordinary "Use this event to ..." advice in a member body
-# would be harvested as a replacement. The capture then ends at the notice's
+# "Please use"/"Use" must follow the notice wording ("was/is/has been
+# deprecated") inside the same paragraph, or ordinary "Use this event to
+# ..." advice in a member body would be harvested as a replacement. The
+# verb is required so the bare word deprecated inside a :doc: role target
+# path (</api/deprecated/date>) cannot anchor a harvest. The capture then ends at the notice's
 # own wording ("as a replacement", "in place of", "instead") or, when a
 # notice omits all three, at the end of the sentence or paragraph. Without
 # that stop the lazy match runs on until the next "as a replacement"
 # anywhere in the page and swallows whole sentences.
 DEPRECATED_REPLACEMENT = re.compile(
-    r"(?:deprecated|removed)\b(?:(?!\n[ \t]*\n).){0,120}?(?:Please use|Use)\s+(.+?)"
+    r"(?:was|is|has been) (?:deprecated|removed)\b"
+    r"(?:(?!\n[ \t]*\n).){0,120}?(?:Please use|Use)\s+(.+?)"
     r"(?:\s+(?:as a replacement|in place of|instead\b)|(?=\.(?:\s|$))|\s*(?=\n[ \t]*\n))",
     re.S,
 )

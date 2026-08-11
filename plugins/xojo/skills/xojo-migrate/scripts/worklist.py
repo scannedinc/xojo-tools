@@ -375,7 +375,7 @@ def report(wl):
                                     if known_replacement(r))
                 print(wrap(f"THE IDE'S SUGGESTION DISAGREES WITH THE MATRIX. "
                            f"It proposes {g['replacement']}; the matrix, read "
-                           f"off the API 2 class pages, says {targets}. The "
+                           f"off the documentation, says {targets}. The "
                            f"IDE sometimes names another member of the "
                            f"deprecated class, which is not a migration "
                            f"target. Verify on the API 2 class page before "

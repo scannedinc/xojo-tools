@@ -214,7 +214,7 @@ The rule being enforced is *the deferral is discoverable from the code*, not *th
 
 The three deferral categories that recur, all of which need this: compound receivers left as deprecated globals (hard rule 3), calls whose replacement takes a different *kind* of argument (`DrawPolygon`/`FillPolygon` → `DrawPath`/`FillPath`), and anything awaiting a design decision from the user.
 
-**Not everything old is deprecated.** Some globals that look like obvious API 1.0 holdovers are still current, and the matrix's silence about them is the answer, not a gap: `Asc`, `Chr`, `Val`, `Str`, `Format`, `Abs`, `Min`, `Max`, `Round`, `CStr`. Do not convert them, and do not go hunting for a replacement when a user asks. Note the trap in the pair, though—the **byte variants `AscB` and `ChrB` *are* deprecated** (→ `String.AscByte` / `String.ChrByte`) even though their base names are fine. If `lookup.py symbol <Name>` returns nothing, the matrix does not cover the symbol; confirm against the xojo skill's deprecation indexes before declaring it current.
+**Not everything old is deprecated.** Some globals that look like obvious API 1.0 holdovers are still current, and the matrix's silence about them is the answer, not a gap: `Asc`, `Chr`, `Val`, `Str`, `Format`, `Hex`, `Abs`, `Min`, `Max`, `Round`, `CStr`. Do not convert them, and do not go hunting for a replacement when a user asks. Note the trap in the pair, though—the **byte variants `AscB` and `ChrB` *are* deprecated** (→ `String.AscByte` / `String.ChrByte`) even though their base names are fine. If `lookup.py symbol <Name>` returns nothing, the matrix does not cover the symbol; confirm against the xojo skill's deprecation indexes before declaring it current.
 
 ### 3. Plan the pass order
 

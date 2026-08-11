@@ -1501,7 +1501,7 @@
      "find": "(?<![\\w.])Redim\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(\\s*([^()\\n]+?)\\s*\\)",
      "replace": "$1.ResizeTo($2)",
      "manual": "canRegex=false because the size expression may contain nested parens (e.g. Redim arr(f(x)) breaks [^()]; verified it does NOT match — fail-safe). NOTE (verifier correction): this single-dim pattern ALSO correctly handles the MULTI-dimensional case — verified Redim aPeople(10, 5) → aPeople.ResizeTo(10, 5) because [^()]+? captures the whole '10, 5'. So the separate multi-dim rule below is REDUNDANT (kept only for documentation/explicitness); you can run this one rule for both. PROCEDURE: run this regex (handles 1-D and multi-D sizes with no nested parens, including negatives and expressions like aNames.LastIndex+10 — verified); then Find-only on  \\bRedim\\b  to locate stragglers whose size contained a function call, and convert those by hand. Size value preserved verbatim.",
-     "caveat": "Size capture [^()] breaks if a size expression contains its own function call with parens — those are MISSED (fail-safe, deprecated Redim flags at compile). 'Redim' is a keyword, unlikely shadowed → low name collision. Could match 'Redim' in a comment. Match Case OFF catches REDIM/redim.",
+     "caveat": "Size capture [^()] breaks if a size expression contains its own function call with parens — those are MISSED (fail-safe: the follow-up Find pass locates the leftover Redim). 'Redim' is a keyword, unlikely shadowed → low name collision. Could match 'Redim' in a comment. Match Case OFF catches REDIM/redim.",
      "examples": [
       {
        "b": "Redim aNames(10)",

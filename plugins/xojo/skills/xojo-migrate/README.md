@@ -10,7 +10,7 @@ To ask what replaced one deprecated symbol, such as `RecordSet.MoveNext`, use th
 
 The skill contains three parts:
 
-- A deprecation matrix of more than a thousand symbols, derived from Xojo's documentation.
+- A deprecation matrix of more than a thousand symbols, derived from Xojo's documentation and the deprecation database inside the Xojo IDE.
 - Hundreds of conversion rules with find and replace patterns, caveats, and examples.
 - Python scripts that inventory a project, look up a symbol, sweep for missed conversions, join the IDE's own analysis to the conversion rules, and turn on the per-project deprecation warnings.
 

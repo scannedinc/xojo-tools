@@ -120,6 +120,20 @@ class Indexes:
             norm_name(row["name"]).lower(): row.get("kind", "")
             for row in members
         }
+        # The current (unflagged) surface, for validating live_on entries: a
+        # name is only "live" where the index documents it without a
+        # deprecated flag.
+        self.current_members = {
+            norm_name(row["name"]).lower()
+            for row in members
+            if "deprecated" not in row.get("flags", "")
+        }
+        self.current_classes = {
+            norm_name(row["name"]).lower()
+            for row in classes
+            if "deprecated" not in row.get("flags", "")
+            and "." not in norm_name(row["name"])
+        }
         self.deprecated_classes = {
             norm_name(row["name"]).lower()
             for row in classes
@@ -247,6 +261,11 @@ def reverify_ide_rows(coverage, indexes):
 def report_disagreements(coverage, indexes):
     status, replacement = [], []
     for row in coverage:
+        # A row can assert something other than a deprecation -- Redim's
+        # status is Superseded, meaning "current but the docs prefer another
+        # form" -- and the indexes agreeing it is current is agreement.
+        if row.get("status") not in ("Deprecated", "Removed"):
+            continue
         name = norm_name(row["old"]).lower()
         rows = indexes.by_name.get(name, [])
         if not rows or row.get("kind") == "Event":

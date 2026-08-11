@@ -192,8 +192,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -436,10 +435,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for AddressBookData (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "AddressBookData.Count",
@@ -452,10 +448,10 @@
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for AddressBookData (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
   "origin": "member",
   "live_on": [
+   "Arrays",
    "DesktopToolbar",
    "DesktopMenuItem",
-   "FolderItem",
-   "RowSet"
+   "FolderItem"
   ]
  },
  {
@@ -469,7 +465,9 @@
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for AddressBookData (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "XMLNode",
+   "XMLDocument",
+   "XMLElement"
   ]
  },
  {
@@ -540,8 +538,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -624,8 +621,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -648,10 +644,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "",
-  "origin": "global",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "global"
  },
  {
   "old": "AppleEventTarget",
@@ -907,10 +900,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "Deprecated in 2019r2, not 2020r2. The Arrays.Add spelling only exists from 2020r2: in 2019r2 through 2020r1 the replacement is Arrays.AddRow, which 2020r2 then deprecated in favor of Arrays.Add.",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "Arrays.FirstRowIndex",
@@ -1545,7 +1535,7 @@
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for Canvas (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
   "origin": "member",
   "live_on": [
-   "Graphics (the class itself)",
+   "Graphics",
    "Picture.Graphics"
   ]
  },
@@ -1786,7 +1776,7 @@
   "covered": false,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for CLong (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
+  "note": "AMBIGUOUS IN XOJO'S OWN DOCS. The per-release Deprecations table lists CLong as deprecated in 2019r2, but the detail page carries no deprecation notice, documents no replacement, and later release notes show continued maintenance (iOS access in 2022r4, a performance improvement in 2023r4). This row follows the table. There is no rename to apply; if the code should move off CLong, the detail page's See also points at Int64.FromString and Val.",
   "origin": "global"
  },
  {
@@ -2575,8 +2565,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -3184,10 +3173,10 @@
   "note": "",
   "origin": "member",
   "live_on": [
+   "Arrays",
    "DesktopToolbar",
    "DesktopMenuItem",
-   "FolderItem",
-   "RowSet"
+   "FolderItem"
   ]
  },
  {
@@ -3390,10 +3379,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "FigureShape.Insert",
@@ -3406,7 +3392,9 @@
   "note": "",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "XMLNode",
+   "XMLDocument",
+   "XMLElement"
   ]
  },
  {
@@ -3420,7 +3408,10 @@
   "note": "",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "Collection",
+   "XMLNodeList",
+   "Encodings",
+   "Group2D"
   ]
  },
  {
@@ -3472,13 +3463,13 @@
  },
  {
   "old": "FolderItem.AbsolutePath",
-  "new": "—",
+  "new": "FolderItem.NativePath",
   "kind": "—",
   "cat": "Removed",
   "covered": false,
   "since": "2013r1",
   "status": "Removed",
-  "note": "Removed from the framework: does not compile, rewrite required",
+  "note": "REMOVED, not merely deprecated: deprecated in 2013r1 with FolderItem.NativePath as the documented replacement, then removed in 2019r2, so the call is a compile error. Rename to NativePath, but verify any code that depended on AbsolutePath's exact path format.",
   "origin": "member"
  },
  {
@@ -3679,7 +3670,10 @@
   "note": "",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "Collection",
+   "XMLNodeList",
+   "Encodings",
+   "Group2D"
   ]
  },
  {
@@ -4414,10 +4408,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "Group2D.Insert",
@@ -4430,7 +4421,9 @@
   "note": "",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "XMLNode",
+   "XMLDocument",
+   "XMLElement"
   ]
  },
  {
@@ -4662,7 +4655,9 @@
   "note": "",
   "origin": "global",
   "live_on": [
-   "Dictionary"
+   "XMLNode",
+   "XMLDocument",
+   "XMLElement"
   ]
  },
  {
@@ -4800,8 +4795,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -5451,10 +5445,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "JSONItem.Clear",
@@ -5500,7 +5491,9 @@
   "note": "",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "XMLNode",
+   "XMLDocument",
+   "XMLElement"
   ]
  },
  {
@@ -5655,8 +5648,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -6731,10 +6723,7 @@
   "since": "2021r3",
   "status": "Deprecated",
   "note": "desktopmenuitem.md.",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "MenuItem.AutoEnable",
@@ -6771,7 +6760,7 @@
   "live_on": [
    "Graphics",
    "TextShape",
-   "StyledTextRun"
+   "StyleRun"
   ]
  },
  {
@@ -6807,7 +6796,9 @@
   "note": "desktopmenuitem.md.",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "XMLNode",
+   "XMLDocument",
+   "XMLElement"
   ]
  },
  {
@@ -6823,7 +6814,7 @@
   "live_on": [
    "Graphics",
    "TextShape",
-   "StyledTextRun"
+   "StyleRun"
   ]
  },
  {
@@ -6837,7 +6828,10 @@
   "note": "desktopmenuitem.md.",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "Collection",
+   "XMLNodeList",
+   "Encodings",
+   "Group2D"
   ]
  },
  {
@@ -6951,7 +6945,7 @@
   "live_on": [
    "Graphics",
    "TextShape",
-   "StyledTextRun"
+   "StyleRun"
   ]
  },
  {
@@ -7899,10 +7893,10 @@
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for OpenDialog (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
   "origin": "member",
   "live_on": [
+   "Arrays",
    "DesktopToolbar",
    "DesktopMenuItem",
-   "FolderItem",
-   "RowSet"
+   "FolderItem"
   ]
  },
  {
@@ -7916,7 +7910,10 @@
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for OpenDialog (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "Collection",
+   "XMLNodeList",
+   "Encodings",
+   "Group2D"
   ]
  },
  {
@@ -8074,10 +8071,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for PagePanel (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "PagePanel.AutoDeactivate",
@@ -8126,7 +8120,9 @@
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for PagePanel (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "XMLNode",
+   "XMLDocument",
+   "XMLElement"
   ]
  },
  {
@@ -8157,8 +8153,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ],
   "src": "xojo-ide-db"
  },
@@ -8403,7 +8398,7 @@
   "covered": false,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for POP3SecureSocket (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
+  "note": "AMBIGUOUS IN XOJO'S OWN DOCS. The per-release Deprecations table lists this event as deprecated in 2019r2, but the current class page documents it as active with no replacement, and the API 2.0 CountMessages method explicitly relies on it (its page says it triggers the MessageCount event). This row follows the table. Do not rename or remove the event on the table's word alone.",
   "origin": "member"
  },
  {
@@ -10013,6 +10008,17 @@
   "origin": "member"
  },
  {
+  "old": "Redim",
+  "new": "Array.ResizeTo",
+  "kind": "Keyword",
+  "cat": "Source — global",
+  "covered": true,
+  "since": "",
+  "status": "Superseded",
+  "note": "Not formally deprecated: the docs say Redim exists for Visual Basic compatibility only and to use ResizeTo instead, with no deprecation notice and no release. Array in the replacement stands for the array variable, not a class name: Redim MyPeople(5) becomes MyPeople.ResizeTo(5). Rules c2r8 and c2r9 convert it, and the size argument carries over unchanged.",
+  "origin": "global"
+ },
+ {
   "old": "Rem",
   "new": "Commenting",
   "kind": "Keyword",
@@ -11516,7 +11522,7 @@
   "live_on": [
    "Graphics",
    "TextShape",
-   "StyledTextRun"
+   "StyleRun"
   ]
  },
  {
@@ -11543,7 +11549,7 @@
   "live_on": [
    "Graphics",
    "TextShape",
-   "StyledTextRun"
+   "StyleRun"
   ]
  },
  {
@@ -11610,7 +11616,7 @@
   "live_on": [
    "Graphics",
    "TextShape",
-   "StyledTextRun"
+   "StyleRun"
   ]
  },
  {
@@ -11687,7 +11693,7 @@
   "covered": true,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for StyledTextPrinter (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
+  "note": "AMBIGUOUS IN XOJO'S OWN DOCS. The per-release Deprecations table lists this property as deprecated in 2019r2, presumably the blanket EOF-to-EndOfFile sweep, but the class has no EndOfFile member and the current page documents EOF as its only completion property, with sample code using it. This row follows the table. A converter must not rename it.",
   "origin": "member"
  },
  {
@@ -11812,10 +11818,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for TabPanel (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "TabPanel.AutoDeactivate",
@@ -12665,8 +12668,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -12937,10 +12939,7 @@
   "since": "2019r2",
   "status": "Deprecated",
   "note": "",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "TextOutputStream.Handle",
@@ -12978,8 +12977,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -13103,10 +13101,7 @@
   "since": "2021r3",
   "status": "Deprecated",
   "note": "desktoptoolbar.md.",
-  "origin": "member",
-  "live_on": [
-   "TextOutputStream"
-  ]
+  "origin": "member"
  },
  {
   "old": "Toolbar.DropDownMenuAction",
@@ -13131,7 +13126,9 @@
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for Toolbar (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "XMLNode",
+   "XMLDocument",
+   "XMLElement"
   ]
  },
  {
@@ -13145,7 +13142,10 @@
   "note": "desktoptoolbar.md.",
   "origin": "member",
   "live_on": [
-   "Dictionary"
+   "Collection",
+   "XMLNodeList",
+   "Encodings",
+   "Group2D"
   ]
  },
  {
@@ -13177,11 +13177,11 @@
   "old": "ToolbarItem",
   "new": "DesktopToolbarItem",
   "kind": "Class",
-  "cat": "Removed",
+  "cat": "Source — type",
   "covered": false,
   "since": "2021r3",
-  "status": "Removed",
-  "note": "Removed from the framework: does not compile, rewrite required",
+  "status": "Deprecated",
+  "note": "SAME NAME, TWO ITEMS: the ToolbarItem in the 2012r2 Removed table is a classic-framework item that is long gone; the API 1.0 ToolbarItem class (an item in a Toolbar, built with ToolbarButton) is listed as Deprecated in the 2021r3 table -- spelled ToolBarItem there -- and its page still exists under api/deprecated with a 2021r3 banner, so the name compiles with a warning, not an error. The current docs also have a bare ToolbarItem page, but it is a cross-surface overview, not a class: it points desktop to DesktopToolbarItem, web to WebToolbarItem, and mobile to MobileToolbarButton. Do not treat a docs hit on the bare name as proof the type is current. Type name used in code; rename by hand, picking the class for the project's surface.",
   "origin": "global"
  },
  {
@@ -13252,12 +13252,12 @@
   "covered": false,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "CHAINED RENAME: ToolbarItem is itself deprecated -> DesktopToolbarItem (Removed). Go straight to the final name; stopping at ToolbarItem creates work that needs a second pass. Type name used in code; rename by hand / per the guide",
+  "note": "CHAINED RENAME: ToolbarItem is itself deprecated -> DesktopToolbarItem (Deprecated). Go straight to the final name; stopping at ToolbarItem creates work that needs a second pass. Type name used in code; rename by hand / per the guide",
   "origin": "global",
   "chains_to": {
    "via": "ToolbarItem",
    "final": "DesktopToolbarItem",
-   "cat": "Removed"
+   "cat": "Source — type"
   }
  },
  {
@@ -13862,8 +13862,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -13961,8 +13960,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -14097,8 +14095,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -14173,8 +14170,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -14270,10 +14266,10 @@
   "note": "iOS / Web / Android / PDF surface, not desktop source scope",
   "origin": "member",
   "live_on": [
+   "Arrays",
    "DesktopToolbar",
    "DesktopMenuItem",
-   "FolderItem",
-   "RowSet"
+   "FolderItem"
   ]
  },
  {
@@ -14501,8 +14497,7 @@
    "DesktopCheckBox",
    "DesktopSlider",
    "DesktopProgressBar",
-   "Dictionary",
-   "Variant"
+   "Dictionary"
   ]
  },
  {
@@ -14874,7 +14869,7 @@
   "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for Window (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
   "origin": "member",
   "live_on": [
-   "Graphics (the class itself)",
+   "Graphics",
    "Picture.Graphics"
   ]
  },
