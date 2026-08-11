@@ -123,10 +123,29 @@ def cmd_analyze(args: argparse.Namespace, res: Result) -> None:
         # fall through to a whole-project analyze -- pass or fail on
         # diagnostics the caller never asked about.
         raise XojoError("--item requires a non-empty item name")
+    project = getattr(args, "project", None)
+    if project is not None and not getattr(args, "discard", False):
+        raise XojoError(
+            "analyze --project runs a bracketed session that ends in a "
+            "discarding close, and discard-closes a stale already-open copy "
+            "of the project first.\nPass --discard to confirm.")
+    if getattr(args, "discard", False) and project is None:
+        raise XojoError("--discard only means something with --project")
+    path = _validated_project_path(project, "--project") if project else None
+    if path:
+        res.project = {"identified": True, "path": path, "reason": None}
+    session: Optional[Dict[str, Any]] = None
     started = time.monotonic()
     wall = time.time()
     with connected(args, res, wall) as client:
         health_check(client, res)
+        opened = False
+        if path:
+            session = {"project": path, "was_open": False, "closed": False}
+            if not _session_open(client, res, path, session):
+                res.result["session"] = session
+                return          # a fatal load classified itself
+            opened = True
         require_project(client, res, "analyze")
         script = (script_analyze_item(item) if item
                   else script_analyze_project())
@@ -160,11 +179,18 @@ def cmd_analyze(args: argparse.Namespace, res: Result) -> None:
             extras = _extras()
         if extras:
             res.notes.append(note(Note.SPLIT_REPLY, count=len(extras)))
+        if opened:
+            # The close is inside the session's bracket, at the end of the
+            # body on purpose: a ReplyTimeout on the analyze skips it, since
+            # a busy IDE answers the next few scripts with empty responses.
+            session["closed"] = _session_close(client)
     res.timing = {"started_at": _iso_utc(wall),
                   "elapsed_ms": int((time.monotonic() - started) * 1000),
                   "reply_ms": int(ex.elapsed * 1000)}
     res.result = {"scope": "item" if item else "project",
                   "item": item, "complete": ex.complete}
+    if session is not None:
+        res.result["session"] = session
 
     cl = ex.result
     parts = [cl] + [classify(m) for m in extras]
@@ -189,6 +215,14 @@ def cmd_analyze(args: argparse.Namespace, res: Result) -> None:
         res.diagnostics = [d for d in res.diagnostics if d["severity"] == "error"]
     elif sev == "warnings":
         res.diagnostics = [d for d in res.diagnostics if d["severity"] == "warning"]
+
+    if session is not None and res.exit_code == EX_OK and not session["closed"]:
+        # The bracket broke: the analysis ran but the project stayed open,
+        # which must not read as safe-to-edit. A nonzero analyze verdict is
+        # never overridden.
+        res.ok = False
+        res.outcome, res.exit_code = "incomplete", EX_INCOMPLETE
+        res.notes.append(note(Note.SESSION_NOT_CLOSED))
 
 
 def cmd_build(args: argparse.Namespace, res: Result) -> None:
@@ -412,6 +446,123 @@ def cmd_script(args: argparse.Namespace, res: Result) -> None:
         res.summary = "script completed"
 
 
+def _judged_parts(client: Client, ex: Exchange) -> List[Classification]:
+    """Every part of a reply that is plausibly ours, classified.
+
+    Every script here ends in a Print, so an operation that ALSO produced
+    diagnostics arrives as TWO same-tag messages whose order is not
+    guaranteed. Judging only the claimed reply reported exit 0 with zero
+    diagnostics for a RunApp that failed to compile, and for a project
+    whose load was FATAL, purely because the Print won the race. Only
+    parts inside the trailing window count: the IDE reuses retired tags,
+    and an unsolicited message must never flip a verdict.
+    """
+    claimed_at = ex.reply.at
+
+    def _ours(m: Message) -> bool:
+        return m is ex.reply or abs(m.at - claimed_at) <= TRAILING_WINDOW
+
+    return [classify(m) for m in client.collect_tag(ex.tag)
+            if _ours(m)] or [ex.result]
+
+
+def _validated_project_path(raw: str, what: str) -> str:
+    if not raw.strip():
+        # abspath("") is the current directory, which exists -- an empty
+        # argument would otherwise send OpenFile(<cwd>) to the IDE.
+        raise XojoError("%s requires a non-empty project path" % what)
+    path = os.path.abspath(os.path.expanduser(raw))
+    if not os.path.exists(path):
+        raise XojoError(
+            "%s does not exist.\nOpenFile on a missing path returns an empty "
+            "scriptRuntimeError, which is hard to diagnose." % path)
+    return path
+
+
+def _same_project_path(a: Optional[str], b: str) -> bool:
+    """Whether two paths name the same project file.
+
+    samefile is the robust comparison (file identity: symlinks, case, 8.3
+    names) but needs both paths to exist and can raise. The fallback
+    normalizes NFC -- a macOS filesystem hands the IDE NFD while the
+    terminal produces NFC -- and normcase, for Windows.
+    """
+    if not a:
+        return False
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        def norm(p: str) -> str:
+            return unicodedata.normalize(
+                "NFC", os.path.normcase(os.path.realpath(p)))
+        return norm(a) == norm(b)
+
+
+def _front_project_path(client: Client) -> Optional[str]:
+    """The front project's path, or None when it has never been saved."""
+    text = reply_text(client, client.exchange(script_front_path()))
+    return unescape_shell_path(text) if text else None
+
+
+def _session_open(client: Client, res: Result, path: str,
+                  session: Dict[str, Any]) -> bool:
+    """Make PATH the front project, freshly loaded from disk.
+
+    OpenFile on an already-open project is a no-op, so an open-then-analyze
+    against a project the IDE already holds would silently judge the stale
+    in-memory copy, not the disk. The rules: only PATH itself is ever
+    discard-closed -- a non-matching front project belongs to someone else
+    and is never touched -- and success means the workspace count grew AND
+    the front path is PATH. Returns True once verified; returns False after
+    classifying a fatal load; raises for what a classification cannot say.
+    """
+    count = project_window_count(client)
+    if count is None:
+        raise ProtocolError("could not count the open workspaces, so this "
+                            "session cannot prove what it analyzed")
+    if count > 0 and _same_project_path(_front_project_path(client), path):
+        client.exchange(script_close_project(save=False))
+        session["was_open"] = True
+    front = None
+    for attempt in (1, 2):
+        before = project_window_count(client)
+        if before is None:
+            raise ProtocolError("could not count the open workspaces, so "
+                                "this session cannot prove what it analyzed")
+        ex = client.exchange(script_open_project(path))
+        worst = worst_of(_judged_parts(client, ex))
+        if (worst is not None and worst.verdict is Verdict.OPEN_ERRORS
+                and worst.fatal):
+            # The project would not load; that verdict IS the result.
+            apply_classification(res, worst, False)
+            return False
+        after = project_window_count(client)
+        front = _front_project_path(client)
+        if after == before + 1 and _same_project_path(front, path):
+            return True
+        if attempt == 1 and _same_project_path(front, path):
+            # The count did not grow but PATH is frontmost: the IDE raised
+            # an already-open stale copy. Close it and open once more.
+            client.exchange(script_close_project(save=False))
+            continue
+        break
+    raise XojoError(
+        "could not open %s fresh as the front project (frontmost: %s).\n"
+        "Close the copy the IDE has open, or bring it front with "
+        "'%s projects --select' and close it, then retry."
+        % (path, front or "unknown", INVOCATION))
+
+
+def _session_close(client: Client) -> bool:
+    """Best-effort discarding close; cleanup must never mask the verdict."""
+    try:
+        ex = client.exchange(script_close_project(save=False))
+        worst = worst_of(_judged_parts(client, ex))
+        return worst is None or worst.verdict in (Verdict.OK, Verdict.WARNINGS)
+    except (XojoError, OSError):
+        return False
+
+
 def _require_ide_version(res: Result, minimum: float, name: str) -> None:
     """Refuse a command the running IDE is too old to know.
 
@@ -451,20 +602,7 @@ def _simple(args: argparse.Namespace, res: Result, script: str, ok_summary: str,
         if needs_project:
             require_project(client, res, needs_project)
         ex = client.exchange(script, ceiling=ceiling)
-        # Every script here ends in a Print, so an operation that ALSO
-        # produced diagnostics arrives as TWO same-tag messages whose order
-        # is not guaranteed. Judging only the claimed reply reported exit 0
-        # with zero diagnostics for a RunApp that failed to compile, and for
-        # a project whose load was FATAL, purely because the Print won the
-        # race. Only parts inside the trailing window count: the IDE reuses
-        # retired tags, and an unsolicited message must never flip a verdict.
-        claimed_at = ex.reply.at
-
-        def _ours(m: Message) -> bool:
-            return m is ex.reply or abs(m.at - claimed_at) <= TRAILING_WINDOW
-
-        parts = [classify(m) for m in client.collect_tag(ex.tag)
-                 if _ours(m)] or [ex.result]
+        parts = _judged_parts(client, ex)
     if len(parts) > 1:
         res.notes.append(note(Note.SPLIT_REPLY, count=len(parts) - 1))
     res.timing = {"started_at": _iso_utc(wall),
@@ -490,15 +628,7 @@ def cmd_stop(args: argparse.Namespace, res: Result) -> None:
 
 
 def cmd_open(args: argparse.Namespace, res: Result) -> None:
-    if not args.project.strip():
-        # abspath("") is the current directory, which exists -- an empty
-        # argument would otherwise send OpenFile(<cwd>) to the IDE.
-        raise XojoError("open requires a non-empty project path")
-    path = os.path.abspath(os.path.expanduser(args.project))
-    if not os.path.exists(path):
-        raise XojoError(
-            "%s does not exist.\nOpenFile on a missing path returns an empty "
-            "scriptRuntimeError, which is hard to diagnose." % path)
+    path = _validated_project_path(args.project, "open")
     res.project = {"identified": True, "path": path, "reason": None}
     _simple(args, res, script_open_project(path), "opened %s" % path)
 
@@ -736,8 +866,14 @@ def render_targets(res: Result, st: Style, out: Any) -> None:
 
 __all__ = [
     "_VERDICT_SEVERITY",
+    "_front_project_path",
+    "_judged_parts",
     "_require_ide_version",
+    "_same_project_path",
+    "_session_close",
+    "_session_open",
     "_simple",
+    "_validated_project_path",
     "apply_classification",
     "cmd_analyze",
     "cmd_build",

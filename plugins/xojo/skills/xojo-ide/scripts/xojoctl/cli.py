@@ -84,7 +84,8 @@ ROOT_EXAMPLES = (
 COMMAND_EXAMPLES = {
     "analyze": ("analyze",
                 "analyze --json | jq '.counts'",
-                "analyze --severity errors -W"),
+                "analyze --severity errors -W",
+                "analyze --project MyApp.xojo_project --discard"),
     "build": ("build --target darwin-arm64",
               "build -t 9 -t 24 --stop-on-error"),
     "script": ("script 'Print Str(6*7)'",
@@ -308,6 +309,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ceiling for the analysis itself (default %d); a large "
                         "project takes far longer than a small one"
                         % WORK_CEILING)
+    s.add_argument("--project", metavar="PATH",
+                   help="run one bracketed session: open PATH fresh from "
+                        "disk, analyze, close without saving (requires "
+                        "--discard)")
+    s.add_argument("--discard", action="store_true",
+                   help="confirm the session's discarding closes")
     s.set_defaults(func=cmd_analyze)
 
     s = sub.add_parser("build", parents=[conn, out, pol],

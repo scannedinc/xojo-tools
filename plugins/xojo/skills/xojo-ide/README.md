@@ -103,6 +103,8 @@ Errors exit 1. Warnings alone exit 0. Add `-W` to make warnings exit 1 too.
 
 Analyze one item instead of the whole project with `--item MyClass`.
 
+`xojoctl analyze --project ~/Projects/MyApp.xojo_project --discard` runs the whole checkpoint as one command. It opens the project fresh from disk, analyzes it, and closes it without saving. If a stale copy of that project is already open, it closes that copy first. It never closes a different project. The closes discard unsaved changes, so the command requires `--discard`. If the final close fails, the command exits 4, because a project left open is not safe to edit.
+
 ### List the build targets
 
 ```console

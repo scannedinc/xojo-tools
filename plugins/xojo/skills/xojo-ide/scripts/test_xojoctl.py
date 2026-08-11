@@ -336,6 +336,12 @@ class MockIDE:
     def __init__(self) -> None:
         self.handshakes = 0
         self.version = "2026.021"    # what Str(XojoVersion) prints for 2026r2.1
+        self.front_path = None       # ProjectShellPath reply; None = never saved
+        self.window_count = 1        # WindowCount reply; 1 keeps old tests green
+        self.scripts = []            # every script received, in order
+        self.open_is_noop = False    # OpenFile silently does nothing
+        self.open_raises_stale = False   # OpenFile raises a copy, count stays
+        self.close_fails = False     # CloseProject replies a scriptError
         self._dir = None
         if X.IS_WINDOWS:
             self._srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -386,6 +392,7 @@ class MockIDE:
 
     def _reply(self, conn: socket.socket, msg: dict) -> None:
         tag, script = msg.get("tag"), msg.get("script", "")
+        self.scripts.append(script)
         # A real IDE runs the trailing `Print "<sentinel>"` that cmd_script
         # appends, so the mock must too -- otherwise every script test waits
         # for a completion signal that never comes.
@@ -466,7 +473,29 @@ class MockIDE:
                 {"type": "scriptCompilerWarning", "line": 1, "message": "w"}]}})
             return
         if "WindowCount" in script:
-            self._send(conn, {"tag": tag, "response": "1"})
+            self._send(conn, {"tag": tag, "response": str(self.window_count)})
+            return
+        if "ProjectShellPath" in script:
+            self._send(conn, {"tag": tag, "response": self.front_path or ""})
+            return
+        if "OpenFile(" in script:
+            m2 = re.search(r'OpenFile\("((?:[^"]|"")*)"\)', script)
+            opened = m2.group(1).replace('""', '"') if m2 else ""
+            if self.open_raises_stale:
+                self.front_path = opened     # raised a copy; count unchanged
+            elif not self.open_is_noop:
+                self.front_path = opened
+                self.window_count += 1
+            self._send(conn, {"tag": tag, "response": "opened"})
+            return
+        if "CloseProject(False)" in script:
+            if self.close_fails:
+                self._send(conn, {"tag": tag, "response": {"scriptError": [
+                    {"type": "compiler", "line": 1, "message": "close failed"}]}})
+                return
+            self.front_path = None
+            self.window_count = max(0, self.window_count - 1)
+            self._send(conn, {"tag": tag, "response": "closed"})
             return
         if "BURST" in script:
             # An unsolicited message, then the real reply, in ONE write.
@@ -1282,6 +1311,91 @@ def test_reload_semantics() -> None:
           X.RELOAD_ITEM_MISSING in s, True)
 
 
+def test_analyze_session() -> None:
+    """analyze --project: one bracketed open -> analyze -> close session.
+
+    The invariants under test: the target is opened FRESH (a stale open
+    copy is discard-closed first), success requires the window count to
+    grow AND the front path to match, a bystander front project is never
+    closed, and a broken bracket can never exit 0.
+    """
+    print("\nanalyze --project (bracketed session)")
+    ide = MockIDE()
+    old_open = X.open_client
+
+    def fake_open(args, res):
+        return X.Client(ide.transport(), first_ceiling=5.0, reply_ceiling=5.0)
+
+    def run(**over):
+        base = dict(quiet=True, json=False, timeout=5.0, warm_timeout=5.0,
+                    connect_timeout=5.0, color="never", warnings_as_errors=False,
+                    item=None, severity="all", analyze_timeout=5.0,
+                    project=None, discard=False)
+        base.update(over)
+        res = X.Result(command="analyze")
+        X.cmd_analyze(argparse.Namespace(**base), res)
+        return res
+
+    tmp = tempfile.mkdtemp()
+    proj = os.path.join(tmp, "Mock.xojo_project")
+    with open(proj, "w") as f:
+        f.write("x")
+    try:
+        set_global("open_client", fake_open)
+
+        check_raises("session: --project requires --discard",
+                     lambda: run(project=proj), X.XojoError)
+        check_raises("session: --discard requires --project",
+                     lambda: run(discard=True), X.XojoError)
+
+        ide.window_count, ide.front_path = 0, None
+        res = run(project=proj, discard=True)
+        check("session: clean analyze exits 0",
+              (res.exit_code, res.outcome), (0, "success"))
+        check("session: recorded as opened fresh and closed",
+              res.result["session"],
+              {"project": proj, "was_open": False, "closed": True})
+        check("session: the close is the last script sent",
+              "CloseProject(False)" in ide.scripts[-1], True)
+
+        ide.window_count, ide.front_path = 1, proj
+        res = run(project=proj, discard=True)
+        check("session: a stale open copy is discard-closed first",
+              (res.exit_code, res.result["session"]["was_open"]), (0, True))
+
+        ide.window_count, ide.front_path = 1, "/tmp/OtherProject.xojo_project"
+        ide.open_is_noop = True
+        n0 = len(ide.scripts)
+        check_raises("session: a silently failed open raises",
+                     lambda: run(project=proj, discard=True), X.XojoError)
+        check("session: the bystander front project was never closed",
+              any("CloseProject" in s for s in ide.scripts[n0:]), False)
+        ide.open_is_noop = False
+
+        ide.window_count, ide.front_path = 1, "/tmp/OtherProject.xojo_project"
+        ide.open_raises_stale = True
+        n0 = len(ide.scripts)
+        check_raises("session: a copy that will not open fresh raises",
+                     lambda: run(project=proj, discard=True), X.XojoError)
+        check("session: the stale copy was closed and retried once",
+              sum(1 for s in ide.scripts[n0:] if "OpenFile(" in s), 2)
+        ide.open_raises_stale = False
+
+        ide.window_count, ide.front_path = 0, None
+        ide.close_fails = True
+        res = run(project=proj, discard=True)
+        check("session: a broken bracket can never exit 0",
+              (res.exit_code, res.outcome, res.result["session"]["closed"]),
+              (X.EX_INCOMPLETE, "incomplete", False))
+        check("session: the broken bracket carries its note",
+              any(n["code"] == "session_not_closed" for n in res.notes), True)
+        ide.close_fails = False
+    finally:
+        set_global("open_client", old_open)
+        ide.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_projects() -> None:
     """WindowTitle is 0-based and index 0 is frontmost, established live."""
     print("\nprojects / workspace enumeration")
@@ -1647,6 +1761,7 @@ def main() -> int:
     test_usage_json()
     test_close_semantics()
     test_reload_semantics()
+    test_analyze_session()
     test_projects()
     test_arg_validation()
     test_no_aliases()

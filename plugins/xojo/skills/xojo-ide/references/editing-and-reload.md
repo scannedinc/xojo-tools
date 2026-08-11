@@ -13,6 +13,8 @@ The rule that prevents both: **after disk edits, reload before anything else tou
 
 The stronger rule, when the timing is yours to choose: **close the project before you edit on disk.** A closed project has no in-memory copy to go stale or to save over your work, and since picking up disk edits costs a close and a reopen anyway, closing first is the same number of operations with no window in which the two copies disagree—and no open IDE inviting the user to edit a project you are rewriting underneath. Default to it for any planned batch of disk edits; the recipe below is for edits that have already happened while the project was open.
 
+For an analyze checkpoint there is one command that does the whole bracket: `xojoctl analyze --project PATH --discard` closes a stale open copy of PATH, opens it fresh from disk, analyzes, and closes without saving—the project is never open around your edits, only a copy of PATH itself is ever closed, and an exit of 4 means the bracket broke and the project is still open.
+
 ## The reload recipe
 
 On Xojo 2026r3 or later, `xojoctl reload --discard` reloads the front project from disk in one step, and `--item NAME` reloads a single project item. `--discard` is required for the same reason `close` has it: Reload Project is 2026r3's rename of Revert to Saved, and it discards the IDE's unsaved in-memory changes without prompting—typing the flag is the confirmation. The command is written from the 2026r3 release notes and is not yet verified against a shipping 2026r3; `xojoctl` refuses to send it to an older IDE.

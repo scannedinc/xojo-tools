@@ -275,6 +275,12 @@ class Note:
         "The script's completion sentinel never arrived, so it may still be "
         "running, may have returned early, or may have failed at runtime. "
         "Any output it produced after that point was not captured.", None)
+    SESSION_NOT_CLOSED = (
+        "session_not_closed", "warning",
+        "The bracketed session analyzed the project but could not close it, "
+        "so the project is still open in the IDE. Disk edits made now would "
+        "go stale, and an IDE-side save would overwrite them.",
+        "Close it before editing: %s close --discard" % INVOCATION)
 
 
 def note(spec: Tuple[str, str, str, Optional[str]], **extra: Any) -> Dict[str, Any]:
