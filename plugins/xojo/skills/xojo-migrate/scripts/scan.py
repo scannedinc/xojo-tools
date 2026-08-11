@@ -441,7 +441,21 @@ def orphaned(src, manifests, root):
             text = m.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        for name in re.findall(r"[^\s;\"]+\.(?:xojo_\w+|rb\w+)", text):
+        names = set()
+        for line in text.splitlines():
+            # Manifest rows are semicolon-separated fields, and a field may
+            # be bare ("Name.xojo_code") or Key=Value ("BuildSteps=Build
+            # Automation.xojo_code"). A filename can contain spaces, which
+            # no token regex can span, so test each whole field's value.
+            for field in line.split(";"):
+                value = field.split("=", 1)[-1].strip().strip('"')
+                if re.fullmatch(r".+\.(?:xojo_\w+|rb\w+)", value):
+                    names.add(value)
+        # The token pass stays as a supplement: it catches several
+        # references packed into one field, which the whole-field test
+        # would read as a single garbled name.
+        names.update(re.findall(r"[^\s;\"]+\.(?:xojo_\w+|rb\w+)", text))
+        for name in names:
             # Manifests saved on Windows use backslash separators, which
             # PurePath does not split on POSIX; normalize first or every such
             # file reads as orphaned (and sweep.py then excludes it).

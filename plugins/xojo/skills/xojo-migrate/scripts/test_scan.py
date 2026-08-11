@@ -23,6 +23,7 @@ import json
 import pathlib
 import re
 import sys
+import tempfile
 import unittest
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -231,6 +232,27 @@ class EquivalenceTests(unittest.TestCase):
             with self.subTest(file=f.name):
                 self.assert_equivalent(
                     f.read_text(encoding="utf-8", errors="replace"))
+
+
+class OrphanedTests(unittest.TestCase):
+    def test_spaced_basenames_are_referenced_not_orphaned(self):
+        # "Build Automation.xojo_code" is referenced via a BuildSteps=
+        # field; the token regex alone cannot span the space, and any
+        # spaced filename was misreported as unreferenced.
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            plain = root / "Window1.xojo_code"
+            spaced = root / "Build Automation.xojo_code"
+            dead = root / "OldStuff.xojo_code"
+            for p in (plain, spaced, dead):
+                p.write_text("", encoding="utf-8")
+            manifest = root / "P.xojo_project"
+            manifest.write_text(
+                "Class=Window1;Window1.xojo_code;&h1234\n"
+                "BuildSteps=Build Automation.xojo_code;&h5678\n",
+                encoding="utf-8")
+            stale = scan.orphaned([plain, spaced, dead], [manifest], root)
+            self.assertEqual([p.name for p in stale], ["OldStuff.xojo_code"])
 
 
 class WorkAvoidanceTests(unittest.TestCase):
