@@ -145,39 +145,43 @@ for r in rows:
 `flags` contains `deprecated` for each item removed from API 2.0. When `flags` contains `deprecated`, `deprecated_in` gives the release, and `replacement` gives the current API:
 
 ```
-ListBox.ListCount   →  DesktopListBox.RowCount           (2019r2)
-ListBox.AddRows     →  DesktopListBox.AddAllRows         (2023r3)
-MsgBox              →  MessageBox or MessageDialog       (2019r2)
-RecordSet           →  RowSet                            (2019r2)
+ListBox.ListCount       →  DesktopListBox.RowCount        (2019r2)
+DesktopListBox.AddRows  →  DesktopListBox.AddAllRows      (2023r3)
+MsgBox                  →  MessageBox or MessageDialog    (2019r2)
+RecordSet               →  RowSet                         (2019r2)
 ```
 
 A few hundred deprecated members have no recorded replacement. Either the docs state that there is no replacement, or the deprecation notice does not name one. In that case, read the page of the member. The prose usually explains the alternative.
 
-You cannot derive a few deprecations from the documentation at all:
+A few rows are maintained by hand in `scripts/deprecation-overrides.tsv`, because the documentation cannot state them deterministically:
 
-- language keywords like `Redim`
-- global functions like `Val` and `Screen`
-- members that the current docs no longer describe
+- deprecations whose page title never matches the identifier in code: the global function `Screen` lives on a page titled "Screen Method"
+- calls the current docs no longer describe, like the removed `FolderItem.CreateBinaryFile` family
+- the hazard notes in the `note` column: the INDEX BASE, EPOCH, and ERROR MODEL warnings
+- advice on a symbol that is not deprecated at all: `Redim` still compiles and carries no `deprecated` flag, but its row points at `ResizeTo`, which the docs prefer
 
-Those deprecations are maintained by hand in `scripts/deprecation-overrides.tsv`. `build` merges them into both indexes, so the same greps find them.
+`build` merges them into both indexes, so the same greps find them. (`Val`, `Str`, `Format`, `Hex`, `CStr`, `Asc`, and `Chr` are **not** deprecated, even though most of them have API 2.0 siblings; only the byte variants `AscB` and `ChrB` are.)
 
 ## Renaming is not enough: some indexes changed
 
-**This is the most dangerous part of the move from API 1.0 to API 2.0.** Several replacements changed their counting base or their not-found value at the same time as the rename. If you substitute the new name and keep the old arithmetic, the code compiles cleanly but produces silent off-by-one bugs.
+**This is the most dangerous part of the move from API 1.0 to API 2.0.** Several replacements changed their counting base, their not-found value, their epoch, or their failure behavior at the same time as the rename. If you substitute the new name and keep the old logic, the code compiles cleanly but produces silent bugs.
 
 | API 1.0 | API 2.0 | What changed |
 | --- | --- | --- |
 | `Mid(s, start, len)` | `s.Middle(start, len)` | The first character is **1** in `Mid` and **0** in `Middle`. Subtract 1 from `start`. |
 | `InStr(s, find)` | `s.IndexOf(find)` | `InStr` returns a **one-based** position and **0** when not found. `IndexOf` returns a **zero-based** position and **-1** when not found. Change the `> 0` test to `>= 0`. Adjust the returned value everywhere the code uses it as a position. |
 | `MidB`, `InStrB` | `MiddleBytes`, `IndexOfBytes` | Same shifts as above. |
+| `Date.TotalSeconds` | `DateTime.SecondsFrom1970` | The epoch moves from **1904** to **1970**. A stored `TotalSeconds` value read as `SecondsFrom1970` is 66 years wrong, so rebase every stored value. |
+| `f.CreateBinaryFile(type)` | `BinaryStream.Create(f)` | Failure returned **`Nil`** before and raises an **`IOException`** now. The `<> Nil` guard becomes dead code, and the exception has no handler. The other file open and create calls changed the same way. |
 
-The docs confirm both changes: the `Mid` page says "the first character is numbered 1", and `String.Middle` says "numbered 0".
+The docs confirm these changes: the `Mid` page says "the first character is numbered 1", `String.Middle` says "numbered 0", `Date.TotalSeconds` counts from 1904 while `DateTime.SecondsFrom1970` counts from 1970, and the `BinaryStream.Create` page says an `IOException` will be raised.
 
-The `note` column spells out this hazard for every item that carries the hazard:
+The `note` column spells out these hazards for every item that carries one:
 
 ```
-grep -h 'INDEX BASE' references/documentation/*.tsv
-awk -F'\t' '$6!=""' references/documentation/classes.tsv     # every note
+grep -h 'INDEX BASE\|EPOCH\|ERROR MODEL' references/documentation/*.tsv
+awk -F'\t' '$6!=""' references/documentation/classes.tsv     # every class note
+awk -F'\t' '$7!=""' references/documentation/members.tsv     # every member note
 ```
 
 **Before you apply a replacement, open the page of the new API. Compare the parameter meanings to the old API.** A replacement name is often not a straight rename. `ListBox.Cell` became `DesktopListBox.CellTextAt`, and several `CellBorder*` properties collapsed into one `PaintCellBackground` event.
