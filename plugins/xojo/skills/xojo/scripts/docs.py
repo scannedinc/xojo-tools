@@ -866,6 +866,39 @@ def run_build(args: argparse.Namespace) -> int:
     # Attach kind and flags from each page's summary tables. The tables name
     # their rows with the same :ref: label the description block anchors on,
     # so this join is exact rather than name-matched.
+    # A deprecated page's title is not reliable as a name. Some carry the
+    # wrong class (desktoppopupmenu.selectrowwithvalue is titled
+    # "DesktopListBox.SelectRowWithValue"), some a suffixed class
+    # (database.commit is titled "Database_Class.Commit"), and some a full
+    # signature (listbox.heading). The docname stem is the stable identity, so
+    # the symbol comes from the stem; the titles only contribute casing.
+    casing: dict[str, str] = {}
+    for docname, page in pages.items():
+        bare = page.title.removesuffix(" (deprecated)").strip()
+        low = bare.lower()
+        if low == docname.rpartition("/")[2] and (
+            low not in casing or not docname.startswith("api/deprecated/")
+        ):
+            casing[low] = bare
+
+    def deprecated_symbol(docname: str, title: str) -> str:
+        """The symbol an api/deprecated/ page describes, stem first.
+
+        Falls back to the title whenever the stem does not parse as a dotted
+        identifier whose member part the title confirms -- disambiguator
+        stems like thread.run_method keep their title-based names.
+        """
+        symbol = title.removesuffix(" (deprecated)").strip()
+        stem = docname.rpartition("/")[2].split("(", 1)[0]
+        if "." not in stem or symbol.lower() == stem:
+            return symbol
+        class_low, _, member_low = stem.rpartition(".")
+        match = re.match(r"[A-Za-z_][A-Za-z0-9_.]*", symbol)
+        member = match.group(0).split(".")[-1] if match else ""
+        if member.lower() != member_low or class_low not in casing:
+            return symbol
+        return f"{casing[class_low]}.{member}"
+
     # A deprecated page names its own replacement. Some are whole classes
     # (ListBox -> DesktopListBox), some are single members with their own page
     # (ListBox.ActiveCell -> DesktopListBox.ActiveTextControl). Index both by
@@ -875,7 +908,7 @@ def run_build(args: argparse.Namespace) -> int:
         if not docname.startswith("api/deprecated/"):
             continue
         page.deprecated = True
-        symbol = page.title.removesuffix(" (deprecated)").strip()
+        symbol = deprecated_symbol(docname, page.title)
         if symbol and (page.deprecated_in or page.replacement):
             replacements[symbol] = (page.deprecated_in, page.replacement)
 
@@ -925,6 +958,13 @@ def run_build(args: argparse.Namespace) -> int:
                 written += 1
 
         title = renderer.inline(page.title, docname, plain=True)
+        if page.deprecated:
+            # Substitute the stem-derived symbol only when it differs, so the
+            # " (deprecated)" suffix keeps distinguishing pages such as the
+            # deprecated ListBox class from the ListBox topic page.
+            symbol = deprecated_symbol(docname, title)
+            if symbol != title.removesuffix(" (deprecated)").strip():
+                title = symbol
         # The prose-harvested version/replacement describe THIS page only when
         # the page itself is deprecated; a guide that merely quotes someone
         # else's deprecation notice must not gain a deprecated_in of its own.
@@ -937,7 +977,10 @@ def run_build(args: argparse.Namespace) -> int:
             (
                 title,
                 page.kind,
-                "deprecated" if (page.deprecated or note) else "",
+                # A note-only override on a current page (empty version) is
+                # advice, not a deprecation -- Redim's compatibility-shim
+                # note must not flag Redim as deprecated.
+                "deprecated" if (page.deprecated or version) else "",
                 version,
                 replacement,
                 note,
@@ -947,13 +990,21 @@ def run_build(args: argparse.Namespace) -> int:
             )
         )
         for member in page.members:
+            # As with the page rows above: the harvested version/replacement
+            # describe the member only when the member itself is deprecated.
+            # A current member whose body merely discusses a deprecation must
+            # not carry that sentence's fragments as its own replacement.
             member_rows.append(
                 (
                     qualified := renderer.inline(member.qualified, docname, plain=True),
                     member.kind,
                     renderer.inline(member.signature, docname, plain=True),
                     member.flags,
-                    *apply_override(qualified, member.deprecated_in, member.replacement),
+                    *apply_override(
+                        qualified,
+                        member.deprecated_in if member.deprecated else "",
+                        member.replacement if member.deprecated else "",
+                    ),
                     f"{docname}.members.md#{member.anchor}",
                 )
             )
@@ -991,6 +1042,20 @@ def run_build(args: argparse.Namespace) -> int:
     print(f"  {written} files written or updated")
     print(f"  {dest / 'classes.tsv'}")
     print(f"  {dest / 'members.tsv'}")
+
+    # A replacement is a symbol or a short phrase, never markup or a sentence.
+    # Brackets, braces, angle brackets, or a sentence boundary mean the notice
+    # carried junk the parser did not strip; say so instead of indexing it.
+    suspect = re.compile(r"[\[\]{}<>]|\.\s")
+    junk = [(row[0], row[4]) for row in class_rows if suspect.search(row[4])]
+    junk += [(row[0], row[5]) for row in member_rows if suspect.search(row[5])]
+    if junk:
+        print(
+            f"\n{len(junk)} replacement(s) look like unparsed markup; extend "
+            f"the sanitizing in convert.py deprecation() or add an override:"
+        )
+        for name, value in junk[:10]:
+            print(f"  {name}\t{value}")
 
     unresolved = renderer.resolver.unresolved
     if unresolved:

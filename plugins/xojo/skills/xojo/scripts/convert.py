@@ -78,10 +78,25 @@ DEPRECATION = re.compile(r"(?:was|is|has been) deprecated", re.I)
 DEPRECATED_VERSION = re.compile(
     r"(?:was|is|has been) (?:deprecated|removed)(?: in)?(?: version| Xojo)?\s+([0-9][0-9r.]*?)\.?(?:\s|$)"
 )
+# The replacement comes from the deprecation notice and only from it: the
+# "Please use"/"Use" must follow the word deprecated/removed inside the same
+# paragraph, or ordinary "Use this event to ..." advice in a member body
+# would be harvested as a replacement. The capture then ends at the notice's
+# own wording ("as a replacement", "in place of", "instead") or, when a
+# notice omits all three, at the end of the sentence or paragraph. Without
+# that stop the lazy match runs on until the next "as a replacement"
+# anywhere in the page and swallows whole sentences.
 DEPRECATED_REPLACEMENT = re.compile(
-    r"(?:Please use|Use)\s+(.+?)\s+as a replacement", re.S
+    r"(?:deprecated|removed)\b(?:(?!\n[ \t]*\n).){0,120}?(?:Please use|Use)\s+(.+?)"
+    r"(?:\s+(?:as a replacement|in place of|instead\b)|(?=\.(?:\s|$))|\s*(?=\n[ \t]*\n))",
+    re.S,
 )
 ROLE_TEXT = re.compile(r":[a-z-]+:`([^`<]*?)\s*(?:<[^`>]*>)?`")
+# Half-converted MediaWiki markup that survives in a few upstream notices:
+# "]]" link closers, "}}" template closers, "<ShowIf" conditional tags, and
+# the literal "(above)"/"(below)" page-position references. Anything from the
+# first such token on is junk, never part of the replacement name.
+WIKI_LEFTOVER = re.compile(r"\s*(?:\]\]|\}+|<ShowIf|\(above\)|\(below\))")
 
 
 def deprecation(text: str) -> tuple[str, str]:
@@ -93,6 +108,10 @@ def deprecation(text: str) -> tuple[str, str]:
         # The replacement is usually a :doc:/:ref: role; keep the display text.
         name = " ".join(ROLE_TEXT.sub(r"\1", replacement.group(1)).split())
         name = name.strip("`* ")
+        # A malformed role (missing the "<" before its target) leaks the
+        # target path into the display text: "System.Version/api/ios/...>".
+        name = re.sub(r"/(?:api|doc)/\S*$", "", name.rstrip(">"))
+        name = WIKI_LEFTOVER.split(name)[0].strip("`* ")
     return (version.group(1).rstrip(".") if version else "", name)
 
 # Underline character -> heading level, matching the convention the Xojo docs use.
