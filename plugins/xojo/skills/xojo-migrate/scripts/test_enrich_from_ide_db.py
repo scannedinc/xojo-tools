@@ -140,7 +140,7 @@ class PlanTests(unittest.TestCase):
     def test_unknown_destination_class_is_rejected_not_guessed(self):
         fills, adds, rejects = self.plan([("Mystery", "Foo", "Bar", "member")])
         self.assertEqual((fills, adds), ([], []))
-        self.assertIn("no documentation page", rejects[0]["why"])
+        self.assertIn("no members for the destination class", rejects[0]["why"])
 
     def test_new_pair_is_added(self):
         fills, adds, rejects = self.plan([("ListBox", "ListCount", "RowCount",

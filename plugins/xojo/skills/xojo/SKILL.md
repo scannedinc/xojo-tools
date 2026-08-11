@@ -168,7 +168,7 @@ A few rows are maintained by hand in `scripts/deprecation-overrides.tsv`, becaus
 
 | API 1.0 | API 2.0 | What changed |
 | --- | --- | --- |
-| `Mid(s, start, len)` | `s.Middle(start, len)` | The first character is **1** in `Mid` and **0** in `Middle`. Subtract 1 from `start`. |
+| `Mid(s, start, len)` | `s.Middle(start, len)` | The first character is **1** in `Mid` and **0** in `Middle`. Subtract 1 from `start`. `Mid` also clamped a start below 1, so `Mid(s, 0)` was legal and its direct conversion is not: audit loops that start at 0. |
 | `InStr(s, find)` | `s.IndexOf(find)` | `InStr` returns a **one-based** position and **0** when not found. `IndexOf` returns a **zero-based** position and **-1** when not found. Change the `> 0` test to `>= 0`. Adjust the returned value everywhere the code uses it as a position. |
 | `MidB`, `InStrB` | `MiddleBytes`, `IndexOfBytes` | Same shifts as above. |
 | `Date.TotalSeconds` | `DateTime.SecondsFrom1970` | The epoch moves from **1904** to **1970**. A stored `TotalSeconds` value read as `SecondsFrom1970` is 66 years wrong, so rebase every stored value. |

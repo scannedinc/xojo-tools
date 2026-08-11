@@ -208,7 +208,7 @@ def plan(coverage, rows, docs, release):
         if verdict is not True:
             rejects.append({"class": cls, "old": old_name, "new": new_name,
                             "target": target,
-                            "why": ("no documentation page for the "
+                            "why": ("the index lists no members for the "
                                     f"destination class {target}"
                                     if verdict is None else
                                     f"{target} documents no {new_name}")})
