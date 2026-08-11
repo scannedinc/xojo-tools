@@ -170,6 +170,47 @@ def code_only(text):
     return "".join(out)
 
 
+COND_IF = re.compile(r"^\s*#if\b(.*)$", re.IGNORECASE)
+COND_ELSEIF = re.compile(r"^\s*#elseif\b(.*)$", re.IGNORECASE)
+COND_ENDIF = re.compile(r"^\s*#endif\b", re.IGNORECASE)
+
+
+def conditional_only(code):
+    """Return `code` with everything OUTSIDE `#If Target*` constructs blanked.
+
+    The IDE analyzer compiles only the branch for the platform it runs on,
+    so a hit inside ANY platform conditional is the analyzer's structural
+    blind spot: it needs the text passes and a human, whatever the IDE
+    reported. Length and line count are preserved, like code_only. The
+    whole construct counts, `#Else` branches included; a nested `#If`
+    inherits its enclosing construct's platform-ness; an `#ElseIf` naming
+    a Target makes the rest of its construct platform-conditional even
+    when the `#If` itself did not. Run this on code_only() output so
+    archived slabs in `#tag Note` blocks stay excluded.
+    """
+    out = []
+    stack = []          # one bool per open #If: does it involve Target*?
+    for raw in code.splitlines(keepends=True):
+        line = raw.rstrip("\n\r")
+        nl = raw[len(line):]
+        before = any(stack)
+        m_elif = COND_ELSEIF.match(line)
+        m_if = COND_IF.match(line)
+        if m_elif:
+            if stack and "target" in m_elif.group(1).lower():
+                stack[-1] = True
+        elif m_if:
+            stack.append("target" in m_if.group(1).lower())
+        elif COND_ENDIF.match(line):
+            if stack:
+                stack.pop()
+        # Directive lines are kept too: `#if TargetCocoa` is itself a hit
+        # for a deprecated compiler constant.
+        keep = before or any(stack)
+        out.append((line if keep else " " * len(line)) + nl)
+    return "".join(out)
+
+
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
 # Connectives and prose words that can never be a Xojo member name. Deliberately
 # excludes words that ARE real symbols somewhere in the matrix -- Line, Text,
@@ -388,7 +429,7 @@ def candidate_keys(text, prefilter):
 
 
 def scan_text(text, pats, prefilter=None):
-    """Per-key (raw, in-code) match counts for one file's text.
+    """Per-key (raw, in-code, in-platform-conditional) counts for one file.
 
     With a prefilter, only candidate patterns run; the result is identical
     to running every pattern -- dict order included, because iteration stays
@@ -397,6 +438,7 @@ def scan_text(text, pats, prefilter=None):
     which is why preserving it is part of the contract.
     """
     code = code_only(text)
+    cond = None
     cand = candidate_keys(text, prefilter) if prefilter is not None else None
     out = {}
     for key, (rx, _m, _rows) in pats.items():
@@ -404,7 +446,13 @@ def scan_text(text, pats, prefilter=None):
             continue
         n = len(rx.findall(text))
         if n:
-            out[key] = (n, len(rx.findall(code)))
+            n_code = len(rx.findall(code))
+            n_cond = 0
+            if n_code:
+                if cond is None:
+                    cond = conditional_only(code)
+                n_cond = len(rx.findall(cond))
+            out[key] = (n, n_code, n_cond)
     return out
 
 
@@ -507,16 +555,17 @@ def main():
     rules = rule_index()
 
     prefilter = build_prefilter(pats)
-    hits = defaultdict(lambda: {"count": 0, "code": 0, "files": set()})
+    hits = defaultdict(lambda: {"count": 0, "code": 0, "cond": 0, "files": set()})
     for f in src:
         try:
             text = f.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
             print(f"warning: cannot read {f}: {e}", file=sys.stderr)
             continue
-        for key, (n, n_code) in scan_text(text, pats, prefilter).items():
+        for key, (n, n_code, n_cond) in scan_text(text, pats, prefilter).items():
             hits[key]["count"] += n
             hits[key]["code"] += n_code
+            hits[key]["cond"] += n_cond
             # Only files with a live-code hit are worth opening. A file that
             # matches purely in layout metadata is not part of the worklist.
             if n_code:
@@ -551,7 +600,8 @@ def main():
             "match": key, "bucket": bucket,
             "mixed_buckets": sorted(buckets) if len(buckets) > 1 else [],
             "live_on": live_on,
-            "count": h["count"], "code": h["code"], "files": sorted(h["files"]),
+            "count": h["count"], "code": h["code"],
+            "platform_conditional": h["cond"], "files": sorted(h["files"]),
             # Only the first few candidates are printed, so the order decides
             # what a reader sees. Sorting by BUCKET_ORDER puts the receivers
             # that break a build first and pushes the iOS/Web surface last --
@@ -605,6 +655,9 @@ def main():
                 tags.append("no replacement documented: needs redesign")
             elif not r["rules"]:
                 tags.append("no rule: use coverage replacement + traps doc")
+            if r["platform_conditional"]:
+                tags.append(f"{r['platform_conditional']} of {r['code']} inside "
+                            f"#if Target* -- the IDE analyzer never compiled them")
             if r["mixed_buckets"]:
                 tags.append("MIXED: receivers disagree -- filed under the most severe of "
                             + ", ".join(r["mixed_buckets"]))

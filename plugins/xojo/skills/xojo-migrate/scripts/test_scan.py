@@ -128,7 +128,7 @@ class CandidateKeysTests(unittest.TestCase):
         text = "v = &hFF\n"
         self.assertEqual(scan.scan_text(text, pats),
                          scan.scan_text(text, pats, prefilter))
-        self.assertEqual(scan.scan_text(text, pats, prefilter).get("&h"), (1, 1))
+        self.assertEqual(scan.scan_text(text, pats, prefilter).get("&h"), (1, 1, 0))
 
 
 class EquivalenceTests(unittest.TestCase):
@@ -195,7 +195,7 @@ class EquivalenceTests(unittest.TestCase):
         # Spot-check the two non-obvious expectations directly, so the trap
         # tests cannot both pass by matching nothing.
         hits = scan.scan_text("foo.Mid☃\n", self.pats, self.prefilter)
-        self.assertEqual(hits.get(".mid"), (1, 1))
+        self.assertEqual(hits.get(".mid"), (1, 1, 0))
         hits = scan.scan_text("éMid(x)\n", self.pats, self.prefilter)
         self.assertNotIn("mid", hits)
 
@@ -218,9 +218,9 @@ class EquivalenceTests(unittest.TestCase):
         # The traps must genuinely match brute-force, or the equivalence
         # checks above could pass with both sides empty.
         hits = scan.scan_text("v = obj.Mıd(1)\n", self.pats)
-        self.assertEqual(hits.get(".mid"), (1, 1))
+        self.assertEqual(hits.get(".mid"), (1, 1, 0))
         hits = scan.scan_text("n = Inſtr(hay, pin)\n", self.pats)
-        self.assertEqual(hits.get("instr"), (1, 1))
+        self.assertEqual(hits.get("instr"), (1, 1, 0))
 
     def test_fixture_projects(self):
         if not FIXTURES.is_dir():
@@ -232,6 +232,51 @@ class EquivalenceTests(unittest.TestCase):
             with self.subTest(file=f.name):
                 self.assert_equivalent(
                     f.read_text(encoding="utf-8", errors="replace"))
+
+
+class ConditionalOnlyTests(unittest.TestCase):
+    def test_only_target_constructs_survive(self):
+        code = ("a = Left(s, 1)\n"
+                "#if TargetWindows\n"
+                "b = Left(s, 2)\n"
+                "#else\n"
+                "c = Left(s, 3)\n"
+                "#endif\n"
+                "#if DebugBuild\n"
+                "d = Left(s, 4)\n"
+                "#endif\n")
+        lines = scan.conditional_only(code).splitlines()
+        self.assertEqual(lines[0].strip(), "")       # outside any construct
+        self.assertIn("Left(s, 2)", lines[2])        # the Target branch
+        self.assertIn("Left(s, 3)", lines[4])        # its #else counts too
+        self.assertEqual(lines[7].strip(), "")       # DebugBuild is not platform
+
+    def test_elseif_target_marks_the_rest_of_the_construct(self):
+        code = ("#if DebugBuild\n"
+                "a = 1\n"
+                "#elseif TargetWindows\n"
+                "b = Left(s, 1)\n"
+                "#endif\n")
+        lines = scan.conditional_only(code).splitlines()
+        self.assertEqual(lines[1].strip(), "")
+        self.assertIn("Left(s, 1)", lines[3])
+
+    def test_directive_lines_are_kept(self):
+        # `#if TargetCocoa` is itself a deprecated-symbol hit.
+        code = "#if TargetCocoa\nx = 1\n#endif\n"
+        self.assertIn("TargetCocoa", scan.conditional_only(code))
+
+    def test_scan_text_counts_conditional_hits(self):
+        pats = shipped_patterns()
+        pre = scan.build_prefilter(pats)
+        text = ("s = Left(t, 1)\n"
+                "#if TargetWindows\n"
+                "u = Left(t, 2)\n"
+                "#endif\n")
+        agg = [v for k, v in scan.scan_text(text, pats, pre).items()
+               if k.lstrip(".").lower() == "left"]
+        self.assertTrue(any(v[1] >= 2 and v[2] == 1 for v in agg),
+                        f"expected one of two Left hits flagged: {agg}")
 
 
 class OrphanedTests(unittest.TestCase):
@@ -282,8 +327,10 @@ class WorkAvoidanceTests(unittest.TestCase):
         counted = counting_patterns(self.pats, cell)
         hits = scan.scan_text("i = UBound(arr)\n", counted, self.prefilter)
         # findall runs once over raw text per candidate, plus once over the
-        # masked text per candidate that hit.
-        self.assertEqual(cell[0], expected + len(hits))
+        # masked text per candidate that hit, plus once over the
+        # platform-conditional mask per candidate that hit in code.
+        in_code = sum(1 for v in hits.values() if v[1])
+        self.assertEqual(cell[0], expected + len(hits) + in_code)
         self.assertIn("ubound", hits)
 
 

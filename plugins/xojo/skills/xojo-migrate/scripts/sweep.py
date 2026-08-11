@@ -55,7 +55,7 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from scan import code_only, collect_files, orphaned  # noqa: E402
+from scan import code_only, collect_files, conditional_only, orphaned  # noqa: E402
 
 REFS = pathlib.Path(__file__).resolve().parent.parent / "references"
 
@@ -270,16 +270,22 @@ def main():
         if bare_rx is None:
             continue
         orig = text.splitlines()
+        # A kept (non-blank) line in conditional_only's output is a line
+        # inside a #if Target* construct -- the analyzer's blind spot.
+        cond_lines = conditional_only(code).splitlines()
         for i, line in enumerate(code.splitlines()):
             if not line.strip():
                 continue
+            in_cond = bool(cond_lines[i].strip())
             for m in bare_rx.finditer(line):
                 name = canonical[m.group(1).lower()]
-                results[name]["bare"].append((rel, i + 1, orig[i].strip()[:120]))
+                results[name]["bare"].append(
+                    (rel, i + 1, orig[i].strip()[:120], in_cond))
             if args.all:
                 for m in dotted_rx.finditer(line):
                     name = canonical[m.group(1).lower()]
-                    results[name]["dotted"].append((rel, i + 1, orig[i].strip()[:120]))
+                    results[name]["dotted"].append(
+                        (rel, i + 1, orig[i].strip()[:120], in_cond))
 
     # Split by what the bare form MEANS for each symbol, which is the whole
     # point of the sweep:
@@ -311,8 +317,10 @@ def main():
             "scanned_files": len(live),
             "symbols_swept": len(active),
             "suppressed": suppressed,
-            "receiverless_members": {n: [{"file": f, "line": ln, "text": t}
-                                         for f, ln, t in v] for n, v in blind.items()},
+            "receiverless_members": {n: [{"file": f, "line": ln, "text": t,
+                                          "platform_conditional": c}
+                                         for f, ln, t, c in v]
+                                     for n, v in blind.items()},
             "global_forms": {n: len(v) for n, v in globals_.items()},
         }, indent=1))
         return
@@ -340,7 +348,9 @@ def main():
                                      for r in rows if "." in r["old"]})[:4])
             live = live_receivers(name)
             flag = "   [LIKELY FINE]" if live else ""
-            print(f"  {name:<26} {len(group[name]):>4} hit(s)   -> {repl}{flag}")
+            n_cond = sum(1 for *_x, c in group[name] if c)
+            cond_tag = f"   [{n_cond} in #if Target*]" if n_cond else ""
+            print(f"  {name:<26} {len(group[name]):>4} hit(s)   -> {repl}{flag}{cond_tag}")
             # Printing a target signature next to a call that already passes an
             # argument reads as an invitation to carry the argument across, and
             # on a real migration it was taken: `invalidate(false)` next to
@@ -350,7 +360,7 @@ def main():
             # behavior. Nothing here can tell whether the parameters
             # correspond, which is exactly why the signature must not be
             # offered without the warning.
-            passes_arg = sum(1 for _f, _l, t in group[name]
+            passes_arg = sum(1 for _f, _l, t, _c in group[name]
                              if re.search(re.escape(name) + r"\s*\(\s*[^)\s]", t, re.I))
             if passes_arg and "(" in repl:
                 print(f"      ARGUMENT WARNING: {passes_arg} of these calls pass an "
@@ -364,8 +374,9 @@ def main():
             if recv:
                 print(f"      deprecated on: {recv}")
             shown = group[name] if args.context else group[name][:6]
-            for f, ln, text in shown:
-                print(f"      {f}:{ln}" + (f"   {text}" if args.context else ""))
+            for f, ln, text, c in shown:
+                print(f"      {f}:{ln}" + (" [#if Target*]" if c else "")
+                      + (f"   {text}" if args.context else ""))
             if not args.context and len(group[name]) > 6:
                 print(f"      ... {len(group[name]) - 6} more (--context to see all)")
         if not group:
