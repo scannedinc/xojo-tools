@@ -10,8 +10,8 @@ text drive the whole design and are pinned here:
     own casing ("Listbox", not "ListBox").
   - Member deprecations arrive with NO receiver ("ListCount is
     deprecated..."), so the matrix join cannot key on the receiver. The
-    IDE's replacement is what disambiguates: "RowCount" picks
-    ListBox.ListCount over PopupMenu.ListCount.
+    IDE's replacement narrows the candidates, and rows that survive the
+    narrowing still settle when they agree on the member's new name.
 
 Run:  python3 test_worklist.py
 """
@@ -101,9 +101,29 @@ class JoinTests(unittest.TestCase):
         return worklist.match_rows(old, new, self.matrix)
 
     def test_replacement_disambiguates_a_bare_member(self):
-        # Two rows own the bare name; only one leads to RowCount.
+        # Four rows own the bare name; only Dictionary's leads to KeyCount.
+        rows = self.rows_for("Count", "KeyCount")
+        self.assertEqual([r["old"] for r in rows], ["Dictionary.Count"])
+
+    def test_agreeing_member_leaves_are_not_ambiguous(self):
+        # ListBox.ListCount and PopupMenu.ListCount both survive the
+        # narrowing -- their replacements share the token RowCount -- but
+        # both rename the site to `.RowCount`, so the join is settled.
         rows = self.rows_for("ListCount", "RowCount")
-        self.assertEqual([r["old"] for r in rows], ["ListBox.ListCount"])
+        self.assertEqual(sorted(r["old"] for r in rows),
+                         ["ListBox.ListCount", "PopupMenu.ListCount"])
+        self.assertFalse(worklist.is_ambiguous(rows))
+
+    def test_differing_member_leaves_stay_ambiguous(self):
+        # Three rows own `.Mode`, every replacement is recorded, and the
+        # leaves genuinely disagree (ExecuteMode vs RunMode): the join
+        # must stay open. All-recorded matters -- an unrecorded row would
+        # trip the earlier guard before any leaf is compared, and this
+        # test exists to pin the leaf comparison itself.
+        rows = self.rows_for("Mode", "")
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(worklist.known_replacement(r) for r in rows))
+        self.assertTrue(worklist.is_ambiguous(rows))
 
     def test_replacement_disambiguates_a_global_from_a_member(self):
         rows = self.rows_for("Left", "String.Left")

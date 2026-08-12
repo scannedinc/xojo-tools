@@ -8562,13 +8562,13 @@
  },
  {
   "old": "PopupMenu.DeleteAllRows",
-  "new": "—",
-  "kind": "—",
+  "new": "DesktopPopupMenu.RemoveAllRows",
+  "kind": "Method",
   "cat": "Source — member",
   "covered": true,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for PopupMenu (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
+  "note": "Name-only in Xojo's per-release tables; filled by hand from DesktopPopupMenu's documented member list (the documentation index lists RemoveAllRows as a documented method). A straight rename: neither form takes arguments.",
   "origin": "member"
  },
  {
@@ -8596,24 +8596,24 @@
  },
  {
   "old": "PopupMenu.List",
-  "new": "—",
-  "kind": "—",
+  "new": "DesktopPopupMenu.RowTextAt",
+  "kind": "Method",
   "cat": "Source — member",
   "covered": true,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for PopupMenu (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
+  "note": "Name-only in Xojo's per-release tables; filled by hand from DesktopPopupMenu's documented member list (the documentation index lists RowTextAt as a documented method). NOT CellTextAt -- a popup has rows, not cells. The documentation describes RowTextAt as reading the row text and shows no assignment form, so a List(i) = ... write is a rework (RemoveRowAt plus AddRowAt), not a rename.",
   "origin": "member"
  },
  {
   "old": "PopupMenu.ListCount",
-  "new": "—",
-  "kind": "—",
+  "new": "DesktopPopupMenu.RowCount",
+  "kind": "Property",
   "cat": "Source — member",
   "covered": true,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for PopupMenu (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
+  "note": "Name-only in Xojo's per-release tables; filled by hand from DesktopPopupMenu's documented member list (the documentation index lists RowCount as a documented property). A straight rename: both are the read-only row count.",
   "origin": "member"
  },
  {
@@ -8644,13 +8644,13 @@
  },
  {
   "old": "PopupMenu.RowTag",
-  "new": "—",
-  "kind": "—",
+  "new": "DesktopPopupMenu.RowTagAt",
+  "kind": "Method",
   "cat": "Source — member",
   "covered": true,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for PopupMenu (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
+  "note": "Name-only in Xojo's per-release tables; filled by hand from DesktopPopupMenu's documented member list (the documentation index lists RowTagAt as a documented method). Reads and writes both survive the rename: the DesktopPopupMenu page's own example assigns Me.RowTagAt(i) = i.",
   "origin": "member"
  },
  {
@@ -8666,13 +8666,13 @@
  },
  {
   "old": "PopupMenu.Text",
-  "new": "—",
-  "kind": "—",
+  "new": "DesktopPopupMenu.SelectedRowText",
+  "kind": "Property",
   "cat": "Source — member",
   "covered": true,
   "since": "2019r2",
   "status": "Deprecated",
-  "note": "Listed as deprecated in Xojo's per-release tables, which are name-only: no detail page records a replacement, so one is not shown here. The rename is usually on the API 2.0 class page for PopupMenu (e.g. Slider.Maximum -> DesktopSlider.MaximumValue). Confirm there before converting.",
+  "note": "Name-only in Xojo's per-release tables; filled by hand from DesktopPopupMenu's documented member list (the documentation index lists SelectedRowText as a documented property). READS ONLY: SelectedRowText is documented read-only, so an assignment site (popup.Text = s) cannot survive the rename -- it becomes SelectRowWithText(value), which raises InvalidArgumentException when no row matches.",
   "origin": "member",
   "live_on": [
    "DesktopTextField",

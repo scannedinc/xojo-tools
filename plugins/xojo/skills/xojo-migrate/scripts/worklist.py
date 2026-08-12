@@ -24,8 +24,10 @@ IDE rather than assumed:
 
   - Member deprecations carry NO receiver ("ListCount is deprecated.  You
     should use RowCount instead"), so the receiver cannot key the join.
-    The replacement disambiguates instead: "RowCount" picks
-    ListBox.ListCount over PopupMenu.ListCount.
+    The replacement narrows instead ("KeyCount" picks Dictionary.Count
+    from the four rows owning bare Count), and candidates that survive
+    the narrowing still settle when they agree on the member's new name:
+    ListBox and PopupMenu both rename ListCount to .RowCount.
   - The IDE spells names in its own casing ("Listbox") and puts two spaces
     after "deprecated.", so all matching is case-insensitive and
     whitespace-tolerant.
@@ -223,6 +225,23 @@ def ide_disagrees(rows, new):
                                     for r in known)
 
 
+def _new_leaf(row):
+    """The member name this row's replacement renames the call site to.
+
+    None when the row is not a member-to-member rename: a global row, an
+    unrecorded replacement, or a replacement that is not a dotted member
+    (Database.Error -> DatabaseException redirects; it does not rename).
+    """
+    if "." not in (row.get("old") or "").split("(")[0]:
+        return None
+    if not known_replacement(row):
+        return None
+    head = re.split(r"[(\s]", _head(row.get("new", "")))[0].rstrip(".")
+    if "." not in head:
+        return None
+    return head.split(".")[-1].lower()
+
+
 def is_ambiguous(rows):
     """True when the candidate rows do not settle on one replacement.
 
@@ -232,12 +251,20 @@ def is_ambiguous(rows):
     each other either -- three classes owning `.InsertRow` with no
     documented replacement is three open questions, not a settled join,
     and reading it as agreement printed it as a mechanical rename.
+
+    Member renames also agree when their replacements differ only by
+    class: a bare `ListCount` warning may belong to DesktopListBox or
+    DesktopPopupMenu, but both rows rename the site to `.RowCount`, so
+    the edit is settled either way and there is nothing to resolve.
     """
     if len(rows) < 2:
         return False
     if any(not known_replacement(r) for r in rows):
         return True
-    return len({(r.get("new") or "").strip().lower() for r in rows}) > 1
+    if len({(r.get("new") or "").strip().lower() for r in rows}) == 1:
+        return False
+    leaves = {_new_leaf(r) for r in rows}
+    return None in leaves or len(leaves) > 1
 
 
 def action_for(rows, rules, confirmed=True, disagrees=False):
