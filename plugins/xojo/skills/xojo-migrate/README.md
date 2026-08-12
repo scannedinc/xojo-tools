@@ -43,6 +43,8 @@ Ask Claude to migrate your project. Claude works through nine phases:
 8. **Type renames.** Rename the types that the IDE converter leaves.
 9. **Validation.** Run `sweep.py`. Then compile and run the application.
 
+Each category ends the same way: analyze the project, diff the result against the last checkpoint, reconcile the dry-run deferral check, and commit with the counts in the body.
+
 Four behaviors are deliberate. Read them before you start.
 
 **The Xojo IDE is the only compiler.** Xojo has no command-line compiler. Each category ends with an Analyze Project checkpoint. Claude runs it through the sibling `xojo-ide` skill when a running IDE is reachable. When it is not, you run it and report the result. The runtime check is always yours. The skill never claims that a conversion works.
@@ -95,6 +97,7 @@ The skill covers desktop projects. It marks the iOS, Web, and Android surface as
 | `pass-hazards.md` | Explains why a count of zero matches does not mean the work is complete, and why a large count does not mean a lot of work. Read it once, before the first category. |
 | `ide-vs-source.md` | Explains what the IDE converter changes and what it leaves. Also explains the difference between deprecated and removed. |
 | `applying-rules-by-script.md` | Explains the `$1` backreference dialect and the `applies` gate. Read it only if you run the rules from a script. |
+| `category-playbook.md` | Holds the fixed pass order for each category, the choice rule between the regex and receiver-sensitive pipelines, and the parked/deferred queues. Claude follows it instead of deriving a plan. |
 
 Two fields need a word of their own. `live_on` names the receivers where a deprecated member name is still correct in API 2.0, on dozens of rows. `chains_to` marks a replacement that Xojo then deprecated again, on a few rows.
 
@@ -107,6 +110,12 @@ Two fields need a word of their own. `live_on` names the receivers where a depre
 | `lookup.py` | Queries the data: one symbol, one rule, one category, or one confidence tier. |
 | `worklist.py` | Joins the output of Analyze Project to the rules. Reads the JSON from `xojoctl analyze` and sorts each warning into a group: hand conversion required, read the caveat first, mechanical rename, or the IDE converter handles it. |
 | `analysis_warnings.py` | Reports or enables the per-project deprecation warnings that Analyze Project needs. |
+| `locate.py` | Adds a real file and line to every diagnostic. The IDE counts lines from the start of each method, not the file, so nothing can act on its output mechanically until this runs. Sites it cannot settle are listed, never guessed. |
+| `targeted_rename.py` | Renames members only on the lines the analyzer flagged. The same member name one line away is not touched, which is what a project-wide regex cannot promise. |
+| `apply_rules.py` | Runs bundled rules by id, in the order named, over code only. Translates the rules' Find-panel dialect itself and refuses the locate-only rules whose empty replacement would delete text. |
+| `global_to_method.py` | Converts `Fn(source, args)` to `source.Fn(args)` with a balanced-paren walk, so nested-call arguments convert. Its dry run doubles as the deferral check: what it refuses needs a marker, what it would convert is unfinished work. |
+| `mid_to_middle.py` | Audits every `Mid` start against its enclosing `For` loop's lower bound, then converts `Mid` to `Middle` with the index decrement. Refuses to convert while a site provably relies on `Mid`'s clamp. |
+| `checkpoint.py` | Diffs two analyze results between passes: error and warning deltas, new errors, symbols cleared. Warns when identical counts suggest the IDE analyzed a stale copy. |
 
 The directory also holds maintenance scripts. `enrich_from_ide_db.py` imports rows from the deprecation database inside the Xojo IDE, and `refresh_from_docs.py` cross-checks the matrix against the generated indexes of the sibling `xojo` skill and backfills release dates. Both are maintainer tools, not migration steps.
 

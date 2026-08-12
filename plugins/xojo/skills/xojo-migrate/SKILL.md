@@ -144,9 +144,45 @@ open → analyze → close → edit on disk → open → analyze → close → c
 
 **Report the counts, every time.** Each analyze returns an error count and a warning count; report both to the user at every session, beside the previous session's numbers—"analyze: 0 errors, 210 warnings (was 260: the ListBox category cleared 50)". The falling warning count is the migration's only live progress meter, and a checkpoint where it does not fall—or where errors appear outside the two categories expected to break the build—is a stop-and-look signal, not a footnote. Two caveats keep the numbers honest: analyze counts every warning type the project's settings enable, not only deprecations, so the finish line is *zero deprecation warnings* (phase 8), not zero warnings; and when the IDE is unreachable and the user runs Analyze Project, ask for both counts and track them the same way.
 
+## The category boundary
+
+Every category—and every burn-down batch, and every playbook sub-pass that commits alone—ends with the same four steps. Run them verbatim; nothing here is derived per category. (`$PROJ` is the `.xojo_project` manifest path and `$PROJDIR` its directory; `$MIG` is the migration workspace, `category-playbook.md`; `NN` is the next checkpoint number, `<slug>` the category.)
+
+**1. One command block** — analyze, diff, oracle, as separate statements (not an `&&` chain: during the burn-down, analyze exits 1 with `project_errors`, which is input, not failure; exit 4 means the bracket broke—stop, `close --discard`, re-run):
+
+```
+python3 -m xojoctl analyze --project "$PROJ" --discard --json > "$MIG/cp-NN-<slug>.json"
+python3 $SKILL/scripts/checkpoint.py "$MIG/cp-NN-<slug>.json" "$MIG/cp-<prev>.json"
+python3 $SKILL/scripts/global_to_method.py "$PROJDIR" --oracle
+```
+
+**2. Read the differ top-down.** Its verdict line comes first. SUSPECT (identical error and warning counts) means the IDE may have analyzed a stale in-memory copy—re-run the bracketed analyze before believing anything else. STOP (NEW errors) means do not commit; a regression outside the two expected-to-break categories is a stop-and-look, not a footnote. Then check symbols **cleared** against the rules you just ran, and symbols **introduced** against `pass-hazards.md` §3—anything else introduced is over-match.
+
+**3. Reconcile the oracle.** The oracle's dry run classifies every remaining deprecated global: each **would-convert** site is either this category's remaining work or a PARKED line in `$MIG/queues.md`; each **illegal-receiver** site is a DEFERRED line whose `#Pragma` marker is already placed. An orphan in either direction is a forgotten site—fix it before the commit, not in phase 8.
+
+**4. Drain, then commit.** If this boundary closes a pass that PARKED entries were blocked on, drain them (playbook, "The drain step"), then commit with the body template below. Every numeric line is a paste from the differ or the applier; composing the body is one sentence of prose.
+
+```
+Xojo API 2.0: <category> -- <one-line what changed>
+
+Rules applied (converted/matched):
+  <the apply_rules.py per-rule summary, pasted verbatim>
+
+Sites: <c> converted across <f> files; <p> parked (blocked on <pass>); <d> deferred (markers placed)
+Skipped: <what and why, or none>
+Still manual: <what remains, or none>
+
+Checkpoint: <e> errors, <w> warnings (was <e0>/<w0>; cleared <symbols>, 0 new)
+Oracle: reconciled -- <n> would-convert (all parked for <pass>), <m> illegal-receiver (all marked)
+
+Compiles: analyze <e> errors, <w> warnings via xojoctl
+```
+
+The `Compiles:` trailer variants in **Commit discipline** (user-declined checkpoints, expected-breakage categories) apply here unchanged.
+
 ## Workflow
 
-Read `$SKILL/references/ide-vs-source.md` before phase 1, and `$SKILL/references/conversion-traps.md` before phases 3–6. Its §8 (string literals) and §9 (declarations) are what phase 4's per-match glance is checking for.
+Read `$SKILL/references/ide-vs-source.md` before phase 1, `$SKILL/references/conversion-traps.md` before phases 3–6 (its §8, string literals, and §9, declarations, are what phase 4's per-match glance is checking for), and `$SKILL/references/category-playbook.md` before phase 3—the per-category pass orders, the regex-vs-receiver pipeline decision rule and the queues live there; do not re-derive them.
 
 ### 1. IDE converter first
 
@@ -160,17 +196,21 @@ Two ways to build the worklist, and the preference between them is not a coin fl
 
 #### 2a. IDE analyze (preferred)
 
-With the deprecation warnings on (phase 0), run one bracketed IDE session (**IDE session discipline**):
+With the deprecation warnings on (phase 0), run one bracketed IDE session (**IDE session discipline**), saving the document as checkpoint zero and adding real file:line positions before the join:
 
 ```
-python3 -m xojoctl analyze --project /path/to/Project.xojo_project --discard --json | python3 $SKILL/scripts/worklist.py
+MIG=<project>/.git/xojo-migrate && mkdir -p "$MIG"
+python3 -m xojoctl analyze --project /path/to/Project.xojo_project --discard --json > "$MIG/cp-00-baseline.json"
+python3 $SKILL/scripts/locate.py "$MIG/cp-00-baseline.json" | python3 $SKILL/scripts/worklist.py
 ```
+
+`$MIG` is the migration workspace (`category-playbook.md`): `cp-00-baseline.json` is the file every boundary's differ chain starts from, and the final report diffs it against the last checkpoint. `locate.py` maps each diagnostic's method-relative line to an absolute file:line (using the document's own session record for the project root) so every site the worklist prints is directly openable; sites it reports ambiguous or unresolved are a manual queue, never a guess.
 
 Report the analyze counts now: they are the baseline every later checkpoint's numbers fall from.
 
 **Compile errors are input, not failure.** A freshly converted project routinely fails to build—the phase-1 converter renames control types and leaves member calls behind—so `analyze` exiting 1 with `outcome: project_errors` is the normal phase-2a state, and `worklist.py` accepts it: those errors are the `Removed` bucket and the converter's leftovers locating themselves. What `worklist.py` refuses is a document whose analysis never ran—a failed connection, a timeout, no project open—which carries an error object and an empty diagnostics list. Its refusal message is the one to act on: nothing has been learned about this project's deprecations, so fix the IDE connection and re-run, or take the scanner path in 2b. Also refuse to proceed whenever the document's `session.closed` is `false`, whatever the exit code—the analysis ran but the project is still open in the IDE (a clean analyze reports it as exit 4; a failing one keeps its own exit code), and editing now is how disk edits get overwritten. Close it (`close --discard`) first. What you must not do is record a failed analyze as "no deprecations found".
 
-Each deprecation warning is a compiler-verified work site with method, line and the replacement named in the message ("Left is deprecated. You should use String.Left instead"). No receiver check is needed to trust the *finding*—the compiler resolved the receiver to produce it. Errors in the same output are the `Removed` bucket locating itself. One mechanical fact about those line numbers: they count within the named method's body, not within the file, so driving edits from a diagnostic means mapping owner + method + line to a file line yourself.
+Each deprecation warning is a compiler-verified work site with method, line and the replacement named in the message ("Left is deprecated. You should use String.Left instead"). No receiver check is needed to trust the *finding*—the compiler resolved the receiver to produce it. Errors in the same output are the `Removed` bucket locating itself. One mechanical fact about those line numbers: they count within the named method's body, not within the file—which is why the pipeline runs `locate.py` first; it is the mapping from owner + method + line to a file line, done once, honestly (its ambiguous/unresolved sites are listed, never guessed).
 
 **Do not work from the raw warnings.** The IDE's message reads like a complete instruction, and for a handful of symbols the rename it proposes is the part that compiles and is still wrong: `InStr`'s not-found sentinel moves from 0 to -1, several functions change index base, and `Date.TotalSeconds` → `SecondsFrom1970` shifts the epoch by 66 years. The IDE never mentions any of it. `worklist.py` joins every warning to the matrix and leads with the sites that need more than a rename, in four groups: **hand conversion required**, **read the caveat before renaming**, **mechanical rename**, and **the IDE converter handles this** (control type renames, phase 1). It reports rule ids for `lookup.py rule <id>`; it decides nothing, and where the join is ambiguous it says so instead of picking.
 
@@ -234,7 +274,7 @@ A line in a commit message is not a durable record: three months later the quest
 
 The rule being enforced is *the deferral is discoverable from the code*, not *the marker count equals the site count*. What is never enough is recording it only in the final report: the report is not in the IDE and not in the file. Where `conversion-traps.md` §4 says to "list them in the final report", that is in addition to the marker, never instead of it.
 
-**Parked is not a fourth state.** Cross-category dependencies create sites that are "not due yet"—an `InStr` comparison waiting for the Mid commit's arithmetic, say. Give such a site its marker (or a written worklist entry) the moment you pass over it, and reconcile in phase 8: every deferral the report claims must trace to a marker at—or covering—its site. On one real migration two parked sites fell out of every tracked state and surfaced only in a closing dry-run—the report claimed two more deferrals than sites carried markers.
+**Parked is not a fourth state—it is a queue with a drain schedule.** Cross-category dependencies create sites that are "not due yet"—an `InStr` comparison waiting for the Mid commit's arithmetic, say. The two queues in `$MIG/queues.md` (`category-playbook.md`) keep them distinct: a DEFERRED site gets its `#Pragma Warning` and its queue line in the same edit, permanently; a PARKED site gets a queue line naming the pass it waits on, no marker, and is drained at the boundary that closes that pass. The boundary's oracle run reconciles both queues every category, and phase 8 reconciles queues, markers and report against each other. On one real migration two parked sites fell out of every tracked state and surfaced only in a closing dry-run—the report claimed two more deferrals than sites carried markers; the queue file plus the per-boundary oracle is what makes that class of slip impossible.
 
 The three deferral categories that recur, all of which need this: compound receivers left as deprecated globals (hard rule 3), calls whose replacement takes a different *kind* of argument (`DrawPolygon`/`FillPolygon` → `DrawPath`/`FillPath`), and anything awaiting a design decision from the user.
 
@@ -250,9 +290,11 @@ From the inventory, build the worklist honoring the ordering pitfalls:
 4. Method-form rules before global-form where both exist.
 5. Category order roughly: strings → arrays → ListBox → Database → Date → error handling → globals → files → graphics → misc.
 
+The playbook's category table fixes the rest—each category's pipeline (regex path or receiver-sensitive, decided by its census rule), its sub-pass split (cat0's six hazard-class commits are encoded there), and its hazards. The commit plan you show the user is the playbook's rows minus the categories with no hits.
+
 #### When the baseline has build errors, the errors come first
 
-A freshly converted project usually does not compile (phase 2a: compile errors are input), and a tree that does not compile can confirm nothing—every category checkpoint would run against a broken build. So when the baseline analyze reports errors, burn the error surface down to zero first, in its own commits: the errors are compiler-located work, mostly member renames the phase-1 converter leaves behind plus the `Removed` bucket. Running those control-member categories first also sidesteps the arrays→`.LastIndex` interaction in `pass-hazards.md` §3 instead of creating it. The step-5 category order resumes once analyze reports zero errors.
+A freshly converted project usually does not compile (phase 2a: compile errors are input), and a tree that does not compile can confirm nothing—every category checkpoint would run against a broken build. So when the baseline analyze reports errors, burn the error surface down to zero first, in its own commits: the errors are compiler-located work, mostly member renames the phase-1 converter leaves behind plus the `Removed` bucket. The playbook's **Pass E** makes the burn-down mechanical—the locate filter positions every error, grouping by message shape supplies the receiver type from the compiler's own words, one rename-map entry per (type, member) group drives `targeted_rename.py`, and the boundary reconciles renames-per-map-entry against errors-cleared-per-symbol. Running those control-member categories first also sidesteps the arrays→`.LastIndex` interaction in `pass-hazards.md` §3 instead of creating it. The step-5 category order resumes once analyze reports zero errors.
 
 #### One pass creates what the next pass matches
 
@@ -280,6 +322,8 @@ For each `high` rule with hits, fetch it (`$SKILL/scripts/lookup.py rule <id>`) 
 
 If all three are clear, apply it. This is a fast pass, not a blind one; most matches clear in a second.
 
+**On the regex path, `apply_rules.py` is how the cleared rules are executed**: `python3 $SKILL/scripts/apply_rules.py <project-dir> --rules <the playbook's ordered id list>`, dry run first, then `--apply` when the counts read sane against the worklist. It masks code from metadata the same way `scan.py` counts it, refuses locate-only rules loudly, and its per-rule converted/suppressed summary is pasted verbatim into the commit body. The three questions above are answered once per rule before it goes in the list, not re-answered per site—that is what the census bought.
+
 **A global-form rule and its method-form sibling are two separate steps.** Most string and array functions survive in both forms, and each form is its own rule: `Len(s)` is c0r0 and `s.Len` is c0r1; `Mid(s, n)` is c0r8–c0r10 and `s.Mid(n)` is c0r11. The global rules are anchored `(?<![\w.])`, whose whole job is to *exclude* the dot form, so applying them cannot touch it. Fifteen member names are in this state, including `.Len`, `.Mid`, `.InStr`, `.UBound`, `.LTrim` and the byte variants.
 
 Work the rules a symbol at a time, not a form at a time: `scan.py` lists every rule for a symbol on one line (`len ... rules: c0r0(high), c0r1(high)`), so clear that line before moving on. Skipping the sibling is invisible—the global rule reports zero remaining and the dot form is still there.
@@ -296,13 +340,15 @@ python3 $SKILL/scripts/sweep.py <project-dir> --only Invalidate,MsgBox,ReplaceAl
 
 The leftovers are the receiverless calls, the continued calls, and anything a lookahead declined. This is a per-category step, not an end-of-run one: done at the end, you can no longer tell which pass should have caught them.
 
-**Category checkpoint, then commit:** run Analyze Project—`python3 -m xojoctl analyze --project <path> --discard` (**IDE session discipline**) when the IDE is reachable, the user otherwise—report the error and warning counts against the previous checkpoint's, then commit that category alone. The Date and error-handling categories are *expected* to produce compile errors; the compiler is locating the manual work, so handle those two per **Commit discipline** rather than committing a broken tree as if it were done.
+**Then run The category boundary** (its own section, above): analyze into the next checkpoint file, read the differ's verdict, reconcile the oracle, drain, commit. The Date and error-handling categories are *expected* to produce compile errors; the compiler is locating the manual work, so handle those two per **Commit discipline** rather than committing a broken tree as if it were done.
 
 ### 5. Receiver pass (`medium` / `low`)
 
 Still inside the same category. These need something phase 4 does not: the *declared type of the receiver*, which is not on the line you are editing. For each hit, look up `Var`/`Dim ... As`, the parameter list, or the control's class; check the rule's `caveat`; then apply or skip. Log skips for the final report; the skip list goes in the commit message body, where it stays attached to the diff it explains.
 
 A member is only in this tier because a plausible receiver takes a different replacement or needs none at all: `.RemoveRow` on a RowSet, `.ColumnType` on a RowSet, `.MoveNext` on an Iterator, `.Remove` on a Dictionary. Finding the declaration is the work; the rename is trivial once you have it.
+
+**On the IDE path, the analyzer already did that work for every site it flagged**, and the tools exploit it: the locate filter turns the analyze document into a file:line list, and `targeted_rename.py` applies a `{Old: New}` map to exactly those flagged lines—the same member name one line away is untouched, which is precisely the discrimination this tier exists to make. Groups the worklist marks AMBIGUOUS, sites locate reports ambiguous or unresolved, and everything the analyzer never saw stay hand-resolved exactly as written above.
 
 **Expect most matches in this tier to be wrong, and check the ratio rather than the count.** On one real project `c3r31` matched hundreds of lines and a handful were correct to apply; `c10r15` matched dozens and none were. A rule matching ninety lines and converting twenty is the system working. See `$SKILL/references/pass-hazards.md` §2 for the measured table, and for why matches cluster in single files.
 
@@ -320,7 +366,7 @@ Take the clause, not the line. Matching the first `As <Type>` on the line types 
 The structural migrations. **One commit each.** These are the changes most likely to be wrong in a way no compiler catches, so they are the ones a reviewer most needs to see in isolation. Each has a section in `$SKILL/references/conversion-traps.md`:
 
 - `InStr` sentinel comparisons (`>0 → >=0`, `=0 → =-1`) if any remain.
-- Index-decrement audit: simplify `(...) - 1`, hunt cross-statement double-decrements.
+- Index-decrement audit: simplify `(...) - 1`, hunt cross-statement double-decrements. For `Mid`, this is a command: `mid_to_middle.py` runs the lower-bound audit `conversion-traps.md` §1 demands (grouping every site by the `For` bound feeding its start), refuses to convert over a proven-risky site, and applies the simplified decrement itself; its hand-review list is yours.
 - `Date → DateTime`: immutability, constructors, `TotalSeconds` → `SecondsFrom1970` epoch shift (stored values must be re-based!), `ParseDate` → `DateTime.FromString`.
 - Error codes → `Try/Catch` exceptions; socket/stream `Error` event signatures.
 
@@ -368,6 +414,8 @@ The sweep is cruder and stricter on purpose: for every symbol it searches the ba
 
 Writing the accounting down is what makes the deferral list honest—it is the same list the `#Pragma Warning` markers and the final report have to agree with.
 
+**Close the ledgers.** The final oracle run (`global_to_method.py --oracle`) must report zero unexplained sites: every would-convert is converted or has become a DEFERRED entry, every illegal-receiver has its marker. `$MIG/queues.md` must hold no PARKED lines, and every DEFERRED line's marker must be verified present (the markers are themselves warnings in the analyze output, so the deprecation count reconciles against the counts the marker texts claim). Then run `checkpoint.py` on the final analyze against `cp-00-baseline.json`—its symbol-level delta, cleared list and remaining table are the skeleton of the final report's numbers.
+
 **Final report.** Lead with `git log --oneline <base>..api2-migration`, using the branch name recorded in phase 0: the commit series *is* the report, one line per category, in the order the work happened.
 
 Then report the leftovers as **three separate states**, never merged into "still manual"—they need different things from the reader, and merging them is how a deliberate decision gets re-litigated as an oversight:
@@ -394,6 +442,7 @@ Then the checklist:
 - [ ] `sweep.py` run; every receiverless hit accounted for in writing
 - [ ] `sweep.py`'s SUPPRESSED names reviewed by hand
 - [ ] Every deliberate deferral carries a `#Pragma Warning` at the site
+- [ ] `queues.md` drained of PARKED; final oracle run, markers and report agree on the deferral list
 - [ ] Other-platform `#If` branches named as compiler-unverified; per-target Analyze/build requested
 - [ ] Analyze Project clean of deprecations; full app run-through done
 - [ ] No commit left in a known-broken state
@@ -421,7 +470,15 @@ python3 $SKILL/scripts/lookup.py category [catN] # the 11 categories / one categ
 python3 $SKILL/scripts/lookup.py tier <t> [catN] # rules by confidence: high|medium|low|manual
 python3 $SKILL/scripts/analysis_warnings.py <project> [--enable]  # report / enable the per-project deprecation warnings (phase 0)
 python3 $SKILL/scripts/worklist.py [analyze.json] [--format json]  # join `xojoctl analyze --json` to the rules (phase 2a); reads stdin
+python3 $SKILL/scripts/locate.py [analyze.json] [--project DIR]   # add real file:line to every diagnostic; sits in the phase-2a pipe (phases 2a, 3, 5)
+python3 $SKILL/scripts/targeted_rename.py <analyze.json> <map.json> [--apply]  # rename members only on analyzer-flagged lines (Pass E, phase 5)
+python3 $SKILL/scripts/apply_rules.py <project-dir> --rules <ids> [--apply]    # execute bundled rules over code only, in the order named (phase 4)
+python3 $SKILL/scripts/global_to_method.py <project-dir> [spec.json|--oracle] [--apply]  # balanced-paren global->method; --oracle is the boundary's deferral check
+python3 $SKILL/scripts/mid_to_middle.py <project-dir> [--apply]   # Mid lower-bound audit + Mid->Middle with the decrement (phase 6)
+python3 $SKILL/scripts/checkpoint.py <new.json> <baseline.json>   # diff two analyze documents: deltas, regressions, cleared symbols (every boundary)
 ```
+
+Every writer among them is a dry run by default and edits only with `--apply`, like `rm` needs `-f`.
 
 `xojoctl` is not this skill's script: it belongs to the sibling **xojo-ide** skill (`$SKILL/../xojo-ide` in this plugin), whose own SKILL.md covers connecting to the IDE. The commands this workflow uses are `analyze --project <path> --discard [--json]` (the whole bracketed checkpoint in one command), plus `open`, `close` (`--save` only in phase 0's warnings step) and `projects` for the manual steps; run them from that skill's `scripts` directory (`python3 -m xojoctl ...`), in the sessions **IDE session discipline** prescribes. When that skill or a running IDE is unavailable, the whole workflow still runs through the user and the scanner path—the IDE preference is a preference, not a dependency.
 
@@ -435,6 +492,7 @@ The two datasets are readable directly if you need to check one symbol without r
 
 Bundled with the skill:
 
+- `$SKILL/references/category-playbook.md` — read before phase 3. The per-category pipelines: the fixed pass orders, the regex-vs-receiver decision rule, the queues and their drain step, the error burn-down recipe, and one worked example.
 - `$SKILL/references/conversion-traps.md` — read before touching string/array/ Date/error code. Index shifts, sentinels, double-decrement, receiver rule.
 - `$SKILL/references/applying-rules-by-script.md` — the `$1` backreference dialect and the `applies` gate. Only needed if you drive the rules from a script rather than the IDE's Find panel.
 - `$SKILL/references/pass-hazards.md` — read once before the first category pass. Why a rule's zero is not completion, why its large match count is not work, and how one pass creates what the next pass matches.
