@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""Rename members only at the sites the analyzer flagged.
+
+Type-blind member rules cannot tell Graphics.DrawRect from a user
+class's own DrawRect. The analyzer already resolved the receiver -- that
+is what produced the warning -- so its located site list is a
+receiver-verified worklist, and this edits nothing else: the same member
+name one line away is not touched.
+
+The IDE reports no column, so precision stops at the line. The honest
+maximum is occurrence accounting: when the flagged line holds exactly as
+many `.Old` occurrences (in code -- strings and comments are masked) as
+the IDE flagged, all of them rename; when the line holds MORE, nothing
+on it renames and the site is reported for hand conversion -- renaming
+both a flagged `pict.Graphics.DrawRect` and an unflagged user-class
+`obj.DrawRect` sharing a line is exactly the corruption this tool
+exists to prevent.
+
+Usage:
+  python3 targeted_rename.py <analyze.json|-> <map.json> [--project DIR]
+                             [--apply] [--format text|json]
+  map.json: {"FillRect": "FillRectangle", "ForeColor": "DrawingColor",
+             "GetSaveInfo": null}
+            a null or "" value means: report those sites, convert nothing.
+
+The analyze document should have passed through locate.py (the pipe
+adds file:line to each diagnostic); an unlocated document is enriched
+here first, using --project or the document's result.session.project.
+Dry run by default; --apply writes. (stdlib only)
+"""
+import argparse
+import collections
+import json
+import pathlib
+import re
+import sys
+
+HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import locate  # noqa: E402
+from editing import masked_pairs, read_source, write_source  # noqa: E402
+
+
+def symbol_of(d):
+    msg = d.get("message") or ""
+    if d.get("severity") == "warning" and " is deprecated" in msg:
+        return msg.split(" is deprecated")[0].strip()
+    return None
+
+
+def gather(doc, mapping):
+    """Sort the mapped diagnostics into work, report-only and unresolved.
+
+    work counts flagged occurrences per (file, line, old, new) -- the
+    IDE emits one diagnostic per occurrence, and that count is what the
+    line's actual occurrence count must equal before anything renames.
+    """
+    ci = {k.lower(): (k, v) for k, v in mapping.items()}
+    work = collections.Counter()
+    report_only, unresolved = [], []
+    for d in doc.get("diagnostics", []):
+        sym = symbol_of(d)
+        if sym is None or sym.lower() not in ci:
+            continue
+        old, new = ci[sym.lower()]
+        where = d.get("position") or d.get("location") or "?"
+        located = (d.get("resolution") == "located"
+                   and d.get("line_basis") != "signature")
+        if not new:
+            report_only.append(
+                f"{d['file']}:{d['file_line']}  {old}" if located
+                else f"{where}  {old}")
+            continue
+        if not located:
+            unresolved.append(f"{old}: {where} "
+                              f"({d.get('resolution') or 'not located'})")
+            continue
+        work[(d["file"], d["file_line"], old, new)] += 1
+    return work, report_only, unresolved
+
+
+def rename(work, apply_):
+    """Apply the renames per file; return (renamed, files, misses)."""
+    member = {}
+    for (_, _, old, _) in work:
+        member.setdefault(old, re.compile(
+            r"(?<=\.)" + re.escape(old) + r"\b", re.I))
+    by_file = collections.defaultdict(lambda: collections.defaultdict(list))
+    for (path, line_no, old, new), flagged in work.items():
+        by_file[path][line_no].append((old, new, flagged))
+
+    renamed, files_changed = 0, []
+    ambiguous, not_found = [], []
+    for path in sorted(by_file):
+        text = read_source(path)
+        lines = text.split("\n")
+        masked = [m for _, m in masked_pairs(text)]
+        changed = False
+        for line_no in sorted(by_file[path]):
+            if not 0 < line_no <= len(lines):
+                not_found.append(f"{path}:{line_no} out of range")
+                continue
+            mline = masked[line_no - 1]
+            spans = []
+            for old, new, flagged in sorted(by_file[path][line_no]):
+                occ = list(member[old].finditer(mline))
+                if not occ:
+                    not_found.append(
+                        f"{path}:{line_no} .{old} not found in code on: "
+                        f"{lines[line_no - 1].strip()[:70]}")
+                    continue
+                if len(occ) != flagged:
+                    ambiguous.append(
+                        f"{path}:{line_no} .{old}: {len(occ)} occurrence(s) "
+                        f"in code, {flagged} flagged -- convert by hand")
+                    continue
+                spans.extend((m.start(), m.end(), new) for m in occ)
+            # All spans are measured against the ORIGINAL line and
+            # spliced right-to-left, so one symbol's replacement can
+            # never feed another's pattern (no A->B->C chaining) and the
+            # result does not depend on map order.
+            spans.sort()
+            overlap = any(b[0] < a[1] for a, b in zip(spans, spans[1:]))
+            if overlap:
+                ambiguous.append(f"{path}:{line_no} overlapping renames -- "
+                                 f"convert by hand")
+                continue
+            real = lines[line_no - 1]
+            for start, end, new in reversed(spans):
+                real = real[:start] + new + real[end:]
+                renamed += 1
+            if spans:
+                lines[line_no - 1] = real
+                changed = True
+        if changed:
+            files_changed.append(path)
+            if apply_:
+                write_source(path, "\n".join(lines))
+    return renamed, files_changed, ambiguous, not_found
+
+
+def main(argv=None, stdin=None):
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("document",
+                    help="analyze JSON (ideally locate.py-enriched); "
+                         "'-' reads stdin")
+    ap.add_argument("map", help="JSON object of {OldMember: NewMember}")
+    ap.add_argument("--project",
+                    help="project root, for enriching an unlocated document")
+    ap.add_argument("--apply", action="store_true",
+                    help="write the renames (default is a dry run)")
+    ap.add_argument("--format", choices=("text", "json"), default="text")
+    args = ap.parse_args(argv)
+
+    stream = stdin or sys.stdin
+    try:
+        if args.document != "-":
+            with open(args.document, encoding="utf-8") as f:
+                doc = json.load(f)
+        else:
+            doc = json.load(stream)
+        with open(args.map, encoding="utf-8") as f:
+            mapping = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        sys.exit(f"cannot read input: {e}")
+    if not isinstance(doc, dict) or "diagnostics" not in doc:
+        sys.exit("this is not an 'xojoctl analyze --json' document: "
+                 "no 'diagnostics' key.")
+    if not isinstance(mapping, dict) or not mapping:
+        sys.exit("the map must be a non-empty JSON object of "
+                 '{"OldMember": "NewMember"}.')
+
+    if "located" not in doc:
+        root, why_not = locate._project_root(args, doc)
+        if root is None:
+            sys.exit(f"the document carries no file:line and none can be "
+                     f"added: {why_not}. Pipe it through locate.py, or "
+                     f"pass --project.")
+        locate.enrich(doc, root)
+
+    work, report_only, unresolved = gather(doc, mapping)
+    renamed, files, ambiguous, not_found = rename(work, args.apply)
+
+    if args.format == "json":
+        print(json.dumps({
+            "renamed": renamed, "files": files, "applied": args.apply,
+            "report_only": report_only, "unresolved": unresolved,
+            "occurrence_ambiguous": ambiguous, "not_found": not_found,
+        }, indent=1))
+        return
+    print(f"renamed: {renamed} site(s) across {len(files)} file(s)")
+    for title, items, coda in (
+            ("REPORT ONLY", report_only,
+             "map value empty -- sites listed, nothing converted"),
+            ("UNRESOLVED", unresolved,
+             "no located line -- resolve by hand (see locate.py)"),
+            ("OCCURRENCE-AMBIGUOUS", ambiguous,
+             "the line holds more of the member than the IDE flagged"),
+            ("NOT FOUND ON LINE", not_found, "check by hand")):
+        if items:
+            print(f"\n{title} ({len(items)}) -- {coda}:")
+            for item in items:
+                print("  " + item)
+    if not args.apply:
+        print("\n(dry run -- nothing written; pass --apply)")
+
+
+if __name__ == "__main__":
+    main()
