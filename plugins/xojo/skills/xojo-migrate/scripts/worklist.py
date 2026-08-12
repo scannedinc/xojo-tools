@@ -294,6 +294,63 @@ def action_for(rows, rules, confirmed=True, disagrees=False):
     return MECHANICAL
 
 
+def vet(doc):
+    """Accept or refuse an analyze document. Returns (fatal, warnings).
+
+    xojoctl emits a document for every outcome. Refused (fatal is the
+    message to exit with): documents whose ANALYSIS never ran -- command
+    failures (an error object), a project that would not load (outcome
+    open_errors, whose diagnostics are load errors, not analysis), and
+    ok:false with nothing in it. Accepted: outcome project_errors, an
+    analysis that RAN on a project that does not compile -- the normal
+    condition of a freshly converted tree -- whose diagnostics are the
+    worklist, errors included; `warnings` carries the stderr advisories.
+    checkpoint.py imports this so both consumers hold one policy.
+    """
+    outcome = doc.get("outcome") or "unknown"
+    session = (doc.get("result") or {}).get("session") or {}
+    bracket_broken = session.get("closed") is False
+    if (doc.get("error") or outcome == "open_errors"
+            or (doc.get("ok") is False and not doc.get("diagnostics"))):
+        err = doc.get("error") or {}
+        detail = err.get("message") or doc.get("summary") or ""
+        if bracket_broken and not doc.get("error") and outcome != "open_errors":
+            return ("the analysis ran, but the session could not close the "
+                    "project -- it is still open in the IDE. Close it "
+                    "(xojoctl close --discard) before editing anything, "
+                    "then re-run the checkpoint.", [])
+        if outcome == "open_errors":
+            return (f"the project would not load, so nothing was analyzed"
+                    f"{': ' + detail if detail else ''}.\n"
+                    f"Fix the load errors (open the project by hand to see "
+                    f"them), or take the scanner path (workflow phase 2b): "
+                    f"python3 scan.py <project-dir>", [])
+        return (f"the analysis did not run: outcome {outcome}"
+                f"{': ' + detail if detail else ''}.\n"
+                f"Nothing here says anything about deprecations. Fix the "
+                f"IDE connection and re-run, or take the scanner path "
+                f"(workflow phase 2b): python3 scan.py <project-dir>", [])
+    warnings = []
+    if doc.get("ok") is False:
+        if bracket_broken:
+            warnings.append(
+                "warning: the session could not close the project -- it "
+                "is still open in the IDE. Close it (xojoctl close "
+                "--discard) before editing anything. The diagnostics "
+                "below are still the worklist.")
+        elif outcome == "project_errors":
+            warnings.append(
+                "note: analyze exited nonzero (outcome project_errors) -- "
+                "the project does not compile, which is normal after the "
+                "phase-1 converter. The diagnostics below are the "
+                "worklist, errors included.")
+        else:
+            warnings.append(
+                f"note: analyze exited nonzero (outcome {outcome}); the "
+                f"diagnostics below are still the worklist.")
+    return None, warnings
+
+
 def build(doc):
     """Group an analyze document into a worklist. Lossless: every diagnostic
     leaves in exactly one of errors / groups / unmatched / other."""
@@ -342,19 +399,28 @@ def build(doc):
                 "categories": sorted({r["cat_name"] for r in rules}),
                 "sites": [],
             }
-        group["sites"].append({
+        site = {
             "message": d.get("message", ""),
             "where": d.get("position") or d.get("location") or "?",
             "line": d.get("line"), "source": d.get("source", ""),
-        })
+        }
+        # locate.py's enrichment, when the document passed through it.
+        for key in ("file", "file_line", "resolution"):
+            if key in d:
+                site[key] = d[key]
+        group["sites"].append(site)
     ordered = sorted(groups.values(),
                      key=lambda g: (ACTION_ORDER.index(g["action"]),
                                     -len(g["sites"]), g["symbol"].lower()))
-    return {"errors": errors, "groups": ordered, "unmatched": unmatched,
-            "related": related, "other": other,
-            "counts": {"diagnostics": len(doc.get("diagnostics") or []),
-                       "symbols": len(ordered),
-                       "sites": sum(len(g["sites"]) for g in ordered)}}
+    wl = {"errors": errors, "groups": ordered, "unmatched": unmatched,
+          "related": related, "other": other,
+          "counts": {"diagnostics": len(doc.get("diagnostics") or []),
+                     "symbols": len(ordered),
+                     "sites": sum(len(g["sites"]) for g in ordered)}}
+    located = doc.get("located")
+    if isinstance(located, dict) and located.get("project_root"):
+        wl["project_root"] = located["project_root"]
+    return wl
 
 
 def wrap(text, indent, width=78):
@@ -363,8 +429,23 @@ def wrap(text, indent, width=78):
                          subsequent_indent=indent)
 
 
+def located_at(d, root):
+    """' [path:line]' when locate.py resolved this diagnostic, else ''."""
+    if not d.get("file") or d.get("file_line") is None:
+        return ""
+    path = d["file"]
+    if root:
+        try:
+            path = str(pathlib.Path(path).resolve().relative_to(
+                pathlib.Path(root).resolve()))
+        except ValueError:
+            pass
+    return f"  [{path}:{d['file_line']}]"
+
+
 def report(wl):
     c = wl["counts"]
+    root = wl.get("project_root")
     print(f"{c['diagnostics']} diagnostics from the IDE: "
           f"{c['sites']} deprecation site(s) across {c['symbols']} symbol(s), "
           f"{len(wl['unmatched'])} unrecognized, {len(wl['related'])} in "
@@ -376,7 +457,8 @@ def report(wl):
         print(f"== Build errors ({len(wl['errors'])}) -- fix before converting ==")
         print("  These do not compile today. Removed API 1.0 symbols land here.")
         for d in wl["errors"]:
-            print(f"  {d.get('position') or d.get('location')}: {d['message']}")
+            print(f"  {d.get('position') or d.get('location')}: {d['message']}"
+                  f"{located_at(d, root)}")
         print()
 
     for action in ACTION_ORDER:
@@ -453,7 +535,8 @@ def report(wl):
                       f"python3 lookup.py rule {first}")
             for site in g["sites"][:SITES_SHOWN]:
                 src = f"   |{site['source']}" if site["source"] else ""
-                print(f"      at {site['where']}{src}")
+                print(f"      at {site['where']}"
+                      f"{located_at(site, root)}{src}")
             if len(g["sites"]) > SITES_SHOWN:
                 print(f"      ... {len(g['sites']) - SITES_SHOWN} more site(s)"
                       f" -- --format json lists them all")
@@ -464,7 +547,8 @@ def report(wl):
         print("  The IDE flagged these; no coverage row owns the name. Convert")
         print("  from the IDE's own replacement, and treat it as a matrix gap.")
         for d in wl["unmatched"]:
-            print(f"  {d.get('position') or d.get('location')}: {d['message']}")
+            print(f"  {d.get('position') or d.get('location')}: {d['message']}"
+                  f"{located_at(d, root)}")
         print()
 
     if wl["related"]:
@@ -474,7 +558,8 @@ def report(wl):
         print("  constructor, a menu bar mixing Desktop and deprecated types.")
         print("  Convert these too; they carry no symbol to look up.")
         for d in wl["related"]:
-            print(f"  {d.get('position') or d.get('location')}: {d['message']}")
+            print(f"  {d.get('position') or d.get('location')}: {d['message']}"
+                  f"{located_at(d, root)}")
         print()
 
     if wl["other"]:
@@ -514,51 +599,11 @@ def main(argv=None, stdin=None):
     if not isinstance(doc, dict) or "diagnostics" not in doc:
         sys.exit("this is not an `xojoctl analyze --json` document: no "
                  "`diagnostics` key.")
-    # xojoctl emits a document for every outcome. Refused here: documents
-    # whose ANALYSIS never ran -- command failures (an error object), a
-    # project that would not load (outcome open_errors, whose diagnostics
-    # are load errors, not analysis), and ok:false with nothing in it.
-    # Accepted: outcome project_errors, an analysis that RAN on a project
-    # that does not compile -- the normal condition of a freshly converted
-    # tree -- whose diagnostics are the worklist, errors included.
-    outcome = doc.get("outcome") or "unknown"
-    session = (doc.get("result") or {}).get("session") or {}
-    bracket_broken = session.get("closed") is False
-    if (doc.get("error") or outcome == "open_errors"
-            or (doc.get("ok") is False and not doc.get("diagnostics"))):
-        err = doc.get("error") or {}
-        detail = err.get("message") or doc.get("summary") or ""
-        if bracket_broken and not doc.get("error") and outcome != "open_errors":
-            sys.exit("the analysis ran, but the session could not close the "
-                     "project -- it is still open in the IDE. Close it "
-                     "(xojoctl close --discard) before editing anything, "
-                     "then re-run the checkpoint.")
-        if outcome == "open_errors":
-            sys.exit(f"the project would not load, so nothing was analyzed"
-                     f"{': ' + detail if detail else ''}.\n"
-                     f"Fix the load errors (open the project by hand to see "
-                     f"them), or take the scanner path (workflow phase 2b): "
-                     f"python3 scan.py <project-dir>")
-        sys.exit(f"the analysis did not run: outcome {outcome}"
-                 f"{': ' + detail if detail else ''}.\n"
-                 f"Nothing here says anything about deprecations. Fix the "
-                 f"IDE connection and re-run, or take the scanner path "
-                 f"(workflow phase 2b): python3 scan.py <project-dir>")
-    if doc.get("ok") is False:
-        if bracket_broken:
-            print("warning: the session could not close the project -- it "
-                  "is still open in the IDE. Close it (xojoctl close "
-                  "--discard) before editing anything. The diagnostics "
-                  "below are still the worklist.", file=sys.stderr)
-        elif outcome == "project_errors":
-            print("note: analyze exited nonzero (outcome project_errors) -- "
-                  "the project does not compile, which is normal after the "
-                  "phase-1 converter. The diagnostics below are the "
-                  "worklist, errors included.", file=sys.stderr)
-        else:
-            print(f"note: analyze exited nonzero (outcome {outcome}); the "
-                  f"diagnostics below are still the worklist.",
-                  file=sys.stderr)
+    fatal, warnings = vet(doc)
+    if fatal:
+        sys.exit(fatal)
+    for w in warnings:
+        print(w, file=sys.stderr)
 
     wl = build(doc)
     if args.format == "json":

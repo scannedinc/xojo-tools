@@ -457,5 +457,70 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("no deprecation", out.lower())
 
 
+class LocatedTests(unittest.TestCase):
+    """The worklist consumes locate.py's enrichment when present."""
+
+    def enriched(self):
+        doc = json.loads(json.dumps(LIVE))
+        d = doc["diagnostics"][0]  # the Left warning
+        d["file"] = "/proj/Sources/App.xojo_code"
+        d["file_line"] = 212
+        d["resolution"] = "located"
+        doc["located"] = {"project_root": "/proj", "located": 1,
+                          "ambiguous": 0, "unresolved": 0, "no_location": 6}
+        return doc
+
+    def render(self, wl):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            worklist.report(wl)
+        return out.getvalue()
+
+    def test_sites_print_file_and_line(self):
+        out = self.render(worklist.build(self.enriched()))
+        self.assertIn("[Sources/App.xojo_code:212]", out)
+
+    def test_unenriched_documents_render_without_brackets(self):
+        # A document that never passed through locate.py must read
+        # exactly as before the enrichment existed.
+        wl = worklist.build(LIVE)
+        self.assertNotIn("project_root", wl)
+        self.assertNotIn("xojo_code:", self.render(wl))
+
+    def test_json_sites_carry_the_enrichment(self):
+        wl = worklist.build(self.enriched())
+        self.assertEqual(wl["project_root"], "/proj")
+        left = next(g for g in wl["groups"] if g["symbol"] == "Left")
+        site = left["sites"][0]
+        self.assertEqual(site["file_line"], 212)
+        self.assertEqual(site["resolution"], "located")
+
+
+class VetTests(unittest.TestCase):
+    """vet() is the acceptance policy worklist and checkpoint share."""
+
+    def test_clean_document_passes_with_no_warnings(self):
+        self.assertEqual(worklist.vet(LIVE), (None, []))
+
+    def test_project_errors_passes_with_a_note(self):
+        broken = dict(LIVE, ok=False, outcome="project_errors")
+        fatal, warnings = worklist.vet(broken)
+        self.assertIsNone(fatal)
+        self.assertIn("project_errors", warnings[0])
+
+    def test_error_object_is_fatal(self):
+        failed = dict(LIVE, ok=False, outcome="connect_failed",
+                      diagnostics=[], error={"message": "no IDE socket"})
+        fatal, _ = worklist.vet(failed)
+        self.assertIn("did not run", fatal)
+
+    def test_clean_run_with_no_diagnostics_is_not_fatal(self):
+        # checkpoint.py rides on this: ok:true with zero diagnostics is
+        # a clean project to celebrate, not a failed analysis -- the
+        # draft differ conflated the two.
+        clean = dict(LIVE, diagnostics=[], summary="0 warnings")
+        self.assertEqual(worklist.vet(clean), (None, []))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
