@@ -32,7 +32,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from scan import code_only  # noqa: E402
+from scan import code_only, mask_line  # noqa: E402
 
 # A method signature line. Used to find the enclosing method for a call
 # site and, in locate.py, to index method bodies. Matches on the
@@ -57,11 +57,18 @@ RECEIVER = re.compile(
 
 
 def legal_receiver(expr):
-    """True when `expr` can legally receive a method call in Xojo."""
+    """True when `expr` can legally receive a method call in Xojo.
+
+    String-literal contents are blanked before the grammar test, so a
+    paren or quote INSIDE a quoted argument -- NthField(s, "(", 1) --
+    cannot fail a receiver that compiles fine. The blanking keeps the
+    delimiters, so a receiver that IS a string literal still starts
+    with a quote and is still refused.
+    """
     s = expr.strip()
     if not s or s.startswith('"') or s.startswith("("):
         return False
-    return bool(RECEIVER.fullmatch(s))
+    return bool(RECEIVER.fullmatch(mask_line(s)))
 
 
 def find_call(line, start):

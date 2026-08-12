@@ -106,19 +106,28 @@ def load_edits(path):
 
 
 def apply_rule(rule, text):
-    """One rule over one file's text. Returns (new_text, hits, skips).
+    """One rule over one file's text: (new_text, hits, skips, matches).
 
-    hits are (lineno, before, after); skips are (lineno, reason) for
-    matches suppressed as non-code. The code test is span identity: a
-    match applies only when the real line and the code_only mask agree
+    hits are (lineno, before, after) per changed line; matches counts
+    individual applied substitutions (a line holding two converts as
+    two -- the count the checkpoint differ's per-symbol deltas must
+    reconcile against); skips are (lineno, reason) for matches
+    suppressed as non-code. The code test is span identity: a match
+    applies only when the real line and the code_only mask agree
     byte-for-byte across the WHOLE matched span, so a match starting in
-    code and running into a string is suppressed, not half-applied.
+    code and running into a string is suppressed, not half-applied. A
+    line's trailing \\r is held out of the match entirely, so a
+    $-anchored rule cannot swallow a CRLF file's carriage return.
     """
     pat, rep = rule["pattern"], rule["replace"]
     real_lines = text.split("\n")
     masked_lines = code_only(text).split("\n")
     hits, skips = [], []
+    matches = 0
     for i, (real, masked) in enumerate(zip(real_lines, masked_lines)):
+        cr = "\r" if real.endswith("\r") else ""
+        if cr:
+            real, masked = real[:-1], masked[:-1]
         out, last, before = [], 0, real
         for m in pat.finditer(real):
             if masked[m.start():m.end()] != real[m.start():m.end()]:
@@ -127,11 +136,12 @@ def apply_rule(rule, text):
             out.append(real[last:m.start()])
             out.append(m.expand(rep))
             last = m.end()
+            matches += 1
         if last:
             out.append(real[last:])
-            real_lines[i] = "".join(out)
-            hits.append((i + 1, before, real_lines[i]))
-    return "\n".join(real_lines), hits, skips
+            real_lines[i] = "".join(out) + cr
+            hits.append((i + 1, before, "".join(out)))
+    return "\n".join(real_lines), hits, skips, matches
 
 
 def main(argv=None):
@@ -176,11 +186,11 @@ def main(argv=None):
     for rule in rules:
         applied, skipped, samples = 0, 0, []
         for f in files:
-            new_text, hits, skips = apply_rule(rule, cache[f])
+            new_text, hits, skips, matches = apply_rule(rule, cache[f])
             if hits:
                 cache[f] = new_text
                 changed.add(f)
-                applied += len(hits)
+                applied += matches
                 samples.extend((f, ln, b, a) for ln, b, a in hits)
             skipped += len(skips)
             if args.verbose:

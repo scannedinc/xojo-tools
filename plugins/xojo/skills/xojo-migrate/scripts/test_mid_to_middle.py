@@ -158,6 +158,44 @@ class AuditAndConvertTests(unittest.TestCase):
         self.assertIn("METHOD FORM (1)", out)
         self.assertIn("s.Mid(2, 1)", out)
 
+    def test_negative_step_to_loop_is_risky(self):
+        # `For i = 10 To 0 Step -1` is the pre-DownTo descending idiom:
+        # its LOWER bound is the To side. Reading the start side called
+        # a clamp-reliant site safe and let --apply through ungated.
+        self.code.write_text(
+            "#tag Class\nProtected Class W\n#tag Method, Flags = &h0\n"
+            "Sub R(s As String)\n"
+            "  For i As Integer = 10 To 0 Step -1\n"
+            "    a = Mid(s, i, 1)\n"
+            "  Next\n"
+            "  For j As Integer = 0 To 10 Step n\n"
+            "    b = Mid(s, j, 1)\n"
+            "  Next\n"
+            "End Sub\n#tag EndMethod\nEnd Class\n#tag EndClass\n")
+        a = self.result()["audit"]
+        self.assertEqual(a["histogram"]["i=0"], 1)
+        self.assertEqual(len(a["risky"]), 1)
+        self.assertIn("start='i'", a["risky"][0])
+        # An unreadable Step leaves the bound unparsed -> hand review,
+        # never silently safe.
+        self.assertTrue(any("start='j'" in r for r in a["review"]))
+
+    def test_nested_mid_is_audited_and_converted(self):
+        # A Mid inside another Mid's arguments was invisible to both
+        # the audit (defeating the risk gate) and the converter.
+        self.code.write_text(
+            "#tag Class\nProtected Class W\n#tag Method, Flags = &h0\n"
+            "Sub R(s As String, t As String)\n"
+            "  a = Mid(s, 5, Len(Mid(t, 0, 2)))\n"
+            "End Sub\n#tag EndMethod\nEnd Class\n#tag EndClass\n")
+        a = self.result()["audit"]
+        self.assertEqual(a["total"], 2)
+        self.assertEqual(len(a["risky"]), 1)   # the inner literal 0
+        code, _, _ = self.run_cli("--apply", "--force")
+        self.assertEqual(code, 0)
+        self.assertIn("a = s.Middle(4, Len(t.Middle(-1, 2)))",
+                      self.code.read_text())
+
     def test_dry_run_is_the_default(self):
         before = self.code.read_bytes()
         code, out, _ = self.run_cli()

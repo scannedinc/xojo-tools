@@ -478,7 +478,7 @@ python3 $SKILL/scripts/mid_to_middle.py <project-dir> [--apply]   # Mid lower-bo
 python3 $SKILL/scripts/checkpoint.py <new.json> <baseline.json>   # diff two analyze documents: deltas, regressions, cleared symbols (every boundary)
 ```
 
-Every writer among them is a dry run by default and edits only with `--apply`, like `rm` needs `-f`.
+The four source editors among them—`targeted_rename`, `apply_rules`, `global_to_method`, `mid_to_middle`—are dry runs by default and edit only with `--apply`, like `rm` needs `-f`.
 
 `xojoctl` is not this skill's script: it belongs to the sibling **xojo-ide** skill (`$SKILL/../xojo-ide` in this plugin), whose own SKILL.md covers connecting to the IDE. The commands this workflow uses are `analyze --project <path> --discard [--json]` (the whole bracketed checkpoint in one command), plus `open`, `close` (`--save` only in phase 0's warnings step) and `projects` for the manual steps; run them from that skill's `scripts` directory (`python3 -m xojoctl ...`), in the sessions **IDE session discipline** prescribes. When that skill or a running IDE is unavailable, the whole workflow still runs through the user and the scanner path—the IDE preference is a preference, not a dependency.
 

@@ -68,7 +68,10 @@ class LegalReceiverTests(unittest.TestCase):
     def test_legal_forms(self):
         for expr in ("s", "a.b", "f(x)", "f(x).g", "a(i).b(j)",
                      "Pad(s, 4).Split(d)", "f.Child(\"x\").Name",
-                     "s.Trim.Uppercase"):
+                     "s.Trim.Uppercase",
+                     # a paren or quote inside a string argument is not
+                     # grammar -- this receiver compiles fine
+                     'NthField(s, "(", 1)', 'f("a""b").Name'):
             self.assertTrue(editing.legal_receiver(expr), expr)
 
     def test_illegal_forms(self):

@@ -41,10 +41,23 @@ import locate  # noqa: E402
 from editing import masked_pairs, read_source, write_source  # noqa: E402
 
 
+NO_MEMBER = re.compile(r'has no member named\s+"?([A-Za-z_]\w*)', re.I)
+
+
 def symbol_of(d):
+    """The member a diagnostic is about, warnings and errors both.
+
+    Pass E's burn-down feeds this ERRORS -- 'Type "DesktopListBox" has
+    no member named "ListCount"' -- and dropping them silently made the
+    whole documented burn-down a no-op.
+    """
     msg = d.get("message") or ""
     if d.get("severity") == "warning" and " is deprecated" in msg:
         return msg.split(" is deprecated")[0].strip()
+    if d.get("severity") == "error":
+        m = NO_MEMBER.search(msg)
+        if m:
+            return m.group(1)
     return None
 
 
@@ -81,10 +94,15 @@ def gather(doc, mapping):
 
 def rename(work, apply_):
     """Apply the renames per file; return (renamed, files, misses)."""
-    member = {}
+    member, bare = {}, {}
     for (_, _, old, _) in work:
         member.setdefault(old, re.compile(
             r"(?<=\.)" + re.escape(old) + r"\b", re.I))
+        # An occurrence with no dot: an implicit-Self member reference
+        # or a global use. The IDE flags those too, so their presence
+        # on the line makes the dotted-occurrence count unattributable.
+        bare.setdefault(old, re.compile(
+            r"(?<![\w.])" + re.escape(old) + r"\b", re.I))
     by_file = collections.defaultdict(lambda: collections.defaultdict(list))
     for (path, line_no, old, new), flagged in work.items():
         by_file[path][line_no].append((old, new, flagged))
@@ -104,6 +122,21 @@ def rename(work, apply_):
             spans = []
             for old, new, flagged in sorted(by_file[path][line_no]):
                 occ = list(member[old].finditer(mline))
+                undotted = list(bare[old].finditer(mline))
+                if undotted:
+                    # The IDE may be flagging the implicit-Self use, not
+                    # the dotted one; renaming the dotted occurrence
+                    # would convert an unflagged site and leave the
+                    # flagged one -- exactly the corruption this tool
+                    # exists to prevent. Refuse the symbol on this line.
+                    beside = (f"beside {len(occ)} dotted" if occ
+                              else "and no dotted occurrence")
+                    ambiguous.append(
+                        f"{path}:{line_no} {old}: {len(undotted)} "
+                        f"undotted (implicit-Self or global) "
+                        f"occurrence(s) {beside} -- the flag cannot be "
+                        f"attributed to a dotted site; convert by hand")
+                    continue
                 if not occ:
                     not_found.append(
                         f"{path}:{line_no} .{old} not found in code on: "

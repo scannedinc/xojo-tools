@@ -76,7 +76,7 @@ def oracle_spec():
     return spec
 
 
-def convert_line(real, masked, pat, method, drop, lineno, path, state):
+def convert_line(real, masked, pat, fn, method, drop, lineno, path, state):
     """One spec entry over one code line. Returns the new real line.
 
     Scans the mask (parens in strings are invisible there), splits the
@@ -116,6 +116,10 @@ def convert_line(real, masked, pat, method, drop, lineno, path, state):
         real = real[:mo.start()] + new + real[c + 1:]
         masked = mask_line(real)
         state["converted"] += 1
+        # Every conversion is recorded with its position: the boundary
+        # reconciles would-convert sites against the PARKED queue site
+        # by site, which bare counts cannot do.
+        state["sites"].append(f"{path}:{lineno} {fn} -> {new[:60]}")
         # rescan from the same offset: the receiver text may itself
         # hold an unconverted global-form call
     return real
@@ -125,7 +129,7 @@ def run(project, spec, apply_):
     files, _, _, _ = collect_files(project)
     cache, changed = {}, set()
     per_fn = {}
-    state = {"converted": 0, "skipped": [], "multiline": []}
+    state = {"converted": 0, "sites": [], "skipped": [], "multiline": []}
     for item in spec:
         fn = item["fn"]
         method = item.get("method") or fn
@@ -147,8 +151,8 @@ def run(project, spec, apply_):
                     continue
                 if not pat.search(masked):
                     continue
-                new_line = convert_line(real, masked, pat, method, drop,
-                                        i + 1, path, state)
+                new_line = convert_line(real, masked, pat, fn, method,
+                                        drop, i + 1, path, state)
                 if new_line != real:
                     lines[i] = new_line
                     file_changed = True
@@ -202,7 +206,8 @@ def main(argv=None):
 
     if args.format == "json":
         print(json.dumps({
-            "converted": state["converted"], "per_function": per_fn,
+            "converted": state["converted"], "sites": state["sites"],
+            "per_function": per_fn,
             "skipped": state["skipped"], "multiline": state["multiline"],
             "files_changed": [str(p) for p in changed],
             "applied": args.apply, "oracle": args.oracle}, indent=1))
@@ -223,6 +228,14 @@ def main(argv=None):
         for s in state["multiline"]:
             print("  " + s)
     if args.oracle:
+        if state["sites"]:
+            print(f"\nWOULD CONVERT ({len(state['sites'])}) -- each is "
+                  f"unfinished work or a PARKED queue entry:")
+            for s in state["sites"][:40]:
+                print("  " + s)
+            if len(state["sites"]) > 40:
+                print(f"  ... {len(state['sites']) - 40} more "
+                      f"(--format json lists all)")
         print(f"\noracle: {state['converted']} would-convert site(s) -- "
               f"each is unfinished work or a PARKED queue entry; "
               f"{len(state['skipped'])} illegal-receiver site(s) -- each "

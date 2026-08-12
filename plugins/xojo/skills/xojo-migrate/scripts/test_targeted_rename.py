@@ -157,6 +157,49 @@ class RenameTests(unittest.TestCase):
         self.assertEqual(len(result["occurrence_ambiguous"]), 1)
         self.assertEqual(len(result["report_only"]), 1)
 
+    def test_error_diagnostics_drive_the_burn_down(self):
+        # Pass E feeds this ERRORS -- 'Type "X" has no member named
+        # "Y"'. The first version accepted only deprecation warnings
+        # and silently no-opped the whole documented burn-down.
+        err = {"severity": "error", "kind": "project", "type": "Code",
+               "message": 'Type "DesktopThing" has no member named '
+                          '"FillRect"',
+               "location": "Painter.Draw",
+               "position": "Painter.Draw, line 1", "line": 1}
+        self.docfile.write_text(json.dumps({
+            "ok": False, "outcome": "project_errors",
+            "diagnostics": [err],
+            "result": {"session": {
+                "project": str(self.root / "Fixture.xojo_project"),
+                "was_open": False, "closed": True}}}))
+        code, out, _ = self.run_cli("--apply")
+        self.assertEqual(code, 0)
+        self.assertIn("renamed: 1 site(s)", out)
+        self.assertIn("g.FillRectangle 0, 0, 10, 10", self.lines()[4])
+
+    def test_undotted_occurrence_refuses_the_line(self):
+        # 'mine.ListCount = ListCount': the IDE may be flagging the
+        # implicit-Self use. Renaming the dotted occurrence converts an
+        # unflagged site and leaves the flagged one -- refuse instead.
+        fixture = (
+            "#tag Class\nProtected Class W\n#tag Method, Flags = &h0\n"
+            "Sub R(mine As Thing)\n"
+            "  mine.ListCount = ListCount\n"
+            "End Sub\n#tag EndMethod\nEnd Class\n#tag EndClass\n")
+        src = self.root / "W.xojo_code"
+        src.write_text(fixture)
+        self.docfile.write_text(json.dumps({
+            "ok": True, "diagnostics": [dg("ListCount", "W.R", 1)],
+            "result": {"session": {
+                "project": str(self.root / "Fixture.xojo_project"),
+                "was_open": False, "closed": True}}}))
+        self.mapfile.write_text(json.dumps({"ListCount": "RowCount"}))
+        _, out, _ = self.run_cli("--apply")
+        self.assertIn("mine.ListCount = ListCount",
+                      src.read_text())          # untouched
+        self.assertIn("undotted", out)
+        self.assertIn("renamed: 0", out)
+
     def test_unlocated_document_without_root_exits(self):
         self.docfile.write_text(json.dumps(
             {"ok": True, "diagnostics": DIAGS}))

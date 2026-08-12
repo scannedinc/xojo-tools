@@ -157,6 +157,35 @@ class ApplyRulesTests(unittest.TestCase):
         self.assertIn("myString.Length", other.read_text())
         self.assertIn("Len(myString)", self.code.read_text())  # untouched
 
+    def test_two_matches_on_one_line_count_as_two(self):
+        # The count the commit template pastes must reconcile with the
+        # differ's per-occurrence warning deltas; counting changed
+        # LINES under-reported.
+        self.code.write_text(
+            "#tag Class\nProtected Class W\n#tag Method, Flags = &h0\n"
+            "Sub R(a As String, b As String)\n"
+            "  n = Len(a) + Len(b)\n"
+            "End Sub\n#tag EndMethod\nEnd Class\n#tag EndClass\n")
+        _, out, _ = self.run_cli("--rules", "c0r0", "--format", "json")
+        self.assertEqual(json.loads(out)["total"], 2)
+
+    def test_crlf_survives_a_dollar_anchored_rule(self):
+        # `\s*$` would otherwise swallow the \r and write a
+        # mixed-ending file; the \r is held out of the match.
+        crlf = ("#tag Class\r\nProtected Class W\r\n"
+                "#tag Method, Flags = &h0\r\nSub R(arr() As String)\r\n"
+                "  arr.Remove i\r\nEnd Sub\r\n#tag EndMethod\r\n"
+                "End Class\r\n#tag EndClass\r\n")
+        self.code.write_bytes(crlf.encode())
+        edits = self.root / "edits.json"
+        edits.write_text(json.dumps(
+            [{"label": "tail", "find": r"\.Remove\s+(\w+)\s*$",
+              "replace": r".RemoveAt(\1)"}]))
+        self.run_cli("--edits", str(edits), "--apply")
+        data = self.code.read_bytes()
+        self.assertIn(b"arr.RemoveAt(i)\r\n", data)
+        self.assertNotIn(b")\n#", data)   # no bare-\n line crept in
+
     def test_json_format(self):
         _, out, _ = self.run_cli("--rules", "c0r0", "--format", "json")
         result = json.loads(out)

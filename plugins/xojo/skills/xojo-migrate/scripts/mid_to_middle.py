@@ -48,7 +48,7 @@ SIMPLE = re.compile(r"^[A-Za-z_]\w*$")
 FOR_RE = re.compile(r"^\s*For\s+(Each\s+)?([A-Za-z_]\w*)(.*)$", re.I)
 FOR_RANGE = re.compile(
     r"^(?:\s+As\s+[A-Za-z_][\w.]*)?\s*=\s*(.+?)\s+(To|DownTo)\s+(.+?)"
-    r"(?:\s+Step\s+.+)?\s*$", re.I)
+    r"(?:\s+Step\s+(.+?))?\s*$", re.I)
 NEXT_RE = re.compile(r"^\s*Next\b\s*([A-Za-z_]\w*)?", re.I)
 # a start argument the audit can reason about: var, var+K, var-K
 START = re.compile(r"^([A-Za-z_]\w*)\s*(?:([+-])\s*(\d+))?$")
@@ -130,7 +130,11 @@ def mid_sites(real, masked):
             else:
                 sites.append((kind, args[start_index].strip(), mo.start(),
                               (o, c, args)))
-            pos = c + 1
+            # Continue INSIDE the argument list, not past the close
+            # paren: a Mid nested in another Mid's arguments is its own
+            # site, and skipping the span hid it from the audit and the
+            # risk gate both.
+            pos = o + 1
     return sites
 
 
@@ -155,8 +159,21 @@ def audit(cache):
                 if not each:
                     r = FOR_RANGE.match(f.group(3))
                     if r:
-                        bound = (r.group(3) if r.group(2).lower() == "downto"
-                                 else r.group(1)).strip()
+                        # The lower bound is the To side for a DownTo
+                        # loop AND for `To ... Step -n`, the pre-DownTo
+                        # idiom old code is full of. A step the audit
+                        # cannot read leaves the bound unparsed, which
+                        # classify() sends to hand review -- never to
+                        # "safe".
+                        step = (r.group(4) or "").strip()
+                        descending = r.group(2).lower() == "downto"
+                        if step and not re.fullmatch(r"[+-]?\d+", step):
+                            bound = None
+                        else:
+                            if step.startswith("-"):
+                                descending = True
+                            bound = (r.group(3) if descending
+                                     else r.group(1)).strip()
                 stack.append((each, counter, bound))
             elif NEXT_RE.match(masked) and stack:
                 named = NEXT_RE.match(masked).group(1)
@@ -264,7 +281,11 @@ def _convert_line(real, masked, path, lineno, skipped, not_framework,
             records.append({"path": str(path), "line": lineno,
                             "kind": kind, "before": before.strip()[:90],
                             "after": real.strip()[:90]})
-            pos = mo.start() + len(new)
+            # Rescan from the same offset: the replacement's argument
+            # text may hold a nested Mid of the same form. Terminates
+            # because Middle( no longer matches mid\s*\( -- each
+            # conversion strictly reduces the matchable count.
+            pos = mo.start()
     return real, masked, records
 
 
