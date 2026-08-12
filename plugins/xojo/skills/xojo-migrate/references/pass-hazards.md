@@ -34,7 +34,7 @@ It cannot see `Dictionary(storage.ObjectValue).Count`, `values(i).Count`, or any
 
 Allow a receiver to end in `)`, and remember that a census answers *who declares this name*, not *who receives it*. A project that declares its own `Border` property does not thereby make every `.Border` in the file that property; several were `CurveShape.Border` on the run where this was missed. Open the sites.
 
-The paren-anchored member rules have the same blind spot from the other side, and it can invert a rule's value entirely: on one run, `.Remove(` matched fifteen sites that were all live Dictionary calls—must not convert—while all thirty real array removes were the paren-less statement form `list.Remove i`, which no dot-plus-paren pattern can see. Every match the rule had was a false positive and every site it was for was invisible to it; only the receiver census told the two apart.
+The paren-anchored member rules have the same blind spot from the other side, and it can invert a rule's value entirely: on one run, every site `.Remove(` matched was a live Dictionary call—must not convert—while every real array remove was the paren-less statement form `list.Remove i`, which no dot-plus-paren pattern can see. Every match the rule had was a false positive and every site it was for was invisible to it; only the receiver census told the two apart.
 
 ## 2. A large match count is not a large amount of work
 

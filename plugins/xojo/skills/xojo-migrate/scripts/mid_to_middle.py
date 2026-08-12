@@ -6,7 +6,7 @@ API 1.0 `Mid` CLAMPS a start below 1; `Middle` does not. A loop written
 breaks after a mechanical decrement. So the audit is the default and is
 inseparable: every run walks each site's enclosing `For` stack, finds
 the bound feeding the start argument, and groups sites by bound -- on a
-real project a few hundred sites collapsed to sixteen distinct bounds,
+real project a few hundred sites collapsed to a dozen-odd distinct bounds,
 turning read-every-site into a one-screen review (conversion-traps.md
 section 1).
 
