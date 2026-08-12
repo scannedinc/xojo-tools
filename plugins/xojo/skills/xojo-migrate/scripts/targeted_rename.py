@@ -12,7 +12,7 @@ maximum is occurrence accounting: when the flagged line holds exactly as
 many `.Old` occurrences (in code -- strings and comments are masked) as
 the IDE flagged, all of them rename; when the line holds MORE, nothing
 on it renames and the site is reported for hand conversion -- renaming
-both a flagged `pict.Graphics.DrawRect` and an unflagged user-class
+both a flagged `g.DrawRect` and an unflagged user-class
 `obj.DrawRect` sharing a line is exactly the corruption this tool
 exists to prevent.
 
