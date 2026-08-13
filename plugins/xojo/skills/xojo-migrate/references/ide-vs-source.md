@@ -55,7 +55,7 @@ The status comes from the per-release tables in Xojo's own `deprecations.md`, no
 
 ## Turning the deprecation warnings on
 
-Analyze Project reports deprecations only while the "Item1 is deprecated" warnings are enabled, and the setting is **per project**—there is no global preference, no key in the IDE's plist, and no IDE-scripting command that reaches it (`DoCommand` offers `CheckProjectErrors`, which *runs* the analysis, but nothing that configures it). The IDE stores the checkbox states in a binary `WrnPGrup` record: at offset 0 of the project's hidden `.xojo_uistate` for text-format projects, embedded in the container itself for `.xojo_binary_project` files. A brand-new project has no record at all until the IDE first writes one when the project closes.
+Analyze Project reports deprecations only while the "Item1 is deprecated" warnings are enabled, and the setting is **per project**—there is no global preference, no key in the IDE's plist, and no IDE-scripting command that reaches it (`DoCommand` offers `CheckProjectErrors`, which *runs* the analysis, but nothing that configures it). The IDE stores the checkbox states in a binary `WrnPGrup` record: at offset 0 of the project's hidden `.xojo_uistate` for text-format projects, embedded in the container itself for `.xojo_binary_project` files. A brand-new project has no record at all: the record is analysis state, so the IDE first writes one when a project that has *been analyzed* closes—verified live on 2026r2.1, where a plain open-and-close left no record and an open → analyze → close cycle materialized it complete.
 
 The bundled script reads and patches it:
 
@@ -67,7 +67,7 @@ python3 $SKILL/scripts/analysis_warnings.py <project-dir> --enable   # turn on
 `--enable` sets both deprecation warnings plus "Show API 2 Desktop control deprecations" (warning ids -2, 2 and 16; the record format is documented in the script's docstring). Two rules, both mandatory:
 
 - **The project must be closed in the IDE while patching.** Warning preferences live on the in-memory document, and the IDE rewrites the file when the project closes, so a patch made while the project is open is silently undone. The sequence: `xojoctl close --save` → `analysis_warnings.py --enable` → `xojoctl open` → `xojoctl analyze`.
-- **Missing or incomplete record?** Open the project in the IDE and close it once; the IDE materializes the record with every entry present. The script refuses to append entries itself, by design—only a same-size in-place patch cannot corrupt the surrounding structure.
+- **Missing or incomplete record?** Open the project, run Analyze Project once (`xojoctl analyze`; its results do not matter yet), and close it; the IDE then materializes the record with every entry present. Closing without an analyze is not enough on a never-analyzed project. The script refuses to append entries itself, by design—only a same-size in-place patch cannot corrupt the surrounding structure.
 
 Verified live against Xojo 2026.2.1: on a project with a deprecated `Left` call, analyze before the patch reported only default-on warnings; after close → patch → reopen, the same analyze reported `Left is deprecated. You should use String.Left instead` with file, method and line, and Project ▸ Analysis Warnings showed the boxes ticked.
 

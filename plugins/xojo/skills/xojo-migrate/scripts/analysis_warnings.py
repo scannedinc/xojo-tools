@@ -64,9 +64,11 @@ LABELS = {
     16: "Show API 2 Desktop control deprecations",
 }
 
-MATERIALIZE = ("open the project in the Xojo IDE once and close it (the IDE "
-               "writes the warning block when the project closes), then "
-               "re-run this script")
+MATERIALIZE = ("open the project in the Xojo IDE, run Analyze Project once, "
+               "and close it (the warning block is analysis state: the IDE "
+               "writes it when a project that has been analyzed closes -- "
+               "closing a never-analyzed project writes none), then re-run "
+               "this script")
 
 Entry = collections.namedtuple("Entry", "value_offset warning_id value")
 Block = collections.namedtuple("Block", "offset length group_id entries")
