@@ -12,6 +12,7 @@
 #   3. Every skill folder under plugins/*/skills carries a LICENSE file
 #      (that exact name, no extension) identical to the repository LICENSE.
 #   4. Every staged .json file parses as JSON.
+#   5. The two plugin manifests declare the same version.
 
 set -u
 
@@ -101,6 +102,30 @@ if command -v python3 >/dev/null 2>&1; then
     done <<EOF
 $files
 EOF
+fi
+
+# --- 5. Plugin manifest versions --------------------------------------------
+claude_manifest="plugins/xojo/.claude-plugin/plugin.json"
+codex_manifest="plugins/xojo/.codex-plugin/plugin.json"
+if command -v python3 >/dev/null 2>&1 \
+    && [ -n "$(git ls-files -s "$claude_manifest")" ] \
+    && [ -n "$(git ls-files -s "$codex_manifest")" ]; then
+    claude_version=$(git show ":$claude_manifest" 2>/dev/null \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version", ""))' 2>/dev/null)
+    codex_version=$(git show ":$codex_manifest" 2>/dev/null \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version", ""))' 2>/dev/null)
+    # An empty version means the manifest failed to parse or has no
+    # "version" key; two empties must not compare as a match.
+    if [ -z "$claude_version" ] || [ -z "$codex_version" ]; then
+        [ -n "$claude_version" ] || echo "pre-commit: could not read the version from staged $claude_manifest" >&2
+        [ -n "$codex_version" ] || echo "pre-commit: could not read the version from staged $codex_manifest" >&2
+        echo "Check that the manifest is valid JSON with a \"version\" key." >&2
+        fail=1
+    elif [ "$claude_version" != "$codex_version" ]; then
+        echo "pre-commit: version in $codex_manifest ($codex_version) differs from $claude_manifest ($claude_version)" >&2
+        echo "These are maintained as matching versions; apply the same bump to both manifests." >&2
+        fail=1
+    fi
 fi
 
 exit "$fail"
