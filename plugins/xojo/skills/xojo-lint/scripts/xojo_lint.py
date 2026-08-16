@@ -14,6 +14,7 @@ import difflib
 import json
 import os
 import re
+import stat
 import struct
 import sys
 import zipfile
@@ -1375,8 +1376,18 @@ def format_command(args: argparse.Namespace) -> int:
                 )
             )
         else:
+            # Write-then-replace so a failed write never truncates the file.
+            real = os.path.realpath(path)
+            tmp = real + ".part"
             try:
-                path.write_bytes(output)
+                # A read-only target must fail closed (XJF002), not be
+                # silently replaced by a writable copy.
+                if not os.access(real, os.W_OK):
+                    raise PermissionError(f"'{real}' is not writable")
+                with open(tmp, "wb") as handle:
+                    handle.write(output)
+                os.chmod(tmp, stat.S_IMODE(os.stat(real).st_mode))
+                os.replace(tmp, real)
             except OSError as exc:
                 print(
                     render_diagnostic(
@@ -1384,6 +1395,13 @@ def format_command(args: argparse.Namespace) -> int:
                     )
                 )
                 errors += 1
+            finally:
+                # After a successful replace the temp is gone; anything else
+                # -- including an interrupt -- must not leave a .part behind.
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
     if not args.check and not args.diff and changed and not args.quiet_summary:
         print(f"Reformatted {changed} file(s).")
     if (args.check or args.diff) and changed and not args.quiet_summary:

@@ -387,6 +387,45 @@ class XojoLintTests(unittest.TestCase):
         self.assertIn("  USAGE\n", rendered_error)
         self.assertIn("format --help", rendered_error)
 
+    @unittest.skipUnless(os.name == "posix", "POSIX file modes required")
+    def test_formatter_write_preserves_permissions_without_leftovers(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "Trailing.xojo_code"
+            path.write_bytes(b"#tag Class\nProtected Class Trailing\n#tag EndClass")
+            os.chmod(path, 0o600)
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(xojo_lint.main(["format", str(path)]), 0)
+            self.assertTrue(path.read_bytes().endswith(b"#tag EndClass\n"))
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+            self.assertEqual(list(Path(folder).glob("*.part")), [])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX file modes required")
+    def test_formatter_fails_closed_on_a_read_only_file(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "Trailing.xojo_code"
+            source = b"#tag Class\nProtected Class Trailing\n#tag EndClass"
+            path.write_bytes(source)
+            os.chmod(path, 0o444)
+            output = io.StringIO()
+            with redirect_stdout(output), redirect_stderr(io.StringIO()):
+                self.assertEqual(xojo_lint.main(["format", str(path)]), 1)
+            self.assertIn("XJF002", output.getvalue())
+            self.assertEqual(path.read_bytes(), source)
+            self.assertEqual(list(Path(folder).glob("*.part")), [])
+
+    @unittest.skipUnless(os.name == "posix", "symbolic links required")
+    def test_formatter_writes_through_a_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            real = root / "Real.xojo_code"
+            real.write_bytes(b"#tag Class\nProtected Class Real\n#tag EndClass")
+            link = root / "Link.xojo_code"
+            link.symlink_to(real.name)
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(xojo_lint.main(["format", str(link)]), 0)
+            self.assertTrue(link.is_symlink())
+            self.assertTrue(real.read_bytes().endswith(b"#tag EndClass\n"))
+
     def test_all_enables_every_optional_check_but_not_failure_policy(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
