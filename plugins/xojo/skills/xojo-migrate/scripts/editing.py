@@ -26,8 +26,10 @@ user's source file.
 
 (stdlib only)
 """
+import os
 import pathlib
 import re
+import stat
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -154,10 +156,30 @@ def read_source(path):
 
 
 def write_source(path, text):
-    """Write text read by read_source back, byte-for-byte where unedited."""
-    with open(path, "w", encoding="utf-8", errors="surrogateescape",
-              newline="") as f:
-        f.write(text)
+    """Write text read by read_source back, byte-for-byte where unedited.
+
+    Writes a sibling .part and renames, so an interrupted write never
+    leaves the user's source file truncated.
+    """
+    # realpath first: os.replace on the symlink itself would break the
+    # link, where open("w") writes through it.
+    real = pathlib.Path(os.path.realpath(path))
+    # os.replace needs only directory write permission, so without this
+    # check a deliberately write-protected file would be replaced where
+    # open("w") raised PermissionError.
+    if real.exists() and not os.access(real, os.W_OK):
+        raise PermissionError(f"{path} is not writable")
+    tmp = real.with_name(real.name + ".part")
+    try:
+        with open(tmp, "w", encoding="utf-8", errors="surrogateescape",
+                  newline="") as f:
+            f.write(text)
+        if real.exists():
+            os.chmod(tmp, stat.S_IMODE(os.stat(real).st_mode))
+        os.replace(tmp, real)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def masked_pairs(text):

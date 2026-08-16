@@ -9,7 +9,10 @@ the user's source (stdlib only, Python 3.9+).
 
 Run:  python3 test_editing.py
 """
+import os
 import pathlib
+import shutil
+import stat
 import sys
 import tempfile
 import unittest
@@ -84,14 +87,73 @@ class LegalReceiverTests(unittest.TestCase):
 
 
 class SourceIOTests(unittest.TestCase):
+    def setUp(self):
+        self.dir = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir)
+
     def test_invalid_utf8_round_trips_byte_for_byte(self):
         raw = b"Dim s As String\r\ns = \"caf\xe9\"\n' tail\n"
-        with tempfile.TemporaryDirectory() as td:
-            p = pathlib.Path(td) / "Legacy.xojo_code"
-            p.write_bytes(raw)
-            text = editing.read_source(p)
-            editing.write_source(p, text)
-            self.assertEqual(p.read_bytes(), raw)
+        p = self.dir / "Legacy.xojo_code"
+        p.write_bytes(raw)
+        text = editing.read_source(p)
+        editing.write_source(p, text)
+        self.assertEqual(p.read_bytes(), raw)
+
+    def test_no_part_sibling_survives_a_successful_write(self):
+        p = self.dir / "Legacy.xojo_code"
+        p.write_bytes(b"x = 1\n")
+        editing.write_source(p, "x = 2\n")
+        self.assertEqual(list(self.dir.iterdir()), [p])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission bits")
+    def test_permission_bits_survive_the_rewrite(self):
+        for mode in (0o600, 0o755):
+            p = self.dir / f"m{mode:o}.xojo_code"
+            p.write_bytes(b"x = 1\n")
+            p.chmod(mode)
+            editing.write_source(p, "x = 2\n")
+            self.assertEqual(stat.S_IMODE(p.stat().st_mode), mode,
+                             oct(mode))
+
+    @unittest.skipUnless(os.name == "posix", "symlinks")
+    def test_writing_through_a_symlink_keeps_the_link(self):
+        target = self.dir / "Real.xojo_code"
+        target.write_bytes(b"x = 1\n")
+        link = self.dir / "Link.xojo_code"
+        link.symlink_to(target)
+        editing.write_source(link, "x = 2\n")
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(target.read_bytes(), b"x = 2\n")
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission bits")
+    def test_read_only_file_is_refused_not_replaced(self):
+        # os.replace needs only directory write permission, so without
+        # the explicit check a write-protected file would be edited.
+        p = self.dir / "Legacy.xojo_code"
+        p.write_bytes(b"x = 1\n")
+        p.chmod(0o444)
+        with self.assertRaises(PermissionError):
+            editing.write_source(p, "x = 2\n")
+        self.assertEqual(p.read_bytes(), b"x = 1\n")
+        self.assertEqual(list(self.dir.iterdir()), [p])
+
+    def test_failed_replace_leaves_the_original_and_no_part(self):
+        # The point of the .part dance: the old open("w") truncated the
+        # file before writing, so any failure lost the user's source.
+        p = self.dir / "Legacy.xojo_code"
+        p.write_bytes(b"x = 1\n")
+
+        def boom(src, dst):
+            raise OSError("simulated replace failure")
+
+        real_replace = os.replace
+        os.replace = boom
+        self.addCleanup(setattr, os, "replace", real_replace)
+        with self.assertRaises(OSError):
+            editing.write_source(p, "x = 2\n")
+        os.replace = real_replace
+        self.assertEqual(p.read_bytes(), b"x = 1\n")
+        self.assertEqual(list(self.dir.iterdir()), [p])
 
 
 class MaskedPairsTests(unittest.TestCase):
