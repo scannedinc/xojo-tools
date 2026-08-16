@@ -26,7 +26,13 @@ Usage:
 The analyze document should have passed through locate.py (the pipe
 adds file:line to each diagnostic); an unlocated document is enriched
 here first, using --project or the document's result.session.project.
-Dry run by default; --apply writes. (stdlib only)
+Located paths are held to a verified project root (--project or the
+root the document records): a site outside it is reported, never
+edited. The verification is structural, not provenance -- the root
+must be a real project folder holding a top-level manifest, and only
+Xojo source files are eligible targets -- so a forged document can
+still only aim at real Xojo source under a real Xojo project. Dry run
+by default; --apply writes. (stdlib only)
 """
 import argparse
 import collections
@@ -39,6 +45,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import locate  # noqa: E402
 from editing import masked_pairs, read_source, write_source  # noqa: E402
+from scan import MANIFEST_EXTS, SOURCE_EXTS  # noqa: E402
 
 
 NO_MEMBER = re.compile(r'has no member named\s+"?([A-Za-z_]\w*)', re.I)
@@ -61,12 +68,14 @@ def symbol_of(d):
     return None
 
 
-def gather(doc, mapping):
+def gather(doc, mapping, root):
     """Sort the mapped diagnostics into work, report-only and unresolved.
 
     work counts flagged occurrences per (file, line, old, new) -- the
     IDE emits one diagnostic per occurrence, and that count is what the
     line's actual occurrence count must equal before anything renames.
+    A located path that resolves outside root never enters work -- a
+    stale or forged document must not steer writes outside the project.
     """
     ci = {k.lower(): (k, v) for k, v in mapping.items()}
     work = collections.Counter()
@@ -87,6 +96,17 @@ def gather(doc, mapping):
         if not located:
             unresolved.append(f"{old}: {where} "
                               f"({d.get('resolution') or 'not located'})")
+            continue
+        # locate.py only maps diagnostics onto collect_files' source
+        # list, so a located diagnostic naming any other suffix is per
+        # se forged or corrupt -- refuse it before the root check.
+        if pathlib.Path(d["file"]).suffix.lower() not in SOURCE_EXTS:
+            unresolved.append(f"{old}: {d['file']}:{d['file_line']} "
+                              f"(not a Xojo source file)")
+            continue
+        if not pathlib.Path(d["file"]).resolve().is_relative_to(root):
+            unresolved.append(f"{old}: {d['file']}:{d['file_line']} "
+                              f"(file outside project root)")
             continue
         work[(d["file"], d["file_line"], old, new)] += 1
     return work, report_only, unresolved
@@ -210,8 +230,42 @@ def main(argv=None, stdin=None):
                      f"added: {why_not}. Pipe it through locate.py, or "
                      f"pass --project.")
         locate.enrich(doc, root)
+        root = pathlib.Path(root).resolve()
+    else:
+        # A pre-located document's file paths are absolute and taken at
+        # their word, so the root they must sit under is pinned here:
+        # --project, the root locate.py recorded, or both in agreement.
+        given = None
+        if args.project:
+            p = pathlib.Path(args.project)
+            given = (p.parent if p.is_file() else p).resolve()
+        meta = doc["located"] if isinstance(doc["located"], dict) else {}
+        recorded = meta.get("project_root")
+        recorded = pathlib.Path(recorded).resolve() if recorded else None
+        if given and recorded and given != recorded:
+            sys.exit(f"--project ({given}) disagrees with the project "
+                     f"root the document records ({recorded}) -- the "
+                     f"document looks stale or relocated. Re-run "
+                     f"locate.py against the right project.")
+        root = given or recorded
+        if root is None:
+            sys.exit("the document's 'located' record carries no "
+                     "project_root, so its file paths cannot be "
+                     "verified; pass --project.")
+        # A degenerate root ("/" makes every absolute path pass the
+        # containment check) defeats verification. locate.py records the
+        # manifest's parent as the root, so a legitimate root always
+        # holds a top-level manifest; demand that structure here.
+        if root == root.parent or not root.is_dir() or not any(
+                c.is_file() and c.suffix.lower() in MANIFEST_EXTS
+                for c in root.iterdir()):
+            sys.exit(f"the verified root ({root}) is not a Xojo project "
+                     f"folder -- expected a directory holding a "
+                     f"top-level .xojo_project manifest. Re-run "
+                     f"locate.py against the real project, or pass "
+                     f"--project.")
 
-    work, report_only, unresolved = gather(doc, mapping)
+    work, report_only, unresolved = gather(doc, mapping, root)
     renamed, files, ambiguous, not_found = rename(work, args.apply)
 
     if args.format == "json":
@@ -226,7 +280,8 @@ def main(argv=None, stdin=None):
             ("REPORT ONLY", report_only,
              "map value empty -- sites listed, nothing converted"),
             ("UNRESOLVED", unresolved,
-             "no located line -- resolve by hand (see locate.py)"),
+             "no located line inside the project -- resolve by hand "
+             "(see locate.py)"),
             ("OCCURRENCE-AMBIGUOUS", ambiguous,
              "the line holds more of the member than the IDE flagged"),
             ("NOT FOUND ON LINE", not_found, "check by hand")):

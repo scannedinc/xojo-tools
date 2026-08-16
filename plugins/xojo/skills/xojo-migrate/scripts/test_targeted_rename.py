@@ -5,8 +5,10 @@ The fixture pins the tool's whole reason to exist: a flagged
 `g.FillRect` renames while the user class's own `DrawRect` -- same
 member name, two lines away -- does not. The rest pin the honesty
 rules: occurrence mismatch refuses instead of guessing, null map values
-report instead of silently dropping, and replacements never chain
-(stdlib only, Python 3.9+).
+report instead of silently dropping, replacements never chain, a
+located path outside the verified project root is reported, never
+edited, and the root itself must be a real project folder naming real
+Xojo source (stdlib only, Python 3.9+).
 
 Run:  python3 test_targeted_rename.py
 """
@@ -61,6 +63,13 @@ def dg(sym, location, line):
                        f"New{sym} instead",
             "location": location,
             "position": f"{location}, line {line}", "line": line}
+
+
+def located(sym, file, file_line):
+    d = dg(sym, "Painter.Draw", 1)
+    d.update({"resolution": "located", "file": str(file),
+              "file_line": file_line, "line_basis": "body-offset"})
+    return d
 
 
 DIAGS = [dg("FillRect", "Painter.Draw", 1),
@@ -206,6 +215,123 @@ class RenameTests(unittest.TestCase):
         code, _, err = self.run_cli()
         self.assertNotEqual(code, 0)
         self.assertIn("locate.py", err)
+
+    def write_located_doc(self, diags, located_record):
+        self.docfile.write_text(json.dumps(
+            {"ok": True, "diagnostics": diags,
+             "located": located_record}))
+        self.mapfile.write_text(json.dumps({"FillRect": "FillRectangle"}))
+
+    def test_out_of_root_located_path_is_reported_not_edited(self):
+        # A located document names its files verbatim; a stale or
+        # forged one can name a file outside the project. That site
+        # must surface in the report and never reach the work queue.
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        victim = pathlib.Path(outside.name) / "Victim.xojo_code"
+        victim.write_text(FIXTURE)
+        self.write_located_doc([located("FillRect", victim, 5)],
+                               {"project_root": str(self.root)})
+        code, out, _ = self.run_cli("--apply")
+        self.assertEqual(code, 0)
+        self.assertEqual(victim.read_text(), FIXTURE)
+        self.assertIn("renamed: 0", out)
+        self.assertIn("file outside project root", out)
+        self.assertIn(str(victim), out)
+
+    def test_project_flag_disagreeing_with_recorded_root_exits(self):
+        # --project naming a different root than the document records
+        # is the stale/relocated-document case: fail loudly naming
+        # both, before any edit, instead of silently preferring either.
+        elsewhere = tempfile.TemporaryDirectory()
+        self.addCleanup(elsewhere.cleanup)
+        before = self.src.read_bytes()
+        self.write_located_doc([located("FillRect", self.src, 5)],
+                               {"project_root": str(self.root)})
+        code, _, err = self.run_cli("--apply", "--project",
+                                    elsewhere.name)
+        self.assertNotEqual(code, 0)
+        self.assertIn("disagrees", err)
+        self.assertIn(str(pathlib.Path(elsewhere.name).resolve()), err)
+        self.assertIn(str(self.root.resolve()), err)
+        self.assertEqual(self.src.read_bytes(), before)
+
+    def test_in_root_located_document_still_renames(self):
+        # The verified-root check must not disturb the normal pipeline:
+        # a document located against this project renames as before,
+        # with no enrichment re-run and no --project needed.
+        self.write_located_doc([located("FillRect", self.src, 5)],
+                               {"project_root": str(self.root)})
+        code, out, _ = self.run_cli("--apply")
+        self.assertEqual(code, 0)
+        self.assertIn("renamed: 1 site(s)", out)
+        self.assertIn("g.FillRectangle 0, 0, 10, 10", self.lines()[4])
+
+    def test_project_flag_agreeing_with_recorded_root_proceeds(self):
+        self.write_located_doc([located("FillRect", self.src, 5)],
+                               {"project_root": str(self.root)})
+        code, out, _ = self.run_cli("--apply", "--project",
+                                    str(self.root))
+        self.assertEqual(code, 0)
+        self.assertIn("renamed: 1 site(s)", out)
+        self.assertIn("g.FillRectangle 0, 0, 10, 10", self.lines()[4])
+
+    def test_non_source_located_target_is_reported_not_edited(self):
+        # locate.py can only locate files from collect_files' source
+        # list, so a located diagnostic naming any other suffix is per
+        # se forged -- it must land in the report, whatever root the
+        # containment check would have blessed.
+        evil = self.root / "Evil.txt"
+        evil.write_text(FIXTURE)
+        self.write_located_doc([located("FillRect", evil, 5)],
+                               {"project_root": str(self.root)})
+        code, out, _ = self.run_cli("--apply")
+        self.assertEqual(code, 0)
+        self.assertEqual(evil.read_text(), FIXTURE)
+        self.assertIn("renamed: 0", out)
+        self.assertIn("not a Xojo source file", out)
+        self.assertIn(str(evil), out)
+
+    def test_filesystem_anchor_root_exits(self):
+        # A forged document recording project_root "/" makes every
+        # absolute path pass the containment check. The anchor is never
+        # a legitimate project folder: hard exit before any edit.
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        victim = pathlib.Path(outside.name) / "Victim.xojo_code"
+        victim.write_text(FIXTURE)
+        self.write_located_doc([located("FillRect", victim, 5)],
+                               {"project_root": "/"})
+        code, _, err = self.run_cli("--apply")
+        self.assertNotEqual(code, 0)
+        self.assertIn(".xojo_project", err)
+        self.assertEqual(victim.read_text(), FIXTURE)
+
+    def test_manifestless_root_exits(self):
+        # A real directory with no top-level manifest is not a project
+        # folder. locate.py records the manifest's parent as the root,
+        # so a legitimate document never trips this; a forged one does.
+        bare = tempfile.TemporaryDirectory()
+        self.addCleanup(bare.cleanup)
+        victim = pathlib.Path(bare.name) / "Victim.xojo_code"
+        victim.write_text(FIXTURE)
+        self.write_located_doc([located("FillRect", victim, 5)],
+                               {"project_root": bare.name})
+        code, _, err = self.run_cli("--apply")
+        self.assertNotEqual(code, 0)
+        self.assertIn(".xojo_project", err)
+        self.assertEqual(victim.read_text(), FIXTURE)
+
+    def test_located_record_without_root_or_project_exits(self):
+        # A bare "located": {} used to skip enrichment AND the root
+        # question entirely, letting the document's absolute paths go
+        # anywhere. It must now demand --project instead.
+        before = self.src.read_bytes()
+        self.write_located_doc([located("FillRect", self.src, 5)], {})
+        code, _, err = self.run_cli("--apply")
+        self.assertNotEqual(code, 0)
+        self.assertIn("--project", err)
+        self.assertEqual(self.src.read_bytes(), before)
 
 
 if __name__ == "__main__":
