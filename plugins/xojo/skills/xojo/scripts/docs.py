@@ -823,6 +823,41 @@ def first_sentence(page: Page, renderer: Renderer) -> str:
     return ""
 
 
+def prune_stale(dest: Path, expected: set[Path]) -> int:
+    """Delete generated pages the current build no longer produces.
+
+    Only *.md files are candidates, so anything else that ends up in the
+    output folder -- a .DS_Store, say -- is never touched; the TSV indexes
+    are fully rewritten every build and need no pruning. Directories the
+    pruning empties are removed with their files.
+
+    Membership is compared casefolded, because the comparison is asymmetric
+    in cost: on a case-insensitive filesystem (macOS APFS) an upstream
+    docname case change leaves the on-disk file at its old case -- the build
+    writes through it without renaming -- and an exact comparison would
+    delete the just-written current page. On a case-sensitive filesystem the
+    worst case is retaining a stale page that differs only in case, which is
+    harmless.
+    """
+    folded = {str(p).casefold() for p in expected}
+    pruned = 0
+    for path in dest.rglob("*.md"):
+        # is_file(): a hostile docname like "api/foo.md/bar" creates a
+        # *directory* named foo.md, which rglob("*.md") yields too.
+        if path.is_file() and str(path).casefold() not in folded:
+            path.unlink()
+            pruned += 1
+    if pruned:
+        # Deepest first, so a directory whose only content was emptied
+        # subdirectories goes too.
+        for folder in sorted(
+            (p for p in dest.rglob("*") if p.is_dir()), reverse=True
+        ):
+            if not any(folder.iterdir()):
+                folder.rmdir()
+    return pruned
+
+
 def run_build(args: argparse.Namespace) -> int:
     source = Path(args.source).expanduser()
     dest = Path(args.dest).expanduser()
@@ -948,13 +983,18 @@ def run_build(args: argparse.Namespace) -> int:
     class_rows: list[tuple[str, ...]] = []
     member_rows: list[tuple[str, ...]] = []
     written = 0
+    expected: set[Path] = set()
     bar = Progress("Converting", len(pages))
 
     for index, (docname, page) in enumerate(sorted(pages.items()), 1):
-        if write_if_changed(dest / f"{docname}.md", render_page(page, renderer)):
+        page_path = dest / f"{docname}.md"
+        expected.add(page_path)
+        if write_if_changed(page_path, render_page(page, renderer)):
             written += 1
         if page.has_members:
-            if write_if_changed(dest / f"{docname}.members.md", render_members(page, renderer)):
+            members_path = dest / f"{docname}.members.md"
+            expected.add(members_path)
+            if write_if_changed(members_path, render_members(page, renderer)):
                 written += 1
 
         title = renderer.inline(page.title, docname, plain=True)
@@ -1032,6 +1072,16 @@ def run_build(args: argparse.Namespace) -> int:
     )
     tsv(dest / "members.tsv", ("name", "kind", "signature", "flags", "deprecated_in", "replacement", "note", "path"), member_rows)
 
+    # `build` exclusively owns dest, so a page that produced no output this
+    # run -- dropped upstream, newly excluded, or left over from a one-time
+    # --include-all build -- is stale and can go. But only from a complete
+    # mirror: a page absent from a half-synced mirror produced no output
+    # either, and pruning then would mass-delete good pages. The same goes
+    # for a hollow inventory -- valid zlib but zero parseable pages leaves
+    # both `absent` and `pages` empty, and pruning against an empty
+    # `expected` would delete every generated page.
+    pruned = 0 if (absent or not pages) else prune_stale(dest, expected)
+
     print(f"\nDone. {len(pages)} pages, {len(member_rows)} members.")
     if skipped:
         print(f"  {skipped} pages excluded (--include-all keeps them)")
@@ -1039,7 +1089,11 @@ def run_build(args: argparse.Namespace) -> int:
         print(f"  {len(absent)} pages in objects.inv are missing from the mirror; run sync")
         for docname in absent[:5]:
             print(f"    {docname}")
+    if not pages:
+        print("  the inventory listed no pages; pruning skipped, re-run sync", file=sys.stderr)
     print(f"  {written} files written or updated")
+    if pruned:
+        print(f"  {pruned} stale files pruned")
     print(f"  {dest / 'classes.tsv'}")
     print(f"  {dest / 'members.tsv'}")
 
