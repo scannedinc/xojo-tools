@@ -47,9 +47,11 @@ repository.
 """
 import argparse
 import json
+import os
 import pathlib
 import re
 import sqlite3
+import stat
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -303,9 +305,25 @@ def main(argv=None):
     if args.dry_run:
         print("\n--dry-run: coverage.json not written")
         return
-    args.coverage.write_text(
-        json.dumps(coverage, indent=1, ensure_ascii=False) + "\n",
-        encoding="utf-8")
+    # coverage.json is curated by hand, so write a sibling .part and
+    # rename: an interrupted run never leaves it truncated. realpath
+    # first: os.replace on the symlink itself would break the link. The
+    # rename needs only directory write permission, so refuse a
+    # write-protected file explicitly.
+    dest = pathlib.Path(os.path.realpath(args.coverage))
+    if dest.exists() and not os.access(dest, os.W_OK):
+        sys.exit(f"{args.coverage} is not writable")
+    tmp = dest.with_name(dest.name + ".part")
+    try:
+        tmp.write_text(
+            json.dumps(coverage, indent=1, ensure_ascii=False) + "\n",
+            encoding="utf-8")
+        if dest.exists():
+            os.chmod(tmp, stat.S_IMODE(os.stat(dest).st_mode))
+        os.replace(tmp, dest)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
     print(f"\nwrote {args.coverage}")
 
 
