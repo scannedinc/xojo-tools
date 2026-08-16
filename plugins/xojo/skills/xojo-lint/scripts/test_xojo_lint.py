@@ -5,7 +5,11 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import shutil
+import stat
 import struct
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -13,6 +17,8 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import xojo_lint
+
+SCRIPTS = Path(__file__).resolve().parent
 
 
 class XojoLintTests(unittest.TestCase):
@@ -413,6 +419,184 @@ class XojoLintTests(unittest.TestCase):
                     ),
                     1,
                 )
+
+
+@unittest.skipUnless(shutil.which("git"), "git is required for hook tests")
+class PreCommitHookTests(unittest.TestCase):
+    """The sample hook lints staged content, not the working tree."""
+
+    VALID = "#tag Class\nProtected Class Hook\n#tag EndClass\n"
+    INVALID = "#tag Class\n\t#tag Method\n\t#tag EndProperty\n#tag EndClass\n"
+
+    def git(self, root: Path, *args: str) -> subprocess.CompletedProcess:
+        env = dict(os.environ)
+        env["XOJO_LINT"] = str(SCRIPTS / "xojo_lint.py")
+        env["GIT_CONFIG_GLOBAL"] = os.devnull
+        env["GIT_CONFIG_SYSTEM"] = os.devnull
+        # A GIT_DIR (or friend) exported by the caller would override cwd
+        # discovery and point every command at the caller's real repository.
+        for name in (
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_COMMON_DIR",
+            "GIT_OBJECT_DIRECTORY",
+        ):
+            env.pop(name, None)
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(root),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+    def init_repo(self, root: Path) -> None:
+        for args in (
+            ("init", "--quiet"),
+            ("config", "user.name", "Tester"),
+            ("config", "user.email", "tester@example.invalid"),
+        ):
+            completed = self.git(root, *args)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+        hook = root / ".git" / "hooks" / "pre-commit"
+        shutil.copy(SCRIPTS / "pre-commit.sample", hook)
+        hook.chmod(0o755)
+
+    def commit(self, root: Path) -> subprocess.CompletedProcess:
+        return self.git(root, "commit", "--quiet", "-m", "test")
+
+    def test_invalid_staged_content_blocks_despite_a_fixed_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.init_repo(root)
+            (root / "App.xojo_code").write_text(self.INVALID, encoding="utf-8")
+            self.git(root, "add", "App.xojo_code")
+            (root / "App.xojo_code").write_text(self.VALID, encoding="utf-8")
+            completed = self.commit(root)
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("XJT002", completed.stdout + completed.stderr)
+
+    def test_valid_staged_content_passes_despite_a_broken_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.init_repo(root)
+            nested = root / "Sources" / "App.xojo_code"
+            nested.parent.mkdir()
+            nested.write_text(self.VALID, encoding="utf-8")
+            self.git(root, "add", "Sources/App.xojo_code")
+            nested.write_text(self.INVALID, encoding="utf-8")
+            completed = self.commit(root)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_a_leading_dash_filename_is_linted_not_parsed_as_a_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.init_repo(root)
+            (root / "-evil.xojo_code").write_text(self.VALID, encoding="utf-8")
+            self.git(root, "add", "--", "-evil.xojo_code")
+            completed = self.commit(root)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_a_staged_file_deleted_from_the_worktree_still_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.init_repo(root)
+            (root / "App.xojo_code").write_text(self.VALID, encoding="utf-8")
+            self.git(root, "add", "App.xojo_code")
+            (root / "App.xojo_code").unlink()
+            completed = self.commit(root)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_a_staged_manifest_finds_its_unchanged_companions(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.init_repo(root)
+            (root / "App.xojo_code").write_text(self.VALID, encoding="utf-8")
+            # The non-xojo asset proves the whole index is materialized for
+            # the lint, not only the .xojo_* files the manifest sits among.
+            (root / "logo.png").write_bytes(b"png bytes")
+            manifest = root / "Example.xojo_project"
+            manifest.write_text(
+                "Type=Desktop\n"
+                "RBProjectVersion=2026.020\n"
+                "Class=Hook;App.xojo_code;&h1;&h0;false\n"
+                "Picture=logo;logo.png;&h2;&h0;false\n",
+                encoding="utf-8",
+            )
+            self.git(root, "add", "App.xojo_code", "logo.png", "Example.xojo_project")
+            completed = self.commit(root)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            manifest.write_text(
+                "Type=Desktop\n"
+                "RBProjectVersion=2026.021\n"
+                "Class=Hook;App.xojo_code;&h1;&h0;false\n"
+                "Picture=logo;logo.png;&h2;&h0;false\n",
+                encoding="utf-8",
+            )
+            self.git(root, "add", "Example.xojo_project")
+            completed = self.commit(root)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_a_manifest_companion_inside_a_submodule_commits_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            dependency = base / "dependency"
+            dependency.mkdir()
+            for args in (
+                ("init", "--quiet"),
+                ("config", "user.name", "Tester"),
+                ("config", "user.email", "tester@example.invalid"),
+            ):
+                completed = self.git(dependency, *args)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+            (dependency / "Thing.xojo_code").write_text(self.VALID, encoding="utf-8")
+            self.git(dependency, "add", "Thing.xojo_code")
+            completed = self.git(dependency, "commit", "--quiet", "-m", "dep")
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+
+            root = base / "super"
+            root.mkdir()
+            self.init_repo(root)
+            # Submodule content is absent from the superproject's index, so
+            # this only passes if the hook copies the submodule's worktree.
+            completed = self.git(
+                root,
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "add",
+                "--quiet",
+                dependency.as_uri(),
+                "Dependency",
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            manifest = root / "Example.xojo_project"
+            manifest.write_text(
+                "Type=Desktop\n"
+                "RBProjectVersion=2026.021\n"
+                "Class=Thing;Dependency/Thing.xojo_code;&h1;&h0;false\n",
+                encoding="utf-8",
+            )
+            self.git(root, "add", "Example.xojo_project")
+            completed = self.commit(root)
+            self.assertEqual(
+                completed.returncode, 0, completed.stdout + completed.stderr
+            )
+
+    def test_format_divergence_blocks_with_the_restage_hint(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.init_repo(root)
+            (root / "App.xojo_code").write_bytes(
+                b"#tag Class\nProtected Class Hook\n#tag EndClass"
+            )
+            self.git(root, "add", "App.xojo_code")
+            completed = self.commit(root)
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("format", completed.stderr)
+            self.assertIn("commit again", completed.stderr)
 
 
 if __name__ == "__main__":

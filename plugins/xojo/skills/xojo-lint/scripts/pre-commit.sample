@@ -11,28 +11,51 @@
 #
 # The default below finds xojo_lint.py inside the installed Claude Code
 # plugin. The version directory in that path changes on upgrade, so a glob
-# resolves it. For any other install, set XOJO_LINT to the real location of
-# xojo_lint.py.
+# resolves it; it assumes a single cached plugin version. For any other
+# install, export XOJO_LINT or set it here.
 
-XOJO_LINT=$(set -- "$HOME"/.claude/plugins/cache/xojo-tools/xojo/*/skills/xojo-lint/scripts/xojo_lint.py; echo "$1")
+[ -n "${XOJO_LINT:-}" ] || XOJO_LINT=$(set -- "$HOME"/.claude/plugins/cache/xojo-tools/xojo/*/skills/xojo-lint/scripts/xojo_lint.py; echo "$1")
 [ -f "$XOJO_LINT" ] || {
-    echo "pre-commit: xojo_lint.py not found; set XOJO_LINT in this hook." >&2
+    echo "pre-commit: xojo_lint.py not found; export XOJO_LINT or set it in this hook." >&2
+    exit 1
+}
+# Hooks run from the top of the worktree, so a relative XOJO_LINT is
+# anchored here before the cd into the temporary directory below.
+case "$XOJO_LINT" in /*) ;; *) XOJO_LINT="$PWD/$XOJO_LINT" ;; esac
+
+# The "*.xojo_*" pathspec matches in subdirectories too (git wildcards cross
+# slashes), so no post-filtering is needed.
+staged=$(git diff --cached --name-only --diff-filter=ACMR -- "*.xojo_*") || exit 1
+[ -n "$staged" ] || exit 0
+
+# The hook checks the staged content, not the working tree: the index is
+# copied into a temporary directory and the changed .xojo_* files are
+# linted there, so a file staged and then edited again is checked exactly
+# as it would be committed. The whole index is copied -- not only .xojo_*
+# files -- so a staged manifest's referenced companions and assets exist
+# beside the copy exactly as they will exist in the commit; a companion
+# that exists only in the working tree but was never added is correctly
+# reported missing. Paths flow NUL-separated (-z, xargs -0) end to end, so
+# names with spaces, quotes, or non-ASCII characters survive regardless of
+# core.quotepath.
+tmpdir=$(mktemp -d) || exit 1
+trap 'rm -rf "$tmpdir"' EXIT
+git checkout-index --all --prefix="$tmpdir/" || exit 1
+# Submodule files are not in the superproject's index, so their
+# working-tree state stands in for the copy.
+export tmpdir
+git submodule --quiet foreach 'mkdir -p "$tmpdir/$displaypath" && cp -R ./. "$tmpdir/$displaypath"' || exit 1
+find "$tmpdir" -type f | grep -q . || {
+    echo "pre-commit: could not copy the staged files for linting." >&2
     exit 1
 }
 
-# Paths flow NUL-separated (-z, xargs -0) end to end, so names with spaces,
-# quotes, or non-ASCII characters survive regardless of core.quotepath.
-count=$(git diff --cached --name-only --diff-filter=ACMR -z \
-    | grep -zc '\.xojo_' 2>/dev/null | tr -d '[:space:]')
-[ "${count:-0}" -eq 0 ] && exit 0
-
-# The hook checks the files as they are on disk. A file staged and then
-# edited again is checked in its newest form.
-git diff --cached --name-only --diff-filter=ACMR -z | grep -z '\.xojo_' \
-    | xargs -0 python3 "$XOJO_LINT" check --all --warnings-as-errors || exit 1
-
-git diff --cached --name-only --diff-filter=ACMR -z | grep -z '\.xojo_' \
-    | xargs -0 python3 "$XOJO_LINT" format --check || {
-    echo "pre-commit: run \`python3 $XOJO_LINT format\` on the files above, then commit again." >&2
+# Linting the copies from inside the temporary directory keeps the reported
+# paths repo-relative.
+git diff --cached --name-only --diff-filter=ACMR -z -- "*.xojo_*" \
+    | (cd "$tmpdir" && xargs -0 python3 "$XOJO_LINT" check --all --warnings-as-errors --) || exit 1
+git diff --cached --name-only --diff-filter=ACMR -z -- "*.xojo_*" \
+    | (cd "$tmpdir" && xargs -0 python3 "$XOJO_LINT" format --check --) || {
+    echo "pre-commit: run \`python3 $XOJO_LINT format\` on the files above in your working tree, then stage the fixes (git add) and commit again." >&2
     exit 1
 }
