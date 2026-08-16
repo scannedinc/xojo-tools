@@ -13,6 +13,9 @@ What they pin:
   every inventory page was converted, and survives when sources are
   missing or the inventory yields no pages at all (the mass-deletion
   gates)
+- the numeric argument validators reject nan, inf, and finite values
+  large enough to overflow settimeout exactly like inf, while keeping
+  their zero semantics apart (pos_float rejects 0, nonneg_float takes it)
 
 Run:  python3 test_docs.py
 """
@@ -27,6 +30,7 @@ import zlib
 from unittest import mock
 
 import docs
+from helptext import nonneg_float
 
 
 class PruneStaleTests(unittest.TestCase):
@@ -186,6 +190,26 @@ class RunBuildPruneGateTests(unittest.TestCase):
 
         self.assertTrue(stale.exists())
         self.assertTrue(other.exists())
+
+
+class ValidatorTests(unittest.TestCase):
+    def reject(self, validator, value):
+        with self.assertRaises(argparse.ArgumentTypeError):
+            validator(value)
+
+    def test_both_reject_non_finite_oversized_and_junk(self):
+        for value in ("nan", "inf", "-inf", "-1", "abc", "9999999999"):
+            for validator in (docs.pos_float, nonneg_float):
+                with self.subTest(validator=validator.__name__, value=value):
+                    self.reject(validator, value)
+
+    def test_zero_separates_the_two(self):
+        self.reject(docs.pos_float, "0")
+        self.assertEqual(nonneg_float("0"), 0.0)
+
+    def test_ordinary_values_parse(self):
+        self.assertEqual(docs.pos_float("1.5"), 1.5)
+        self.assertEqual(nonneg_float("1.5"), 1.5)
 
 
 if __name__ == "__main__":

@@ -149,10 +149,21 @@ class HelpConfig:
             object.__setattr__(self, "usage", (self.usage,))
 
 
+# Any real delay or timeout is minutes; ~11.6 days is the cap. Merely-finite
+# is not enough: a large value like 1e18 overflows settimeout exactly like
+# 'inf' does.
+SECONDS_MAX = 10 ** 6
+
+
 def nonneg_float(value: str) -> float:
-    number = float(value)
-    if number < 0:
-        raise argparse.ArgumentTypeError("must not be negative")
+    try:
+        number = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be a number")
+    if not 0 <= number <= SECONDS_MAX:  # False for nan, on purpose
+        raise argparse.ArgumentTypeError(
+            "must be between 0 and %d" % SECONDS_MAX
+        )
     return number
 
 

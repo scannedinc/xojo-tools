@@ -29,6 +29,7 @@ import archive
 from helptext import (
     HelpConfig,
     HelpfulParser,
+    SECONDS_MAX,
     nonneg_float,
     nonneg_int,
 )
@@ -127,9 +128,14 @@ def release_arg(value: str) -> str:
 
 def pos_float(value: str) -> float:
     """A timeout of 0 would put every socket in non-blocking mode."""
-    number = float(value)
-    if number <= 0:
-        raise argparse.ArgumentTypeError("must be greater than zero")
+    try:
+        number = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be a number")
+    if not 0 < number <= SECONDS_MAX:  # False for nan, on purpose
+        raise argparse.ArgumentTypeError(
+            "must be greater than zero, at most %d" % SECONDS_MAX
+        )
     return number
 
 # Site-level artifacts that are not listed in objects.inv. objects.inv is what
