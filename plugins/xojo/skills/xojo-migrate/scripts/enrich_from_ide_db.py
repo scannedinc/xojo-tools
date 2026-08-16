@@ -69,12 +69,18 @@ def usable(path):
     opened before it can be chosen.
     """
     try:
+        # connect is lazy; an unreadable path raises here all the same.
         con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return False
+    try:
         con.execute("select class_name, old_name, new_name from items "
                     "limit 1").fetchall()
         return True
     except sqlite3.Error:
         return False
+    finally:
+        con.close()
 
 
 # A Xojo release is [Year].[ReleaseNumber].[MinorRelease] -- 2026.2.1 --
@@ -178,12 +184,16 @@ def ide_rows(db):
     # Read-only: the database lives inside the Xojo application bundle and
     # is never ours to modify, not even to leave a journal beside.
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-    items = [(c, o, n, "member") for c, o, n in
-             con.execute("select class_name, old_name, new_name from items")]
-    events = [(c, o, n, "event") for c, o, n in con.execute(
-        "select cl.name, e.old_name, e.new_name from events e "
-        "join classes cl on cl.id = e.class_id")]
-    return items + events
+    try:
+        items = [(c, o, n, "member") for c, o, n in
+                 con.execute("select class_name, old_name, new_name "
+                             "from items")]
+        events = [(c, o, n, "event") for c, o, n in con.execute(
+            "select cl.name, e.old_name, e.new_name from events e "
+            "join classes cl on cl.id = e.class_id")]
+        return items + events
+    finally:
+        con.close()
 
 
 def plan(coverage, rows, docs, release):

@@ -233,6 +233,66 @@ class FindDbTests(unittest.TestCase):
         self.assertIn("2025.2.1", str(self.find_in(root)))
 
 
+class ConnectionCloseTests(unittest.TestCase):
+    """usable() and ide_rows() open the database; both must close it.
+
+    Checked deterministically: sqlite3.connect is wrapped to record every
+    connection handed out, and a closed connection refuses to execute. A
+    ResourceWarning filter cannot pin this -- the warning fires in the
+    finalizer during gc, where an error filter is "Exception ignored"
+    rather than a test failure.
+    """
+
+    def setUp(self):
+        self.dir = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir)
+        self.db = make_db(self.dir / "ok.db",
+                          items=[("ListBox", "Bevel", "BevelStyle")],
+                          classes=[(1, "ListBox", None)],
+                          events=[(1, "Open", "Opening()")])
+
+    def record_connections(self):
+        opened = []
+        real_connect = sqlite3.connect
+
+        def recording_connect(*args, **kwargs):
+            con = real_connect(*args, **kwargs)
+            opened.append(con)
+            return con
+
+        sqlite3.connect = recording_connect
+        self.addCleanup(setattr, sqlite3, "connect", real_connect)
+        return opened
+
+    def assert_all_closed(self, opened):
+        self.assertTrue(opened)
+        for con in opened:
+            with self.assertRaises(sqlite3.ProgrammingError):
+                con.execute("select 1")
+
+    def test_usable_closes_after_a_successful_probe(self):
+        opened = self.record_connections()
+        self.assertTrue(E.usable(self.db))
+        self.assert_all_closed(opened)
+
+    def test_usable_closes_after_a_failed_probe(self):
+        # connect succeeds on any readable file; the probe query is what
+        # fails, and that path must close too.
+        empty = sqlite3.connect(str(self.dir / "empty.db"))
+        empty.execute("create table something (x)")
+        empty.commit()
+        empty.close()
+        opened = self.record_connections()
+        self.assertFalse(E.usable(self.dir / "empty.db"))
+        self.assert_all_closed(opened)
+
+    def test_ide_rows_closes_the_connection(self):
+        opened = self.record_connections()
+        rows = E.ide_rows(self.db)
+        self.assertEqual(len(rows), 2)
+        self.assert_all_closed(opened)
+
+
 class ParseVersionTests(unittest.TestCase):
     def test_reads_both_release_spellings(self):
         for path, want in (
