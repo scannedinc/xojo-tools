@@ -404,6 +404,23 @@ def build_parser():
     return parser
 
 
+def current_version_line():
+    """What the manifests say today, for the bare-invocation help.
+
+    Never raises: help is the one place that has to render whatever
+    state the repository is in, including a broken one.
+    """
+    try:
+        versions = {path: read_version(path) for path in MANIFESTS}
+    except ReleaseError as exc:
+        return "Current version: cannot tell -- %s" % exc
+    if len(set(versions.values())) == 1:
+        return "Current version: %s" % versions[CLAUDE_MANIFEST]
+    return "Current version: the manifests disagree -- %s" % ", ".join(
+        "%s %s" % (path.parent.name, version)
+        for path, version in versions.items())
+
+
 def fail(message, status):
     # stdout is block-buffered when redirected; flush it or the plan
     # printed earlier lands after this message in the log.
@@ -417,6 +434,7 @@ def main(argv=None):
     parser = build_parser()
     if not argv:
         parser.print_help()
+        print("\n%s" % current_version_line())
         return 0
     args = parser.parse_args(argv)
 
