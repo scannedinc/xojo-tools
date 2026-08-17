@@ -5,21 +5,25 @@ A desktop toolbar companion is a tagged designer tree with a `DesktopToolbar` ro
 ```text
 #tag DesktopToolbar
 Begin DesktopToolbar MainToolbar
-   Inherits DesktopToolbar
-   Style = 0
-   Begin DesktopToolbarButton NewButton
-      Caption = "New"
-      Tooltip = "Create a document"
-      ButtonStyle = 0
-      Icon = 204128255
-      Symbol = ""
-   End
-   Begin DesktopToolbarButton FlexibleSpace
-      ButtonStyle = 6
-   End
+Inherits DesktopToolbar
+	Style = 0
+	Begin DesktopToolbarButton NewButton
+		Caption = "New"
+		Tooltip = "Create a document"
+		ButtonStyle = 0
+		Icon = 204128255
+		Symbol = ""
+	End
+	Begin DesktopToolbarButton FlexibleSpace
+		ButtonStyle = 6
+	End
 End
 #tag EndDesktopToolbar
 ```
+
+A toolbar region is indented with tabs, not spaces, in both generations. `Inherits` is the exception to the nesting: it belongs to the root block but is written at zero indentation, where the root's own properties sit at one tab. A legacy `Toolbar` root states no `Inherits` line at all.
+
+Toolbar regions do not order their properties the way other designer families do, and no ordering rule is established for them beyond `Enabled` following `Caption` on a button that states it.
 
 Observed button fields are `Caption`, `Tooltip`, `ButtonStyle`, `Symbol`, optional `Enabled`, and `Icon`. `Icon` is the referenced image's low 32-bit project ID pattern written as signed decimal. For example, image ID `&h000000000C2ABFFF` becomes `204128255`; a value with bit 31 set is negative. It is not an image-array index. See the conversion rule in [xojo-project.md](xojo-project.md#ids-and-cross-references).
 

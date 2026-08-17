@@ -91,7 +91,7 @@ End
 #tag EndIOSContainerControl
 ```
 
-Other examples use container/view root classes. Code may be under `WindowCode`, despite the item being mobile. Preserve the existing code-region name rather than normalizing it.
+Other examples use container/view root classes. Code may be under `WindowCode`, despite the item being mobile. The code-region tag follows the project's target rather than the designer family: an iOS-target item writes `WindowCode` and an Android-target item writes `ScreenCode`, and a launch screen or a legacy container follows the same split. Preserve the existing code-region name rather than normalizing it.
 
 ## iOS layouts and layout trees
 

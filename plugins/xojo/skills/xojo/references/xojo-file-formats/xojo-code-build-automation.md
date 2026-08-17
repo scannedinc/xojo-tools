@@ -115,3 +115,11 @@ The referenced `.xojo_script` is plain XojoScript source and remains an external
 ## The signing step and the project type
 
 A `SignProjectStep` states `DeveloperID` even when it holds nothing — except in an iOS project, where the step is written with no properties at all. The division is by project type and holds for every signing step.
+
+`macOSEntitlements` follows the same kind of division. A signing step in the `Mac OS X` step list of a desktop or console project states it; the step lists of Web, Mobile and iOS projects state no entitlements line at all. The value is present whether or not the project carries entitlements of its own: where none have been set it is the all-off default, and that default is the only value observed.
+
+```text
+macOSEntitlements={"App Sandbox":"False","Hardened Runtime":"False","Notarize":"False","UserEntitlements":""}
+```
+
+The line is therefore not recoverable from a binary or XML project by presence alone, because those formats record nothing for a signing step whose entitlements are all off. A writer producing tagged text supplies the default rather than omitting the line.

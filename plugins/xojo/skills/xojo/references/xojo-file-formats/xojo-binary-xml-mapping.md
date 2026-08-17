@@ -33,6 +33,8 @@ Spaces shown inside backticks are significant. For example, `Img `, `Lib `, and 
 | `xWbV` | `WebView` | `pLib` | `Library` |
 | `iosv` | `IOSView` | `pWSe` | `WebSession` |
 | `pWPg` | `WebView` |  |  |
+| `pDC1` | `PostgreSQLConnection` | `pDC3` | `MySQLConnection, ` |
+| `pDC4` | `ODBCConnection` |  |  |
 
 An empty obsolete `pItm` block has no XML block. Unknown nonempty block tags must not be treated as `pItm` or discarded.
 
@@ -170,6 +172,11 @@ Four of these tags belong to superseded generations and survive only in projects
 | `Vsbl` | `Visible` | `CPif` | `InheritedFrom` |
 | `bkGP` | `BookmarkGroup` | `MiKK` | `MacControlModifier` |
 | `Meta` | `MetaData` |  |  |
+| `AppN` | `AppName` | `dbnm` | `DBName` |
+| `Mult` | `Multithreaded` | `dbpt` | `DBPort` |
+| `auto` | `Autoconnect` | `dbto` | `DBTimeout` |
+| `dbPW` | `DBPassword` | `dbhs` | `DBHost` |
+| `dbUN` | `DBUserName` |  |  |
 
 ## Contextual and non-bijective records
 
@@ -182,7 +189,7 @@ The following records do not have a simple one-record/one-element mapping:
 | `Stag` | `<PropertyVal Name="Stage">...</PropertyVal>` in a legacy SQLite connection |
 | `auto` | `<PropertyVal Name="AutoConnect">True|False</PropertyVal>` in a legacy SQLite connection |
 | `pasw` | Omitted internal encrypted-password slot |
-| `PrGp`, `type`, `visi` inside `PDef` | Omitted with the other internal property metadata |
+| `PrGp`, `type`, `visi`, `Enco` inside `PDef` | Omitted with the other internal property metadata |
 
 `Icon` can be an integer selector or a group depending on its parent. `Rpsc`, `data`, `name`, and `type` also occur with more than one RbBF value type. The binary value-type field and XML parent context are authoritative; the tag name alone is insufficient for those records.
 

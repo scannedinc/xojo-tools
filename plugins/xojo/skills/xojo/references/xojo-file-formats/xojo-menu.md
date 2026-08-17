@@ -28,7 +28,7 @@ The root and all descendants use `Begin`/`End`; nesting defines submenus. The co
 Common fields are:
 
 - `Text`, `Visible`, `Index`, and `SpecialMenu`;
-- `AutoEnabled` and the legacy spelling `AutoEnable`, sometimes emitted together with the same logical setting;
+- `AutoEnabled` and the legacy spelling `AutoEnable`, emitted together in the current generation and singly in the legacy one — see below;
 - `ShortcutKey` and legacy `Shortcut`, also sometimes emitted together;
 - `MenuModifier`, with occasional `AltMenuModifier`;
 - `MacOptionKey` and `PCAltKey` when the shortcut distinguishes the Mac Option key from the Windows Alt key;
@@ -39,6 +39,17 @@ Fields are not guaranteed to be present on every menu-item subclass. Numeric val
 `MacOptionKey` maps to XML `MacOptionModifier` and RbBF `Mopt`; `PCAltKey` maps to XML `PCAltModifier` and RbBF `MiAK`.
 
 `AutoEnabled` and `AutoEnable` are two tagged-text spellings of the same XML `MenuAutoEnable` / RbBF `maEn` value. When both appear, they carry the same Boolean. `SubMenu=True` maps to bit 0 of XML `ItemFlags` / RbBF `flag`; the nested child tree remains the authoritative submenu contents.
+
+### Two generations of menu item
+
+A menu item is written in one of two forms, and the property set and the field order move together — a file does not mix them:
+
+| Generation | `AutoEnable` spelling | Field order |
+| --- | --- | --- |
+| current | both `AutoEnabled` and `AutoEnable` | `Index` before `Text` |
+| legacy | `AutoEnable` only | `Text` before `Index` |
+
+The legacy order is an exception to the property ordering other designer families follow, so a writer must not sort a legacy menu item's fields by name. Neither the item's class name nor its `AutoEnable` value identifies the generation on its own: `MenuItem` rather than `DesktopMenuItem` still occurs with the current layout. The pair of properties and the field order decide it together. Because RbBF stores one `maEn` record for both spellings, the generation is not recoverable from a binary project alone.
 
 ## Text, localization, and separators
 

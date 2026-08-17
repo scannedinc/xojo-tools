@@ -60,9 +60,9 @@ A group of appearance properties has two names, an older and a current one: `Tex
 
 Both forms occur in tagged text, and both occur on the same class, so the class name does not determine which one a block carries. A `Begin RadioButton` block may carry either `TextSize` or `FontSize`. What it carries is whatever the project itself holds: a project that has never been through a writer that renames the property keeps the older name, and one that has carries the current name.
 
-A reader must therefore accept both spellings for these properties and must not treat one as invalid. A writer must preserve the spelling it was given rather than normalising to either form, because doing so would change the file for every project that had the other.
+A reader must therefore accept both spellings for these properties and must not treat one as invalid. A writer must preserve the spelling it was given rather than normalizing to either form, because doing so would change the file for every project that had the other.
 
-The two forms are not interchangeable within a single block. A block carries one or the other, never both, and the value belongs to whichever name is present.
+A block usually carries one of the two, but it may carry both, and a reader must not treat a block that states both as malformed. Where both are present the values agree, and both rows are preserved rather than collapsed. The both-form is confined to the current-generation classes for the font and text-alignment pairs, and occurs on classic-named classes as well for `HelpTag`/`Tooltip` and `AutoDeactivate`/`AllowAutoDeactivate`.
 
 ### Item order inside a code region
 
@@ -94,7 +94,7 @@ Report bands and their controls follow the same order. Toolbar regions are a sep
 A designer property's declared type, not its value and not its name, decides how the value is written.
 
 - A property declared `String` is quoted; one declared anything else is bare. The same property name therefore appears both ways: one control states `TabPanelIndex = 0` and another `TabPanelIndex = "0"`, and both are correct for the control that carries them.
-- A property declared `Color` is written as a `&c` literal, so a stored `0` becomes `&c00000000`. A property declared `ColorGroup` holds a reference rather than a colour: a plain number in one is an index and stays as it stands, while a `&h` or `&c` literal it may also hold keeps the `&c` form. `TextColor = 0` and `ColorOff = 0` are both ordinary, and neither can be told from the other by name.
+- A property declared `Color` is written as a `&c` literal, so a stored `0` becomes `&c00000000`. A property declared `ColorGroup` holds a reference rather than a color: a plain number in one is an index and stays as it stands, while a `&h` or `&c` literal it may also hold keeps the `&c` form. `TextColor = 0` and `ColorOff = 0` are both ordinary, and neither can be told from the other by name.
 - A property whose declared type is an enumeration, written `Class.Members`, is stated as the enumeration's zero rather than as an empty string when the item stores no value for it.
 
 The declared type is Inspector metadata. A Xojo Binary Project records it; the Xojo XML Project does not, so a conversion that passes through XML cannot recover which form a given property should use.

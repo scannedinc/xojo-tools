@@ -105,7 +105,9 @@ Value spellings inside `Begin`/`End` blocks changed in four ways. Legacy spellin
 
 | Concern | Legacy spellings | Current spelling |
 | --- | --- | --- |
-| Color | `&hRRGGBB`, a plain decimal integer such as `16777215`, or a quoted `"&cRRGGBB"` | `&cRRGGBBAA` |
+| Color | `&hAARRGGBB` | `&cRRGGBBAA` |
+| Color | `&hRRGGBB` | `&cRRGGBB`, six digits, no transparency byte appended |
+| Color | a plain decimal integer such as `16777215` | `&cRRGGBB00`, eight digits, with an opaque transparency byte |
 | Number | Exponent notation such as `3.99e+2` and `4.42e+2` occurs alongside plain decimals | Plain decimal only; exponent notation is not written |
 | Unset object reference | `""` — for example `Backdrop = ""`, `MenuBar = ""` | `0` |
 | Unset boolean or number | `""` | The typed default, such as `False`, `0` or `0.0` |
@@ -139,14 +141,21 @@ Many desktop control properties have two names — a classic spelling and a late
 | `Placement` | `DefaultLocation` |
 | `TextAlign` | `TextAlignment` |
 | `TextFont`, `TextSize`, `TextUnit` | `FontName`, `FontSize`, `FontUnit` |
-| `HelpTag` | `Hint` |
+| `HelpTag` | `Tooltip` |
 | `LimitText` | `MaximumCharactersAllowed` |
 | `Mask` | `ValidationMask` |
 | `Styled` | `AllowStyledText` |
 | `ScrollbarVertical` | `HasVerticalScrollbar` |
 | `EnableDrag` | `AllowRowDragging` |
+| `TabStop` | `AllowTabStop` |
+| `Mode` | `RunMode` |
+| `ButtonStyle` | `MacButtonStyle` |
 
-A `Begin Label` block uses the classic spellings; a `Begin DesktopLabel` block uses the aliases. The same split holds for `Window` against `DesktopWindow`, `PushButton` against `DesktopButton`, `TextField` against `DesktopTextField`, `TextArea` against `DesktopTextArea`, `ListBox` against `DesktopListBox`, `Slider` against `DesktopSlider`, and the rest of the `Desktop`-prefixed family. Because the `Desktop`-prefixed classes are current-generation only, the alias vocabulary is reachable only from a current-generation file — but the reverse does not hold: a current-generation file that contains classic control classes uses the classic spellings throughout, and a legacy-extension file may be written with the alias vocabulary. Read the `Begin` class name, not the file extension, to decide which spellings to expect.
+`Hint` is not a member of this table. It is the placeholder text of a text-entry control and is unrelated to `HelpTag`, which is the hover help; a block states both, and only text-entry classes state `Hint` at all.
+
+The class name predicts which spelling a block carries but does not determine it. A `Begin Label` block overwhelmingly uses the classic spellings and a `Begin DesktopLabel` block the aliases, and the same tendency holds for `Window` against `DesktopWindow`, `PushButton` against `DesktopButton`, `TextField` against `DesktopTextField`, and the rest of the `Desktop`-prefixed family. But either spelling occurs on either class: a `Begin RadioButton` block may carry `TextSize` or `FontSize`, and a `Begin DesktopLabel` block may carry either as well. What a block carries is what the project itself holds — a project that has never been through a writer that renames the property keeps the older name, and one that has carries the current one.
+
+A reader must therefore accept both spellings on every class and must not treat one as invalid on the strength of the class name. Read the `Begin` class name rather than the file extension as a guide, but do not rely on it as a rule.
 
 The renaming is not exhaustive, so the pairing cannot be inferred from a spelling rule. `Caption` on a button or group box, `Text` on a label or text field, `Value` on a checkbox, and the misspelled `Resizeable` on a window are all carried into the `Desktop`-prefixed classes unchanged. Only the pairs listed above are defined.
 

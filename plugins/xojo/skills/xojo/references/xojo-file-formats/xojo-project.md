@@ -142,6 +142,23 @@ Directory nesting alone is therefore not authoritative. Resolve the parent ID to
 
 Item IDs are allocated when a project is created; they are not derived from names. Recent IDs often have their low 11 bits set and fit below `2^31`, but older files violate both patterns and may set the high 32 bits. Treat every ID as an opaque 64-bit identity: never validate, truncate, or generate one from the recent pattern.
 
+The upper half of an IDE-written ID is the sign extension of bit 31 of the lower half — `FFFFFFFF` where that bit is set, `00000000` where it is clear — so it carries no information of its own, which is why the binary and XML forms can store the low 32 bits alone and still name the same item. A hand-edited manifest can hold an upper half that is neither value, or the wrong one of the two. A reader must not assume the relationship holds, and a writer must not recompute an upper half it was given.
+
+An ID outside that pattern is not stable, because the sixteen digits are carried as a signed 64-bit value in a binary64. Any magnitude below `2^53` survives exactly, which covers every ID the format itself allocates: a positive 32-bit value and a sign-extended negative one are both small enough. A larger magnitude is rounded to the nearest representable double, ties to even, so an ID such as `&hDEADBEEF5CF31FFF` becomes `&hDEADBEEF5CF32000` — a different item identity, arrived at silently.
+
+The rounding is a property of how the value is carried rather than of the manifest grammar, and it applies before the low 32 bits are taken, so the binary and XML forms of a rounded item hold the rounded low half. Cross-references follow: a child's `ParentID` is rewritten to the parent's rounded ID, and the project stays internally consistent while naming items it was not given.
+
+| Written | Signed magnitude | Read back as |
+| --- | --- | --- |
+| `&h001FFFFFFFFF0001` | below `2^53` | `&h001FFFFFFFFF0001` |
+| `&h0020000000000002` | `2^53 + 2`, representable | `&h0020000000000002` |
+| `&h0020000000000001` | `2^53 + 1` | `&h0020000000000000` |
+| `&hFFE00000FFFF0001` | below `2^53`, negative | `&hFFE00000FFFF0001` |
+| `&hFFDFFFFF00000003` | past `2^53`, negative | `&hFFDFFFFF00000004` |
+| `&hDEADBEEFCAFE0005` | far past `2^53` | `&hDEADBEEFCAFE0000` |
+
+Treat `2^53` as the point beyond which an item ID stops round-tripping through this format at all.
+
 IDs must be unique within one manifest, and every nonzero parent ID must resolve to another item row. Xojo may replace duplicate IDs and reset unresolved parents to the root when saving. A validator should report both conditions as errors.
 
 The low 32-bit identity pattern can appear elsewhere as a signed decimal:
@@ -163,7 +180,9 @@ RawData=invoice;../invoice.html;&h...;&h...;false
 AppleScript=Add;../Add.scpt;&h...;&h...;false
 ```
 
-The Navigator name becomes the project symbol; spaces may be removed or normalized by the IDE. Preserve the actual relative path and parent ID. A Navigator parent does not require the asset itself to reside in a matching disk directory: sound, movie, AppleScript, and raw-data items can remain next to the manifest while their parent IDs place them in nested Navigator folders.
+The Navigator name becomes the project symbol; spaces may be removed or normalized by the IDE. Preserve the parent ID. A Navigator parent does not require the asset itself to reside in a matching disk directory: sound, movie, AppleScript, and raw-data items can remain next to the manifest while their parent IDs place them in nested Navigator folders.
+
+The path is relative to the manifest, not to the file it names, so it is a function of where the manifest itself sits. Writing a manifest at a different depth from the one it was read at must resolve the stored path against the original location and re-express it against the new one; carrying the string across unchanged aims it somewhere else. The same holds for the paths inside a copy-file build step, which are relative to the project that states them. Two manifests in different directories therefore state different paths for one file, and both are correct.
 
 ### Libraries and dependencies
 

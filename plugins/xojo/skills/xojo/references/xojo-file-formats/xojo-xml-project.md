@@ -69,7 +69,10 @@ The following block types and RbBF correspondences are established.
 | `ApplicationIcon` | `Aicn` | Application icon set |
 | `LaunchImages` | `Limg` | Launch-image set |
 | `Report` | `pRpt` | Report layout and code |
+| `PostgreSQLConnection` | `pDC1` | IDE-managed PostgreSQL connection |
 | `SQLiteLocalConnection` | `pDC2` | IDE-managed SQLite connection |
+| `MySQLConnection, ` | `pDC3` | IDE-managed MySQL connection |
+| `ODBCConnection` | `pDC4` | IDE-managed ODBC connection |
 | `BuildAutomation` | `BSts` | Build-automation source item |
 | `BuildStepsList` | `Bsls` | Ordered project build steps |
 | `BuildProjectStep` | `BSbu` | Built-in build-project step |

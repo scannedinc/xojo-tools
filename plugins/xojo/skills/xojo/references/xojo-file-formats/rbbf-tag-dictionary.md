@@ -23,7 +23,7 @@ Two names in this list collide: `BCar` and `BCMO` both describe a Carbon build n
 
 Where a tag appears here but has no XML element, the absence should not be read as a guarantee that no element exists — only that none is known.
 
-The set of tags is open. Newer writers emit records that older ones do not, and a reader that treats an unrecognised tag as a fatal error will reject files that are otherwise well formed.
+The set of tags is open. Newer writers emit records that older ones do not, and a reader that treats an unrecognized tag as a fatal error will reject files that are otherwise well formed.
 
 Four records are named but carry no independently established payload semantics: `Meta` (`MetaData`), an empty byte string inside a database-connection block, and `tbs ` (`ToolbarStyle`), `tims` (`ToolItemAllowMulticolorSymbol`) and `tis ` (`ToolItemSymbol`) inside a desktop toolbar block, the first two integers and the third an empty byte string. Their names come from the XML elements they correspond to; their payloads occur only at empty or zero values, so nothing further about them can be inferred from the payload alone. Note that two of these tags are four characters wide only because of a trailing space, which is significant.
 
