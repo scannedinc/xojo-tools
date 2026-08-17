@@ -1,6 +1,6 @@
 # `.xojo_report`
 
-Report companions are tagged text layouts. The four examples contain a root report, ordered bands, report controls inside those bands, and a `ReportCode` region.
+Report companions are tagged text layouts. A report file contains a root report, ordered bands, report controls inside those bands, and a `ReportCode` region.
 
 ## Layout shape
 
@@ -39,6 +39,8 @@ End
 Band start lines intentionally have two spaces after `Begin`: the class position is empty and the final token is the band name. Do not parse them as ordinary `Begin <class> <instance>` rows.
 
 ## Bands
+
+A band states `Type` first and the rest of its properties in name order, the way a designer block states `Compatibility` ahead of its sorted ones. `Type` is not part of that order.
 
 Observed names include `PageHeader`, `Body`, `PageFooter`, `GroupHeader1`, `GroupHeader2`, `GroupFooter1`, and `GroupFooter2`. Band `Type` values correlate as follows:
 

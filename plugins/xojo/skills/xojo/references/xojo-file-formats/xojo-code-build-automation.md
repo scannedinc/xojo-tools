@@ -2,6 +2,8 @@
 
 A project normally has a `BuildSteps` manifest item whose companion is `Build Automation.xojo_code`.
 
+A build-step list belongs to that item and is written inside its region. A project may instead hold a list whose container is the project root, and such a list is a project item in its own right: it is left out of the `#tag BuildAutomation` region, it gets an empty code file named after it, and the manifest states no row for it. An empty `.xojo_code` file with no manifest row is therefore well formed and should not be treated as a truncated item.
+
 ## Structure
 
 ```text
@@ -73,7 +75,9 @@ The same menus and values are used on the Linux, Mac OS X, and Windows lists. `T
 
 `Subdirectory` is raw UTF-8 after `Subdirectory = `, including spaces and non-ASCII characters, with no quoting or escaping. An empty value leaves the space following `=` at the end of the line.
 
-Each copied input has one `FolderItem` line, in list order. The Base64 payload is a percent-encoded, UTF-8 relative POSIX path. The path is relative to the project file as if that file were a directory, so a sibling file is represented as `../File.txt`. The tested literal set includes ASCII letters, digits, `.`, `,`, `=`, `@`, `'`, `!`, `$`, `&`, `+`, `~`, `(`, `)`, and `/`. The tested percent-encoded set includes spaces, semicolons, square and curly brackets, `^`, `%`, `?`, `#`, double quotes, angle brackets, `|`, backticks, and non-ASCII UTF-8 bytes; hexadecimal digits are uppercase. On macOS, filenames can consequently reflect the filesystem's decomposed Unicode form. Decode Base64 first and percent-decoding second when resolving a path. Preserve the original encoded bytes when rewriting without relocating the file.
+Each copied input has one `FolderItem` line, in list order. The Base64 payload is a percent-encoded, UTF-8 relative POSIX path. The path is relative to the project file as if that file were a directory, so a sibling file is represented as `../File.txt`. A path naming a folder rather than a file ends in a separator, and the separator is part of what the path means.
+
+Saving the project to a new location re-aims such a path only while it stays inside the directory holding the project. A path that climbs out of that directory names a location the project has no bearing on — a temporary folder, or a directory on the machine that first saved it — and it is written unchanged. The tested literal set includes ASCII letters, digits, `.`, `,`, `=`, `@`, `'`, `!`, `$`, `&`, `+`, `~`, `(`, `)`, and `/`. The tested percent-encoded set includes spaces, semicolons, square and curly brackets, `^`, `%`, `?`, `#`, double quotes, angle brackets, `|`, backticks, and non-ASCII UTF-8 bytes; hexadecimal digits are uppercase. On macOS, filenames can consequently reflect the filesystem's decomposed Unicode form. Decode Base64 first and percent-decoding second when resolving a path. Preserve the original encoded bytes when rewriting without relocating the file.
 
 ## IDE script steps
 
@@ -107,3 +111,7 @@ End
 In XML this is an `ExternalScriptStep` block with `StepAppliesTo`, `CopyFileStepArch`, `Target`, and `FileAlias` children. Because the observed alias contains NUL, XML represents `FileAlias` with a `Hex` child. RbBF uses block tag `IExs` and records `StpA`, `Arch`, `Targ`, and `alis` after the common `Name`, `Cont`, and `pasw` header.
 
 The referenced `.xojo_script` is plain XojoScript source and remains an external file. It is not a manifest project item and is not embedded in binary or XML project data. Its format is documented in [xojo-script.md](xojo-script.md).
+
+## The signing step and the project type
+
+A `SignProjectStep` states `DeveloperID` even when it holds nothing — except in an iOS project, where the step is written with no properties at all. The division is by project type and holds for every signing step.

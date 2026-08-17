@@ -29,8 +29,8 @@ There may be many `ImageRepresentation` regions. Their order is part of the IDE'
 
 ## Paths and bookmark data
 
-- `PartialPath` is normally the portable project-relative path and uses backslashes in the examples.
-- `FullPath` is an absolute path from the creating machine. It is useful to the IDE but is not portable.
+- `PartialPath` is normally the portable project-relative path and uses backslashes as its separator. It is relative to the directory holding the project file that references the image, not to the image declaration itself, so a converter writing the project to a different directory must resolve the stored path against the original location and re-express it against the new one. Writing the string unchanged aims it at nothing whenever the two directories differ, which is what happens when a binary project — a single file — becomes a project directory one level deeper.
+- `FullPath` is an absolute path from the creating machine. It is useful to the IDE but is not portable, and it cannot be used to re-aim `PartialPath`: it names an ancestor directory rather than the one `PartialPath` is relative to.
 - `SaveInfo` is opaque Base64 bookmark/alias data. Do not decode, edit, or synthesize it unless its platform format is independently understood.
 
 An empty app-icon or launch-image slot omits the path/bookmark fields but keeps its `ImageSpecification`. This is not the same as deleting the representation. Parsers should also accept representations without all three path fields.

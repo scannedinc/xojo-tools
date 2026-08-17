@@ -1,6 +1,6 @@
 # `.xojo_menu`
 
-Menu bar files are tagged text containing a nested menu-item tree. The 245 examples use current desktop menu items, with a small number of legacy `MenuItem` variants.
+Menu bar files are tagged text containing a nested menu-item tree. Current files use desktop menu items; the legacy `MenuItem` variants still occur in files written by older IDE generations.
 
 ## Structure
 

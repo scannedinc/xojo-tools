@@ -2,6 +2,8 @@
 
 This appendix maps the four-character block and record tags in a Xojo Binary Project to the semantic names in a Xojo XML Project. It complements [xojo-binary-project.md](xojo-binary-project.md) and [xojo-xml-project.md](xojo-xml-project.md).
 
+The tables here are the complete tag-to-XML correspondence, so a tag with no XML counterpart does not appear. For those tags — IDE editor state, obsolete build settings, and container structure — see [rbbf-tag-dictionary.md](rbbf-tag-dictionary.md), which names each tag in its own right.
+
 Spaces shown inside backticks are significant. For example, `Img `, `Lib `, and `ti  ` are four-byte tags with trailing spaces.
 
 ## Block tags
@@ -15,7 +17,7 @@ Spaces shown inside backticks are significant. For example, `Img `, `Lib `, and 
 | `BSsn` | `SignProjectScriptStep` | `pDWn` | `DesktopWindow` |
 | `BSts` | `BuildAutomation` | `pFTy` | `FileTypes` |
 | `Bsls` | `BuildStepsList` | `pFol` | `Folder` |
-| `IExs` | `ExternalScriptStep` |  |  |
+| `IExs` | `ExternalScriptStep` | `pExt` | `ExternalCode` |
 | `Img ` | `MultiImage` | `pLay` | `IOSLayout` |
 | `Limg` | `LaunchImages` | `pMed` | `Movie` |
 | `NotC` | `NotificationCenter` | `pMnu` | `Menu` |
@@ -28,9 +30,13 @@ Spaces shown inside backticks are significant. For example, `Img `, `Lib `, and 
 | `mobc` | `MobileContainer` | `pTxt` | `AnyFile` |
 | `pUIs` | `UIState` | `xWSs` | `WebSession` |
 | `pVew` | `Window` | `xWbC` | `WebContainer` |
-| `xWbV` | `WebView` |  |  |
+| `xWbV` | `WebView` | `pLib` | `Library` |
+| `iosv` | `IOSView` | `pWSe` | `WebSession` |
+| `pWPg` | `WebView` |  |  |
 
 An empty obsolete `pItm` block has no XML block. Unknown nonempty block tags must not be treated as `pItm` or discarded.
+
+Four of these tags belong to superseded generations and survive only in projects written before the rename. `iosv` is the legacy iOS view: the modern IDE preserves it rather than migrating it, so a current project can still contain one. `pExt` is an external project item — the block form of what a manifest references as a `.xojo_binary_code` or `.xojo_xml_code` file outside the project directory. `pWSe` and `pWPg` are the Web 1.0 spellings of `xWSs` and `xWbV`; both legacy tags carry the same XML block types as their successors.
 
 ## Record tags
 
@@ -161,8 +167,9 @@ An empty obsolete `pItm` block has no XML block. Unknown nonempty block tags mus
 | `Ver1` | `MajorVersion` | `vbET` | `EditorType` |
 | `Ver2` | `MinorVersion` | `wahl` | `WriteAheadLogging` |
 | `Ver3` | `SubVersion` | `winA` | `WindowsArchitecture` |
-| `Vsbl` | `Visible` |  |  |
-| `bkGP` | `BookmarkGroup` |  |  |
+| `Vsbl` | `Visible` | `CPif` | `InheritedFrom` |
+| `bkGP` | `BookmarkGroup` | `MiKK` | `MacControlModifier` |
+| `Meta` | `MetaData` |  |  |
 
 ## Contextual and non-bijective records
 

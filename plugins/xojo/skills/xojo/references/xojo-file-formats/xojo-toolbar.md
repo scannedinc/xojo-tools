@@ -60,3 +60,5 @@ The legacy text names `HelpTag`, `Style`, and `Pushed` correspond to XML `ItemHe
 Both toolbar generations use XML `ToolbarStyle`, `ToolItemSymbol`, and `ToolItemAllowMulticolorSymbol`. Their RbBF tags are respectively `tbs `, `tis `, and `tims`; the spaces in `tbs ` and `tis ` are significant.
 
 Current desktop toolbar output supplies `ToolItemAllowMulticolorSymbol = 0`/`tims = 0` even when the text button omits an explicit multicolor field. The `pDTb` class header also contains an `Atrb` string, which is normally empty, and its `VwBh` contains the standard `Name`, `Index`, `Super`, `Left`, `Top`, `Width`, `Height`, `Enabled`, and `Visible` properties. These are single-file defaults reconstructed from the more compact toolbar companion rather than user-authored toolbar fields.
+
+A toolbar item states `Enabled` only when the item is disabled; an enabled item states nothing.

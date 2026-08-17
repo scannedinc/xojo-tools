@@ -6,7 +6,11 @@ A project manifest is line-oriented UTF-8 text containing the project header, or
 
 ## File structure and parse rules
 
-A `.xojo_project` file is **line-oriented UTF-8 text, LF-terminated**, with no sections, no nesting, and no comments. Every line is `Key=Value`.
+A `.xojo_project` file is **line-oriented UTF-8 text**, with no sections, no nesting, and no comments. Every line is `Key=Value`.
+
+**Line separation is LF, CRLF, or CR.** LF is by far the most common, but all three occur in manifests the IDE itself writes. The convention is a property of an individual file, not of a project type or a format generation: a file uses one of the three throughout rather than mixing them, and re-saving a project does not reliably carry its convention across. A reader must therefore split on any of the three — universal newline handling — and must not assume LF. A writer is free to emit LF.
+
+**A final line terminator is normal but not guaranteed.** Manifests occur whose last line ends at end-of-file with no terminator, so a reader must treat the final line as a line. This is the same rule the companion formats follow — see [`.xojo_script`](xojo-script.md).
 
 Three line categories, in order: header, item references, settings.
 
@@ -27,12 +31,20 @@ OrigIDEVersion=20260201
 
 | Key | Meaning |
 |-----|---------|
-| `Type` | `Desktop`, `Console`, `Web2`, `iOS`, `Mobile` (Android). Binary `prTp` and XML `ProjectType` store the same choice as a number, pairing Desktop `0`, Console `1`, Web2 `3`, iOS `4`, Mobile `5` (`2` is unattested across all 446 example binaries) |
-| `RBProjectVersion` | Format version — "RB" is vestigial *REALbasic* |
+| `Type` | `Desktop`, `Console`, `Web`, `Web2`, `iOS`, `Mobile` (Android). Binary `prTp` and XML `ProjectType` store the same choice as a number, pairing Desktop `0`, Console `1`, web `3`, iOS `4`, Mobile `5`; the number `2` has no known meaning. Number `3` covers both `Web` and `Web2`, which a separate record tells apart — see [Web generations](#web-generations) |
+| `RBProjectVersion` | IDE that last saved it, in the same spelling as the Project block's `ProjectSavedInVers` — `2026.021` is 2026r2.1, `2025.03` is 2025r3. "RB" is vestigial *REALbasic*, and a `.rbvcp` manifest carries a Real Studio version here |
 | `MinIDEVersion` | Oldest IDE that can open it, `YYYYRRVV` |
-| `OrigIDEVersion` | IDE that created it (`20260201` = 2026r2.1) |
+| `OrigIDEVersion` | IDE that created it (`20260201` = 2026r2.1). May be absent, or present as `00000000` when the creating version is not recorded. A file written under a new name records the writing IDE here, because that write creates the project; a file written back over itself does not, so a project that never carried the field keeps `00000000` however often it is saved |
 
-Known `MinIDEVersion` values are Console `20070100`, iOS `20140300`, Android `20190200`, Web2 `20200200`, and Desktop `20210300`.
+Known `MinIDEVersion` values are Console `20070100`, Web `20110400`, iOS `20140300`, Android `20190200`, Web2 `20200200`, and Desktop `20210300`.
+
+### Web generations
+
+Project type `3` covers two generations of web project, so the number alone does not name the `Type` token. The generation is carried by a separate record in the project block: binary `Web2`, XML `WebVersion`. It is written with the value `1` in a `Web2` project and left out entirely in a `Web` project, so absence is the signal for the earlier generation. A reader that maps type `3` to `Web2` without consulting that record silently converts a `Web` project into a `Web2` one.
+
+The header version fields move with the generation, because the two generations belong to different eras of the IDE, but neither states it. `MinIDEVersion` records the oldest IDE that can open the file and `RBProjectVersion` names the IDE that last saved it. The `WebVersion` record is the field that names the generation, and it is the one to read.
+
+The two generations also differ in which build settings reach the manifest. A `Web` project states `WebLaunchString` and `WebDisconnectMessage`; a `Web2` project states neither and adds `WebHostingDomain`. The launch-string and disconnect-message records themselves are present in both generations' binary and XML forms; only the manifest key set differs.
 
 ### Project item rows
 
@@ -58,13 +70,21 @@ DesktopWindow=Main;UI/Main.xojo_window;&h0000000015DA9FFF;&h0000000031BB07FF;fal
 
 Do not split unrelated setting values merely because they contain semicolons. For example, `AppIcon=Project.xojo_resources;&h0` is a two-field setting, not an item row.
 
-### Encrypted classes
+### External items in binary form
 
-A class saved with encryption has a `.xojo_binary_code` companion instead of `.xojo_code`, and its item row is the one case where the trailing boolean is `true`. Across the example corpus, every `true` row has such a companion and every other row is `false`.
+An item made external with **Make External** is exported beside the project rather than inlined. The IDE offers two forms — `.xojo_binary_code` and `.xojo_xml_code` — and never `.xojo_code`. Dragging a `.xojo_code` file into the Navigator instead *copies* it into the project folder and references the copy, so a `.xojo_code` companion is always an ordinary internal item.
 
-The companion is its own `RbBF` container rather than tagged text: a 20-byte header of magic, format version `1`, two reserved integers, and the header size, followed by a single `Blok` whose block type and item ID match the manifest row, and closing with `EOF!`. This is the earlier container revision; the 28-byte version `2` header used by Xojo Binary Project adds two further fields. See [xojo-binary-project.md](xojo-binary-project.md).
+The binary form is its own `RbBF` container rather than tagged text: a 20-byte header of magic, format version `1`, two reserved integers, and the header size, followed by one or more `Blok` records and closing with `EOF!`. This is the earlier container revision; the 28-byte version `2` header used by Xojo Binary Project adds two further fields. See [xojo-binary-project.md](xojo-binary-project.md).
 
-The block's records are enciphered, so the class contents cannot be read, projected into another format, or round-tripped. A conversion cannot represent such an item and must say so rather than treating the file as damaged text.
+Three properties of this companion are easily assumed and are not guaranteed.
+
+**It may hold more than one block.** A single `.xojo_binary_code` file can carry several `pObj` blocks — one exporting a class hierarchy holds five, including a subclass of `TCPSocket`. A reader must not assume a single block. The XML form differs here: `.xojo_xml_code` carries exactly one.
+
+**It is not necessarily encrypted.** The extension does not imply encryption. A companion holding plaintext records is ordinary and common, with the `Strn` payloads yielding readable source. Encryption is signalled by the block flags word in the block header, where bits 0 and 1 both indicate an enciphered block. A reader should decode the container and treat it as unreadable only when those flags are set.
+
+**The trailing boolean does not mark encryption.** The final field of an item row is not an encryption flag; a row referencing such a companion carries `false` like any other.
+
+A `.xojo_binary_code` file may also contain **several concatenated documents**, each with its own `RbBF` signature and closing `EOF!` marker. In such a file the header-size field of the first document holds the header length as usual, while the documents that follow hold an absolute offset from the start of the file — that document's own start plus the header length. A reader that walks documents by signature rather than by header arithmetic will handle both forms.
 
 ### Item kinds
 
@@ -99,6 +119,15 @@ Folder=Extras;Extras;&h000000004B9BC7FF;&h0000000000000000;false
 Folder=iOSDesignExtensions;Extras/iOSDesignExtensions;&h000000000D697FFF;&h000000004B9BC7FF;false
 Module=UIKit;Extras/iOSDesignExtensions/UIKit.xojo_code;&h0000000048070FFF;&h000000000D697FFF;false
 ```
+
+A `Folder` name may itself contain `/`. The character is part of the item's name, not a separator between two items, but it does become a directory separator in the path field and on disk, so one such folder yields more than one level of nesting:
+
+```text
+Folder=UI;UI;&h000000007358DD00;&h0000000000000000;false
+Folder=Desktop/Tablet;UI/Desktop/Tablet;&h0000000035044FFF;&h000000007358DD00;false
+```
+
+Here a single project folder named `Desktop/Tablet` sits inside `UI` and its children are written under `UI/Desktop/Tablet/`. A reader must not infer the item hierarchy from the depth of the path field; `ParentID` is the authority. A writer must expand the name rather than escaping or substituting the `/`.
 
 A class, interface, or module whose parent is a `Module` is in that module's namespace. A nested class can also use a module as its parent:
 

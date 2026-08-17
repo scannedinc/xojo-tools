@@ -188,6 +188,17 @@ Constants encode their definition in tag metadata rather than a source declarati
 
 `Dynamic=True` marks a dynamic/localizable constant. Each `Instance` supplies a platform/language override. Strings use the metadata escape rules described in `shared-text-grammar.md`; do not parse these rows as ordinary CSV.
 
+The five opening fields always appear, in the order shown. A constant may then carry `CompatibilityFlags`, `Attributes`, and `Description`:
+
+```text
+#tag Constant, Name = kPrompt, Type = String, Dynamic = False, Default = \"", Scope = Private, Description = 5468652074657874207061737465642066726F6D207468652070757A7A6C6520706167652E0A
+#tag Constant, Name = kPaddingSize, Type = Double, Dynamic = False, Default = \"5", Scope = Private, Attributes = \"Hidden"
+```
+
+`Description` is the Inspector description as hexadecimal UTF-8, exactly as on a method or property. `Attributes` takes the metadata-escaped form rather than the declaration-line form, and an empty attribute list is spelled out in full as `Attributes = \""` instead of being omitted. `CompatibilityFlags` holds an ordinary compatibility expression.
+
+A constant carries no `Flags` field, because its stored flag mask holds two facts the header spells out separately. The low bits give the scope on the same scale as other members — `&h0` public, `&h1` protected, `&h21` private — and bit `&h40` marks the constant dynamic. A stored mask of `&h41` therefore describes the protected localizable constant whose header reads `Dynamic = True, Scope = Protected`.
+
 ## External methods and declares
 
 An IDE external method is a single Declare statement:
@@ -215,12 +226,21 @@ Scope is represented both by the flags and declaration keyword. The signature is
 ```text
 #tag Enum, Name = Comparison, Type = Integer, Flags = &h0
 	Less = -1
-	Equal
+	  Equal
 	Greater
 #tag EndEnum
 ```
 
-`Name`, underlying `Type`, and `Flags` are header metadata. Values are one per line; explicit assignments and implicit increments may be mixed. No separate scope keyword appears inside the body.
+The member list is laid out the way a method body is: the first and last members sit at the region's own depth and every member between them is indented two further spaces. A member carries no indentation of its own, so all of it comes from position — a two-member list gains nothing, and a three-member list indents only the middle one. Structures follow the same rule.
+
+`Name`, underlying `Type`, and `Flags` are header metadata. `Type` appears only when the enumeration stores an underlying type; where it does not, the field is left out rather than written with an implied default. An enumeration may also carry `Binary`, written as `Binary = True`, and `Description`, the Inspector description as hexadecimal UTF-8:
+
+```text
+#tag Enum, Name = CellKind, Type = Integer, Flags = &h0, Description = 486F7720612063656C6C2073746F726573206974732076616C75652E0A
+#tag Enum, Name = SearchDomains, Flags = &h0, Binary = True
+```
+
+Values are one per line; explicit assignments and implicit increments may be mixed. No separate scope keyword appears inside the body.
 
 ## Structures
 

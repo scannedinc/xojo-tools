@@ -42,6 +42,8 @@ One older variant writes the 12-byte `ICNS`, marker, and zero-length prefix and 
 
 Observed chunk codes are `ICN#`, `h8mk`, `ic07`, `ic08`, `ic09`, `ic10`, `ic1m`, `ich#`, `ich8`, `icl8`, `ics#`, `ics8`, `ih32`, `il32`, `is32`, `it32`, `jp2m`, `l8mk`, `s8mk`, `t8mk`, and `x8mk`. Some payloads begin with a PNG signature; others are legacy planar image data or masks. Chunk codes and payloads should remain opaque unless the corresponding Apple icon format is implemented deliberately.
 
+An element with no data is never written. A project may store one — a mask whose image was never supplied — and a resources file carries no zero-length element.
+
 ## RbBF icon groups
 
 An RbBF Project or FileType `Icon` group stores each resource chunk as an `elem` group containing an integer `type` and byte-string `data`. The integer is the big-endian four-character chunk code interpreted as an unsigned 32-bit value. Chunk order remains significant.
@@ -58,7 +60,7 @@ When a modern PNG chunk is copied from a sidecar into an RbBF icon group, observ
 
 The mask is added only when the selected sidecar segment does not already contain that mask code. `ic07` and `it32` are alternate 128-pixel representations and therefore share `t8mk`; do not add the same mask twice if both appear.
 
-Another valid RbBF representation expands the PNG into four bytes per pixel and stores a populated compatibility mask. This can make an otherwise equivalent binary project many megabytes larger. The repeated conversion behavior observed for PNG-bearing sidecars is preservation of the compressed PNG plus an empty mask; no rule has yet been established for when the IDE chooses the expanded representation. A converter should preserve either representation when binary is the input. When text is the input, preserving the sidecar's PNG payload and adding the empty mask is the evidence-backed default.
+Another valid RbBF representation expands the PNG into four bytes per pixel and stores a populated compatibility mask. This can make an otherwise equivalent binary project many megabytes larger. The ordinary form for a PNG-bearing sidecar is the compressed PNG plus an empty mask; what makes the IDE choose the expanded representation instead is not established. A converter should preserve either representation when binary is the input. When text is the input, the sidecar's PNG payload plus an empty mask is the safe default.
 
 ## References and editing guidance
 

@@ -95,7 +95,9 @@ Other examples use container/view root classes. Code may be under `WindowCode`, 
 
 ## iOS layouts and layout trees
 
-Both `IOSLayout` and `iOSLayout` spellings occur. A layout is not a control designer. It stores supported orientations and a nested navigation tree:
+Three tag spellings occur and they are not interchangeable. An item that subclasses `iosScreen` is tagged `IOSScreen`. Otherwise the tag follows the generation the item belongs to: the older layout generation writes `IOSLayout` and the screen generation writes `iOSLayout`. It is the same generation split the manifest states as `DefaultLayout`/`DefaultTabletLayout` against `DefaultScreen`/`DefaultTabletScreen`, so a project's manifest and its layout files always agree. The two layout spellings are otherwise identical in structure.
+
+A layout is not a control designer. It stores supported orientations and a nested navigation tree:
 
 ```text
 #tag IOSLayout
@@ -112,6 +114,34 @@ Both `IOSLayout` and `iOSLayout` spellings occur. A layout is not a control desi
 ```
 
 For a leaf, `Target` is normally the referenced screen's low 32-bit project ID pattern written as signed decimal. Eight top/container nodes instead use `-1` or `-2` as structural sentinels. A `-2` root represents a tab container; its first child target is also stored in the layout's `Tab_0_Content` property and the layout has an empty `Tabs` property. A `-1` root represents a split container; its first two child targets are also stored in `Left_Content` and `Right_Content`. Every layout additionally stores the root target in its `Content` property. `Icon` is zero or an image reference using the same signed-decimal convention. Nested `ScreenContent` nodes form tab/navigation hierarchies. Empty top nodes occur. Do not reorder nodes; their order is UI order.
+
+Indentation in this region is written with tabs. The orientation lines and a root `Begin ScreenContent`/`End ScreenContent` pair sit at one tab, and a node's `ItemName`, `Target`, and `Icon` lines sit one tab deeper than that node's own `Begin`. A nested node is not written at its parent's depth plus one tab: its `Begin` and `End` lines sit one tab deeper than the parent's property lines, so a second-level node opens and closes at three tabs and carries its fields at four. A nested `End ScreenContent` matches the indentation of its own `Begin`, not that of the enclosing node. A root holding two tab children is written as:
+
+```text
+#tag iOSLayout
+	OrientationPortrait = True
+	OrientationLandscapeLeft = True
+	OrientationLandscapeRight = True
+	OrientationPortraitUpsideDown = True
+	Begin ScreenContent
+		ItemName = 
+		Target = -2
+		Icon = 0
+			Begin ScreenContent
+				ItemName = Tab 0
+				Target = 1373085695
+				Icon = 0
+			End ScreenContent
+			Begin ScreenContent
+				ItemName = Tab 1
+				Target = 947228671
+				Icon = 0
+			End ScreenContent
+	End ScreenContent
+#tag EndiOSLayout
+```
+
+An empty `ItemName` keeps the separator and its trailing space. This tab-based scheme belongs to the layout tree alone. Designer regions such as `DesktopWindow`, `WebPage`, `WebContainerControl`, `MobileScreen`, `MobileContainer`, and `IOSContainerControl` indent with spaces instead: every line is written at three spaces per enclosing `Begin` block, whether it is a field or a further `Begin`, so a block's fields and its child blocks share one depth.
 
 Legacy `IOSScreen` files use the same orientation and `ScreenContent` grammar but a different outer tag/project item kind.
 
@@ -134,6 +164,8 @@ A Web session is an ordinary class inheriting `WebSession`, plus an unindented s
   LazyLoadDependencies=True
 #tag EndSession
 ```
+
+The region stands immediately after the `Inherits WebSession` line and before anything else the class holds, and it states all seven fields in the order shown whether or not the project has assigned them. The three message fields are written in lower case; the other four keep their Inspector spelling.
 
 The manifest kind is `WebSession`. Keep message text unquoted and to end of line; these entries do not use designer-string quoting.
 

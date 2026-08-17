@@ -1,6 +1,6 @@
 # `.xojo_code`
 
-`.xojo_code` is an umbrella extension. It stores ordinary language items, platform UI designs, Web session metadata, Worker metadata, and build automation. Determine the variant from its first outer tag, not from the filename.
+`.xojo_code` is an umbrella extension. It stores ordinary language items, platform UI designs, Web session metadata, Worker metadata, and build automation. Determine the variant from its first outer tag, not from the filename. Its counterpart in the legacy tagged-text generation is `.rbbas`, which uses the same regions with a smaller vocabulary; see [xojo-code-generations.md](xojo-code-generations.md).
 
 ## Variant routing
 
@@ -29,6 +29,7 @@ Class-like and UI variants reuse these regions:
 - `Event` for implemented event code;
 - `Hook` for an event definition;
 - `ExternalMethod`, `DelegateDeclaration`, `Enum`, `Structure`, `Note`;
+- `Using` for a namespace import, in current-generation files only;
 - `MenuHandler` for `Handles <menu>.Action` methods;
 - `ViewBehavior` for Inspector definitions.
 
@@ -41,3 +42,4 @@ UI files put code in `WindowCode` or `ScreenCode`, and put control event handler
 - Do not remove empty code regions. IDE output commonly includes an empty `WindowCode` or `ScreenCode` pair.
 - Preserve `ViewBehavior`, including inherited-looking entries and private `_m...` properties. It is IDE metadata, not redundant source code.
 - Preserve compatibility expressions and unknown tag metadata.
+- Do not modernize legacy spellings when editing a `.rbbas` file. Region kinds, member metadata fields, designer key names and value spellings are generation-specific; see [xojo-code-generations.md](xojo-code-generations.md).
