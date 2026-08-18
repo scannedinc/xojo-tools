@@ -31,7 +31,7 @@ python3 scripts/xojo_lint.py format --diff PATH
 python3 scripts/xojo_lint.py format PATH
 ```
 
-The formatter only changes serialization details it can identify safely: tag case and nesting, whitespace around manifest keys, missing minimum indentation inside source tags, and a missing line break at the end of a file. It does not reorder properties and does not rewrite Xojo expressions, identifiers, comments, or string literals. Never format a project the user has designated read-only.
+The formatter only changes serialization details it can identify safely: tag case and nesting, whitespace around manifest keys, missing minimum indentation inside source tags, and a missing line break at the end of a file -- except in `.xojo_script`, which Xojo writes both ways, so use `--final-newline add` to force one there. It does not reorder properties and does not rewrite Xojo expressions, identifiers, comments, or string literals, including the trailing whitespace of a manifest value. Never format a project the user has designated read-only.
 
 ## Reading the output
 

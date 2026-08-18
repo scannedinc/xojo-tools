@@ -18,7 +18,7 @@ import stat
 import struct
 import sys
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Iterator, Sequence
@@ -27,6 +27,7 @@ from helptext import HelpConfig, HelpfulParser, help_theme
 
 
 KNOWN_PROJECT_VERSION = Decimal("2026.021")
+KNOWN_PROJECT_TYPES = {"Console", "Desktop", "Mobile", "Web", "Web2", "iOS"}
 
 LINT_PROG = "python3 scripts/xojo_lint.py"
 LINT_COLOR_ENV = "XOJO_LINT_COLOR"
@@ -94,6 +95,7 @@ KNOWN_OPAQUE_EXTENSIONS = {
 TAGGED_EXTENSIONS = {
     ".xojo_code",
     ".xojo_color",
+    ".xojo_database_connection",
     ".xojo_filetypeset",
     ".xojo_image",
     ".xojo_menu",
@@ -118,9 +120,11 @@ EXPECTED_OUTER_TAGS = {
         "WebContainerControl",
         "WebPage",
         "WebStyle",
+        "iOSLaunchScreen",
         "iOSLayout",
     },
     ".xojo_color": {"ColorGroup"},
+    ".xojo_database_connection": {"DatabaseConnection"},
     ".xojo_filetypeset": {"FileTypeSet"},
     ".xojo_image": {"MultiImage"},
     ".xojo_menu": {"Menu"},
@@ -137,6 +141,7 @@ KNOWN_TAG_KINDS = {
     "CompatibilityFlags",
     "ComputedProperty",
     "Constant",
+    "DatabaseConnection",
     "DelegateDeclaration",
     "DesktopToolbar",
     "DesktopWindow",
@@ -184,6 +189,7 @@ KNOWN_TAG_KINDS = {
     "Window",
     "WindowCode",
     "Worker",
+    "iOSLaunchScreen",
     "iOSLayout",
 }
 
@@ -208,6 +214,7 @@ SOURCE_BODY_TAGS = {
 }
 DESIGNER_TAGS = {
     "BuildAutomation",
+    "DatabaseConnection",
     "DesktopToolbar",
     "DesktopWindow",
     "IOSContainerControl",
@@ -224,6 +231,7 @@ DESIGNER_TAGS = {
     "WebContainerControl",
     "WebPage",
     "Window",
+    "iOSLaunchScreen",
     "iOSLayout",
 }
 
@@ -282,7 +290,8 @@ class TagToken:
 @dataclass(frozen=True)
 class FormatOptions:
     line_ending: str = "preserve"
-    final_newline: str = "add"
+    # None defers to resolve_final_newline; an explicit choice applies as given.
+    final_newline: str | None = None
     source_indent: bool = True
 
 
@@ -356,7 +365,11 @@ def validate_common_text(path: Path, document: TextDocument) -> list[Diagnostic]
                     line=number,
                 )
             )
-    if document.text and not document.text.endswith(("\n", "\r")):
+    if (
+        document.text
+        and not document.text.endswith(("\n", "\r"))
+        and resolve_final_newline(path, None) == "add"
+    ):
         diagnostics.append(
             diagnostic(
                 path,
@@ -713,6 +726,20 @@ def validate_project(
         if required not in values:
             diagnostics.append(
                 diagnostic(path, "XJP005", f"missing required {required}= header")
+            )
+
+    if "Type" in values:
+        type_text, type_line = values["Type"][0]
+        if type_text not in KNOWN_PROJECT_TYPES:
+            choices = ", ".join(sorted(KNOWN_PROJECT_TYPES))
+            diagnostics.append(
+                diagnostic(
+                    path,
+                    "XJP104",
+                    f"unknown project type {type_text!r}; expected one of {choices}",
+                    line=type_line,
+                    severity="warning",
+                )
             )
 
     if "RBProjectVersion" in values:
@@ -1110,8 +1137,6 @@ def validate_file(
         diagnostics.extend(
             validate_tagged_text(path, document, warn_unknown=warn_unknown)
         )
-    elif extension == ".xojo_database_connection":
-        diagnostics.extend(validate_begin_blocks(path, document.text))
     return diagnostics
 
 
@@ -1154,13 +1179,21 @@ def source_minimum_indent(tag_stack: Sequence[str]) -> int | None:
 
 
 def format_manifest(text: str) -> str:
+    """Normalize whitespace around a manifest key, and nothing else.
+
+    A manifest value runs to end of line, so its trailing whitespace is part of
+    the value rather than serialization slack: the keys that carry any are
+    free text the user typed, such as `LongVersion` (the Inspector's Copyright)
+    and `DebuggerCommandLine`. `check` rejects a key needing this repair with
+    XJP002 before `format` may write the file, so this normally does nothing.
+    """
     formatted: list[str] = []
     for line in split_lines_keepends(text):
         body, ending = split_line_ending(line)
         if "=" in body:
             key, value = body.lstrip().split("=", 1)
             if KEY_RE.fullmatch(key.strip()):
-                body = f"{key.strip()}={value.rstrip()}"
+                body = f"{key.strip()}={value}"
         formatted.append(body + ending)
     return "".join(formatted)
 
@@ -1209,6 +1242,17 @@ def format_tagged_text(text: str, *, source_indent: bool) -> str:
     return "".join(formatted)
 
 
+def resolve_final_newline(path: Path, requested: str | None) -> str:
+    """Xojo writes `.xojo_script` both with and without a final line break,
+    and most observed scripts carry none, so the default leaves them as they
+    stand. Every other text format is written with one. An explicit
+    --final-newline still applies to all of them.
+    """
+    if requested is not None:
+        return requested
+    return "preserve" if extension_for(path) == ".xojo_script" else "add"
+
+
 def apply_line_policy(text: str, options: FormatOptions) -> str:
     if options.line_ending != "preserve":
         ending = "\n" if options.line_ending == "lf" else "\r\n"
@@ -1243,7 +1287,13 @@ def format_document(path: Path, document: TextDocument, options: FormatOptions) 
         text = format_manifest(text)
     elif extension in TAGGED_EXTENSIONS:
         text = format_tagged_text(text, source_indent=options.source_indent)
-    text = apply_line_policy(text, options)
+    text = apply_line_policy(
+        text,
+        replace(
+            options,
+            final_newline=resolve_final_newline(path, options.final_newline),
+        ),
+    )
     payload = text.encode("utf-8")
     return (b"\xef\xbb\xbf" if document.bom else b"") + payload
 
@@ -1504,9 +1554,9 @@ def build_parser() -> LintParser:
     formatter.add_argument(
         "--final-newline",
         choices=("preserve", "add", "remove"),
-        default="add",
-        help="final-newline policy (default: add a missing final line break; "
-        "preserve to skip)",
+        default=None,
+        help="final-newline policy (default: add a missing final line break, "
+        "except in .xojo_script, which Xojo writes both ways; preserve to skip)",
     )
     formatter.add_argument(
         "--no-source-indent",
