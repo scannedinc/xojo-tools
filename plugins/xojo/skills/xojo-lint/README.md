@@ -24,7 +24,7 @@ Unknown properties, keys, and tag kinds are accepted, so a newer IDE can extend 
 
 ## What `format` changes
 
-The formatter is deliberately conservative. It normalizes serializer tag case and nesting, preserves Xojo's special `#Tag Instance` spelling, repairs missing minimum source indentation, removes whitespace around manifest keys, and adds a missing line break at the end of a file (skip that with `--final-newline preserve`). It does not reorder properties and does not rewrite Xojo expressions, identifiers, comments, or string literals. Byte order marks and line endings are preserved unless you override them. Invalid files are never rewritten.
+The formatter is deliberately conservative. It normalizes serializer tag case and nesting, preserves Xojo's special `#Tag Instance` spelling, repairs missing minimum source indentation, removes whitespace around manifest keys, and adds a missing line break at the end of a file (skip that with `--final-newline preserve`). It leaves `.xojo_script` alone, since Xojo writes those with and without a final line break; `--final-newline add` forces one. It does not reorder properties and does not rewrite Xojo expressions, identifiers, comments, or string literals -- a manifest value runs to end of line, so its trailing whitespace is kept. Byte order marks and line endings are preserved unless you override them. Invalid files are never rewritten.
 
 ## As a pre-commit hook
 

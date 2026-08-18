@@ -20,6 +20,29 @@ import xojo_lint
 
 SCRIPTS = Path(__file__).resolve().parent
 
+# A SQLite connection as the IDE writes one: the format version token after the
+# region kind, the unindented top-level fields, and one tab inside each set.
+DATABASE_CONNECTION = (
+    "#tag DatabaseConnection 1\n"
+    "AutoConnect = False\n"
+    "Stage = 0\n"
+    "ImplicitInstance = True\n"
+    "Begin ConnectionSet\n"
+    "\tEncryptionKey = \n"
+    "\tFullPath = \n"
+    "\tMetaData = \n"
+    "\tName = Development\n"
+    "\tLoadExtensions = False\n"
+    "\tThreadYieldInterval = 0\n"
+    "\tTimeout = 10\n"
+    "\tWriteAheadLogging = False\n"
+    "End\n"
+    "Begin ConnectionSet\n"
+    "\tName = Final\n"
+    "End\n"
+    "#tag EndDatabaseConnection\n"
+)
+
 
 class XojoLintTests(unittest.TestCase):
     def validate(
@@ -212,6 +235,85 @@ class XojoLintTests(unittest.TestCase):
             )
             self.assertEqual(self.validate(path), [])
 
+    def test_database_connection_regions_and_sets_are_checked(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            good = root / "Inventory.xojo_database_connection"
+            good.write_text(DATABASE_CONNECTION, encoding="utf-8")
+            self.assertEqual(self.validate(good, warn_unknown=True), [])
+
+            unclosed_region = root / "Region.xojo_database_connection"
+            unclosed_region.write_text(
+                DATABASE_CONNECTION.replace("#tag EndDatabaseConnection\n", ""),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                [item.code for item in self.validate(unclosed_region)], ["XJT004"]
+            )
+
+            unclosed_set = root / "Set.xojo_database_connection"
+            unclosed_set.write_text(
+                DATABASE_CONNECTION.replace("\tName = Final\nEnd\n", "\tName = Final\n"),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                [item.code for item in self.validate(unclosed_set)], ["XJB004"]
+            )
+
+            wrong_region = root / "Wrong.xojo_database_connection"
+            wrong_region.write_text(
+                DATABASE_CONNECTION.replace("DatabaseConnection", "Class"),
+                encoding="utf-8",
+            )
+            diagnostics = self.validate(wrong_region)
+            self.assertEqual([item.code for item in diagnostics], ["XJT102"])
+            self.assertEqual(diagnostics[0].severity, "warning")
+
+    def test_formatter_leaves_a_database_connection_byte_for_byte(self) -> None:
+        raw = DATABASE_CONNECTION.encode("utf-8")
+        document = xojo_lint.TextDocument(DATABASE_CONNECTION, False, raw)
+        path = Path("Inventory.xojo_database_connection")
+        formatted = xojo_lint.format_document(
+            path, document, xojo_lint.FormatOptions()
+        )
+        # The `1` after the region kind is the format version, not metadata the
+        # formatter may drop.
+        self.assertIn(b"#tag DatabaseConnection 1\n", formatted)
+        self.assertEqual(formatted, raw)
+
+    def test_lowercase_ios_launch_screen_is_a_known_spelling(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "LaunchScreen.xojo_code"
+            path.write_text(
+                "#tag iOSLaunchScreen\n"
+                "Begin iosView LaunchScreen\n"
+                "   Begin iOSLabel Title\n"
+                "   End\n"
+                "End\n"
+                "#tag EndiOSLaunchScreen\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(self.validate(path, warn_unknown=True), [])
+
+    def test_unknown_project_type_warns_without_failing(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            web2 = root / "Web2.xojo_project"
+            web2.write_text(
+                "Type=Web2\nRBProjectVersion=2026.021\n", encoding="utf-8"
+            )
+            self.assertEqual(self.validate(web2), [])
+
+            unknown = root / "Future.xojo_project"
+            unknown.write_text(
+                "Type=Frobnicate\nRBProjectVersion=2026.021\n", encoding="utf-8"
+            )
+            diagnostics = self.validate(unknown)
+            self.assertEqual([item.code for item in diagnostics], ["XJP104"])
+            self.assertEqual(diagnostics[0].severity, "warning")
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(xojo_lint.main(["check", str(unknown)]), 0)
+
     def test_uistate_accepts_an_integer_record(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "State.xojo_uistate"
@@ -305,6 +407,49 @@ class XojoLintTests(unittest.TestCase):
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 self.assertEqual(xojo_lint.main(["format", "--check", str(empty)]), 0)
             self.assertEqual(empty.read_bytes(), b"")
+
+    def test_scripts_keep_their_missing_final_newline_unless_forced(self) -> None:
+        # Most IDE-written .xojo_script files carry no final line break, so the
+        # default must not fight the IDE; an explicit flag still applies.
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "Build.xojo_script"
+            source = b'print "***DONE***"'
+            path.write_bytes(source)
+
+            # The notice must not promise a repair the formatter will not make.
+            self.assertEqual(self.validate(path), [])
+
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(xojo_lint.main(["format", "--check", str(path)]), 0)
+                self.assertEqual(xojo_lint.main(["format", str(path)]), 0)
+            self.assertEqual(path.read_bytes(), source)
+
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    xojo_lint.main(
+                        ["format", "--final-newline", "add", str(path)]
+                    ),
+                    0,
+                )
+            self.assertEqual(path.read_bytes(), source + b"\n")
+
+    def test_manifest_values_keep_their_trailing_whitespace(self) -> None:
+        # A manifest value runs to end of line, so the space a user typed into
+        # the Inspector's Copyright field is data, not serialization slack.
+        source = (
+            "Type=Desktop\n"
+            "RBProjectVersion=2026.021\n"
+            "LongVersion=Example Inc. 2026 - \n"
+            "DebuggerCommandLine=/tmp/Sample.xojo_binary_project \n"
+        )
+        self.assertEqual(xojo_lint.format_manifest(source), source)
+        document = xojo_lint.TextDocument(source, False, source.encode("utf-8"))
+        self.assertEqual(
+            xojo_lint.format_document(
+                Path("Example.xojo_project"), document, xojo_lint.FormatOptions()
+            ),
+            source.encode("utf-8"),
+        )
 
     def test_formatter_splits_only_on_real_line_endings(self) -> None:
         # str.splitlines would split on the form feed and U+2028 inside the
