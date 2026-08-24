@@ -21,9 +21,29 @@ End
 #tag EndDesktopToolbar
 ```
 
-A toolbar region is indented with tabs, not spaces, in both generations. `Inherits` is the exception to the nesting: it belongs to the root block but is written at zero indentation, where the root's own properties sit at one tab. A legacy `Toolbar` root states no `Inherits` line at all.
+A toolbar region is indented with tabs, not spaces, in both generations. `Inherits` is the exception to the nesting: it belongs to the root block but is written at zero indentation, where the root's own properties sit at one tab. Where it is present it names the root's own class. A `DesktopToolbar` root always states it; a legacy `Toolbar` root may state it or omit it, and both occur.
 
-Toolbar regions do not order their properties the way other designer families do, and no ordering rule is established for them beyond `Enabled` following `Caption` on a button that states it.
+`Style` is a root field of a `DesktopToolbar` only, and it is optional there. A legacy `Toolbar` root states no properties of its own.
+
+## Button classes
+
+Three button classes occur, and the class decides both the vocabulary and the field set. The class is not implied by the root: a legacy `Toolbar` root may hold `ToolbarButton` children, which state the current spellings.
+
+| Class | Always states | May state | Never states |
+| --- | --- | --- | --- |
+| `ToolButton` | `Caption`, `HelpTag`, `Style` | `Icon`, `Pushed` | `Symbol`, `Tooltip`, `ButtonStyle` |
+| `ToolbarButton` | `Caption`, `Tooltip`, `ButtonStyle` | `Symbol` | `HelpTag`, `Style` |
+| `DesktopToolbarButton` | `Caption`, `Tooltip`, `ButtonStyle` | `Symbol`, `Icon`, `Enabled` | `HelpTag`, `Style` |
+
+`HelpTag`/`Tooltip` and `Style`/`ButtonStyle` are the same two properties under their older and current names, and a block states one spelling of each, never both.
+
+## Field order
+
+A button states its fields in one fixed order, and the two renamed pairs occupy the position of their counterpart rather than one of their own:
+
+`Caption`, `Enabled`, `HelpTag` or `Tooltip`, `Style` or `ButtonStyle`, `Symbol`, `Pushed`, `Icon`
+
+The order holds in both generations. A field the block does not state is skipped without disturbing the order of the rest, so this is not the case-insensitive name ordering other designer families use — it is a fixed sequence, and sorting a toolbar button's fields by name produces a file the format does not write.
 
 Observed button fields are `Caption`, `Tooltip`, `ButtonStyle`, `Symbol`, optional `Enabled`, and `Icon`. `Icon` is the referenced image's low 32-bit project ID pattern written as signed decimal. For example, image ID `&h000000000C2ABFFF` becomes `204128255`; a value with bit 31 set is negative. It is not an image-array index. See the conversion rule in [xojo-project.md](xojo-project.md#ids-and-cross-references).
 

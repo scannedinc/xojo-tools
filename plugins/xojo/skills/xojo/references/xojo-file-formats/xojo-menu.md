@@ -51,6 +51,8 @@ A menu item is written in one of two forms, and the property set and the field o
 
 The legacy order is an exception to the property ordering other designer families follow, so a writer must not sort a legacy menu item's fields by name. Neither the item's class name nor its `AutoEnable` value identifies the generation on its own: `MenuItem` rather than `DesktopMenuItem` still occurs with the current layout. The pair of properties and the field order decide it together. Because RbBF stores one `maEn` record for both spellings, the generation is not recoverable from a binary project alone.
 
+A transitional variant of the current form additionally states `Value` between `SpecialMenu` and `Index`, spelled identically to the item's `Text` — the older name of the caption beside the newer one, the way `AutoEnabled` stands beside `AutoEnable`. A file that uses it does so on every item. XML and RbBF store a single caption, so the variant, like the generations above, is not recoverable from the other forms.
+
 ## Text, localization, and separators
 
 Ampersands in menu text define platform mnemonic behavior where supported. Localized values can be dynamic constant references such as `Text = "#App.kFileMenu"`. A separator is represented by an ordinary item whose `Text` is `"-"`; keep the IDE-emitted class and remaining properties.

@@ -112,6 +112,8 @@ Value spellings inside `Begin`/`End` blocks changed in four ways. Legacy spellin
 | Unset object reference | `""` — for example `Backdrop = ""`, `MenuBar = ""` | `0` |
 | Unset boolean or number | `""` | The typed default, such as `False`, `0` or `0.0` |
 
+A stored real may carry an exponent marker with no exponent after it — `0.0e+`, a mantissa followed by `e+` and nothing else. It is read as the mantissa alone, so a project holding it states `0.0` once written to tagged text; the truncated form belongs to the stored representation and is not a value the text format carries.
+
 The empty-string convention is the largest single source of difference between the two generations, because the legacy generation uses one spelling — `""` — for the unset state of every property type, while the current generation writes a value of the property's own type. Do not translate a legacy `""` to a current-generation `""` without knowing the property's type.
 
 Quoting of designer values is not uniform in either generation, and it is not a reliable generation signal. Integers, booleans and floating-point numbers occur both bare and quoted; quoted forms are more frequent in the current generation. Preserve the quoting an existing file uses rather than normalizing it.

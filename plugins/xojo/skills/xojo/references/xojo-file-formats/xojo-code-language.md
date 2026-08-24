@@ -14,7 +14,7 @@ End Class
 #tag EndClass
 ```
 
-The declaration carries the type access (`Public`, `Protected`, `Private`, or omitted), name, optional language attributes, base class and implemented interfaces. `Inherits` and `Implements` are separate source lines immediately after the declaration. Multiple spaces are possible (`Implements  Iterable`).
+The declaration carries the type access (`Public`, `Protected`, `Private`, or omitted), name, optional language attributes, base class and implemented interfaces. `Inherits` and `Implements` are separate source lines immediately after the declaration. Multiple spaces are possible (`Implements  Iterable`): the stored interface string is kept verbatim and may begin with its own space — the XML form holds ` Iterable` where the text states `Implements  Iterable` — so a writer emits `Implements ` followed by the stored string, and a reader must not strip the stored string's leading whitespace.
 
 Attributes precede the declaration on the same line:
 

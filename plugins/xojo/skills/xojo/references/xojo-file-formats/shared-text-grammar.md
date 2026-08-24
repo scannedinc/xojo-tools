@@ -2,6 +2,8 @@
 
 Most Xojo project companions are line-oriented text assembled from two simple containers: `#tag` regions and `Begin`/`End` object blocks. This document covers the syntax shared by `.xojo_code`, `.xojo_window`, `.xojo_menu`, `.xojo_report`, `.xojo_toolbar`, `.xojo_image`, `.xojo_color`, and `.xojo_filetypeset`. The same two containers are used by the legacy tagged-text generation — `.rbbas`, `.rbfrm`, `.rbmnu`, `.rbtbar` and `.rbres` — whose region kinds, metadata fields and value spellings differ in the ways described in [xojo-code-generations.md](xojo-code-generations.md).
 
+A file's lines end in any one of the three conventions — line feed, carriage return plus line feed, or bare carriage return — and one project may hold files of all three. Re-saving, including Save As, keeps each file's own convention rather than converting it. A parser must accept all three, and a writer that reproduces a file byte for byte must keep the file's convention rather than normalize it.
+
 ## `#tag` regions
 
 A region starts with `#tag KIND`, may carry comma-separated metadata, and ends with the matching `#tag EndKIND`:
@@ -30,6 +32,8 @@ Blank lines inside a code region are structural. A code region — the body of `
 - two blank lines wherever the run changes.
 
 Stored properties and computed properties form a single run, and so do methods, external methods and delegate declarations. Every other item kind is a run of its own: implemented events, event definitions, menu handlers, constants, enumerations, structures, notes, and `#tag Using`. A closing `#tag ViewBehavior` counts as one more run, so two blank lines separate it from the item above it and none precede it when it is the region's only content.
+
+A language item need not carry a `#tag ViewBehavior` region at all, and its absence is a property of the file rather than of the item: a class, module, interface or designer may state one or state nothing. The run break survives the region either way. A class that holds item regions and states no `ViewBehavior` still closes on the two blank lines that would have separated the last run from it, so `End Class` follows two empty lines; a class that holds no item regions closes immediately, with none. A reader must not treat the missing region as an error, and a writer must not add one, because the binary and XML forms carry an Inspector schema on every such item whether or not the text stated it — their having one is no evidence that the text did.
 
 `#tag Class`, `#tag Module` and `#tag Interface` close immediately after their last region: no blank line stands between it and `End Class`, `End Module` or `End Interface`. A designer's `#tag WindowCode` or `#tag ScreenCode` instead closes on two blank lines when it holds any item region, and closes immediately when it is empty.
 
@@ -87,13 +91,19 @@ A `Begin` block lists its properties in one order, case-insensitive by name with
 
 The property is never written with an empty value where it would carry a constraint: a control with no constraints states no `AutoLayout` line at all.
 
-Report bands and their controls follow the same order. Toolbar regions are a separate family that does not, and are described with the toolbar format.
+Report bands and their controls follow the same order. Toolbar regions are a separate family that does not: a toolbar button states its fields in a fixed sequence rather than by name, described with [the toolbar format](xojo-toolbar.md).
 
 ### The declared type decides a value's form
 
 A designer property's declared type, not its value and not its name, decides how the value is written.
 
-- A property declared `String` is quoted; one declared anything else is bare. The same property name therefore appears both ways: one control states `TabPanelIndex = 0` and another `TabPanelIndex = "0"`, and both are correct for the control that carries them.
+- A property declared `String` is quoted; one declared anything else is bare.
+
+A value that is quoted where its declared type is not a string is written by a producer that could not see the type. The declared type is stated in a binary project and in an XML one, and nowhere in tagged text: a producer rewriting tagged text has only the property name to go on, and quotes the value when it cannot place it — which happens most readily on a legacy class whose properties are no longer current. The same project written from its binary form, where the type is legible, states the value bare.
+
+`Window.LiveResize` shows the whole of it. Every binary that carries the property declares it `Boolean`, and tagged text written from a binary states `LiveResize = False`. Tagged text rewritten from tagged text states `LiveResize = "False"` — the same property, the same value, and a form its own type does not admit.
+
+So the two forms are not equally correct, and the quoted one is not a variant to reproduce. A reader must accept both. A writer states the value by the declared type where it has one, and by what it knows of the property otherwise; it does not copy a quoted form onto a property that is not a string.
 - A property declared `Color` is written as a `&c` literal, so a stored `0` becomes `&c00000000`. A property declared `ColorGroup` holds a reference rather than a color: a plain number in one is an index and stays as it stands, while a `&h` or `&c` literal it may also hold keeps the `&c` form. `TextColor = 0` and `ColorOff = 0` are both ordinary, and neither can be told from the other by name.
 - A property whose declared type is an enumeration, written `Class.Members`, is stated as the enumeration's zero rather than as an empty string when the item stores no value for it.
 
@@ -147,12 +157,12 @@ Observed scalar spellings include:
 | Kind | Examples | Notes |
 | --- | --- | --- |
 | Boolean | `True`, `False`, `true`, `false` | Casing varies by subformat. |
-| Decimal integer | `0`, `-2147483648`, `726177791` | Designer references use signed 32-bit decimal representations. |
+| Decimal integer | `0`, `-2147483648`, `726177791` | Designer references use signed 32-bit decimal representations. A 32-bit value may also be stated in its unsigned spelling: `Index = 2147483648` occurs where the sentinel is elsewhere spelled `-2147483648`, both naming the bit pattern `0x80000000`, and re-saving keeps the stated spelling. |
 | Hex integer/bitmask | `&h21`, `&h00000000548D0FFF` | Xojo notation. Width is significant for project IDs. |
 | Floating point | `50.00`, `+1.00`, `0.3800000000000000044409`, `3.99e+2` | Do not shorten designer values merely for aesthetics. Exponent notation occurs in legacy-generation designer files; current-generation files write plain decimals only. |
 | String | `"Save"`, `""` | Designer strings are quoted. |
 | Empty | `BackgroundColor =`, `Backdrop = ""` | Empty is distinct from absent. Legacy-generation designer files write `""` for the unset state of an object reference, boolean or number, where current-generation files write a typed default such as `0` or `False`. |
-| Color | `&cRRGGBBAA`, `LabelColor`, `0` | In `&c` notation the last byte is transparency; `00` is opaque. A color value is never quoted. Where a property references a color group rather than holding a color, the value is the group's name or its index written plainly, so `TextColor = LabelColor` and `TextColor = 0` are both ordinary. Legacy-generation designer files also spell a color as `&hRRGGBB`, as a plain decimal integer, or as a quoted `"&cRRGGBB"`. |
+| Color | `&cRRGGBBAA`, `&cRRGGBB`, `LabelColor`, `0` | In `&c` notation the last byte is transparency; `00` is opaque. The six-digit form omits the transparency byte and denotes the same value as the eight-digit form ending `00`; both occur in current IDE output, and re-saving keeps the stated spelling. A color value is never quoted. Where a property references a color group rather than holding a color, the value is the group's name or its index written plainly, so `TextColor = LabelColor` and `TextColor = 0` are both ordinary. Legacy-generation designer files also spell a color as `&hRRGGBB`, as a plain decimal integer, or as a quoted `"&cRRGGBB"`. |
 | Reference | `Icon = 204128255` | Usually the low 32-bit project ID pattern rendered as signed decimal. |
 
 Designer strings use backslash escapes such as `\n`. Constant metadata uses a different serialization: a string starts with `\"` and ends with `"`, with delimiter-sensitive bytes escaped as `\xNN` (for example comma `\x2C` and equals `\x3D`). Large JavaScript constants demonstrate byte escapes such as `\xC2\xA0`. Preserve unknown escapes byte-for-byte.

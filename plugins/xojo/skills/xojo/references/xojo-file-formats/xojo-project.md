@@ -84,7 +84,7 @@ Three properties of this companion are easily assumed and are not guaranteed.
 
 **The trailing boolean does not mark encryption.** The final field of an item row is not an encryption flag; a row referencing such a companion carries `false` like any other.
 
-A `.xojo_binary_code` file may also contain **several concatenated documents**, each with its own `RbBF` signature and closing `EOF!` marker. In such a file the header-size field of the first document holds the header length as usual, while the documents that follow hold an absolute offset from the start of the file — that document's own start plus the header length. A reader that walks documents by signature rather than by header arithmetic will handle both forms.
+A `.xojo_binary_code` file may also contain **several concatenated documents**, each with its own `RbBF` signature and closing `EOF!` marker. In such a file the header-size field of the first document holds the header length as usual, while the documents that follow hold an absolute offset from the start of the file — that document's own start plus the header length. A reader that walks documents by signature rather than by header arithmetic will handle both forms. The concatenated documents may serialize the same blocks repeatedly — the same block identifiers and record contents, differing only in each document's own group-identifier sequence — so a reader must not assume each document contributes distinct items.
 
 ### Item kinds
 

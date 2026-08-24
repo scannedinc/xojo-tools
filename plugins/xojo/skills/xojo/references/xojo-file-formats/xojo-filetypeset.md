@@ -38,7 +38,9 @@ A project can contain multiple file type groups. Each `FileTypeSet` row in the m
 
 The project-wide XML `Project` block and RbBF `Proj` block also permit `FileType`/`fTyp` records, but this is a separate legacy duplication rather than the representation of file type groups. Across the paired IDE files, those project-wide records occur only for a group named exactly `FileTypes`; differently named groups remain fully represented by their own `FileTypes`/`pFTy` blocks and are not copied into `Project`/`Proj`. The three-group project described above consequently has ten definitions in its three group blocks and none in its project block.
 
-`MacCreator` and `MacType` are legacy four-byte codes. Tagged text omits trailing spaces, so a value such as `MacType=BMP` becomes `BMP ` in XML and RbBF. Empty values remain empty; nonempty values shorter than four bytes are padded on the right when converted to either single-file format.
+`MacCreator` and `MacType` are legacy four-byte codes. Tagged text states either spelling of a code whose fourth byte is a space — `MacType=ZIP ` with the literal trailing space and `MacType=ZIP` without it both occur in authentic files, and re-saving preserves whichever spelling a file holds. XML and RbBF retain the four-byte field width, so a value shorter than four bytes is padded on the right with spaces when converted to either single-file format; empty values remain empty. A converter writing tagged text must reproduce the stated spelling rather than normalize toward either form.
+
+Tagged text also states a subset of the keys per file type: an older set omits the Uniform Type Identifier keys (`UTI`, `UTIConformsTo`, `UTIPhysicalType`, `Imported`, `HandlerRank`) and may omit `Description` and `MimeType`. A reader must not require the full key set, and a converter that preserves rather than migrates must not add keys a file type did not state.
 
 Observed `Flags` are `&h0`, `&h1`, `&h2`, `&h5`, and `&h9`; observed `HandlerRank` values are `&h5`, `&h9`, and `&h11`. Not every bit or rank is assigned. Both `Imported=True` and `Imported=False` occur (with casing varying in older files).
 
