@@ -70,7 +70,11 @@ End
 #tag EndScreenCode
 ```
 
-Controls use `Mobile...`, `Android...`, custom, or inherited classes. Repeated `AutoLayout` rows store constraints. Each row is a comma-separated positional tuple containing source control/attribute, target control/attribute, relation, multiplier, priority/strength, constant, optional expression, and active flag. The precise numeric enum mapping is not fully established; clone and modify an IDE-produced constraint rather than constructing tuples from guessed numbers.
+Controls use `Mobile...`, `Android...`, custom, or inherited classes. Repeated `AutoLayout` rows store constraints. Each row is a comma-separated positional tuple: first item, first attribute, second item, second attribute, locked flag, multiplier (`+1.00` form), priority code, relation code, offset (a number or a symbolic expression such as `-*kStdControlGapV`), constraint name, and active flag. A row reads `AutoLayout = Label2, 11, Label1, 11, False, +1.00, 4, 1, 0, , True`.
+
+The attribute codes follow `iOSLayoutConstraint.AttributeTypes` in declaration order: `0` None, `1` Left, `2` Right, `3` Top, `4` Bottom, `5` Leading, `6` Trailing, `7` Width, `8` Height, `9` CenterX, `10` CenterY, `11` Baseline. The second item may name a control, the enclosing view (`<Parent>`), or a layout guide (`TopLayoutGuide`, `BottomLayoutGuide`). A width or height constraint (first attribute `7` or `8`) states an empty second item with attribute `0`. On any other attribute, an empty second item denotes the enclosing view, and a load writes it back as `<Parent>` with the second attribute mirroring the first.
+
+Attribute `11` (Baseline) survives a text load and is stored by a binary save, but a binary *load* rewrites it to `10` (CenterY) on both ends of the constraint, for every control class; Baseline alignment therefore does not survive a binary save-and-reopen cycle. The relation and priority codes' full numeric mappings are not established (`1` is the equal relation); clone an IDE-produced row rather than constructing those fields from guessed numbers.
 
 ## Mobile containers
 
